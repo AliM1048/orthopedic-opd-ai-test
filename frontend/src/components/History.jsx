@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import Swal from "sweetalert2";
 
 const API_BASE = 'http://localhost:8000';
 
@@ -38,12 +39,27 @@ export default function History({ refreshTrigger }) {
   }, [refreshTrigger]);
 
   const handleClear = async () => {
-    if (!window.confirm('Clear all transcription history?')) return;
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'Clear all transcription history?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, clear it!'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       await axios.delete(`${API_BASE}/history`);
       setItems([]);
     } catch {
-      alert('Failed to clear history.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Oops...',
+        text: 'Failed to clear history.'
+      });
     }
   };
 
@@ -90,6 +106,8 @@ export default function History({ refreshTrigger }) {
                 <p className={`history-text ${isArabic ? 'arabic' : ''}`}>{item.text}</p>
                 <div className="history-meta">
                   <span className="history-meta-tag lang">{lang.name}</span>
+                  <span className="history-meta-tag">·</span>
+                  <span className="history-meta-tag">👤 {item.speaker_id || 'Unknown'}</span>
                   <span className="history-meta-tag">·</span>
                   <span className="history-meta-tag">{formatTime(item.timestamp)}</span>
                   {item.duration_seconds > 0 && (

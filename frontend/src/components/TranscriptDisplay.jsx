@@ -19,8 +19,11 @@ export default function TranscriptDisplay({ transcript, isProcessing }) {
         {transcript && (
           <div style={{ display: 'flex', gap: 8 }}>
             <span className="lang-tag">
-              <span>{LANG_INFO[transcript.language]?.flag}</span>
-              {LANG_INFO[transcript.language]?.name}
+              <span>{LANG_INFO[transcript.language]?.flag || '🌐'}</span>
+              {LANG_INFO[transcript.language]?.name || transcript.language_name || 'Unknown'}
+            </span>
+            <span className="speaker-tag">
+              👤 {transcript.speaker_id || 'Unknown'}
             </span>
             <button
               className={`copy-btn ${copied ? 'copied' : ''}`}

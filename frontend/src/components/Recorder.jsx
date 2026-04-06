@@ -6,9 +6,9 @@ function formatTimer(seconds) {
   return `${m}:${s}`;
 }
 
-export default function Recorder({ language, onTranscriptReceived, onError }) {
+export default function Recorder({ onTranscriptReceived, onError }) {
   const { isRecording, isProcessing, elapsedSeconds, startRecording, stopRecording } =
-    useRecorder({ language, onTranscriptReceived, onError });
+    useRecorder({ onTranscriptReceived, onError });
 
   const handleClick = () => {
     if (isRecording) stopRecording();

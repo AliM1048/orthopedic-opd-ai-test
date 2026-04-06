@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_BASE = 'http://localhost:8000';
 
-export function useRecorder({ language, onTranscriptReceived, onError }) {
+export function useRecorder({ onTranscriptReceived, onError }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -47,7 +47,7 @@ export function useRecorder({ language, onTranscriptReceived, onError }) {
     } catch (err) {
       onError('Microphone access denied. Please allow mic permissions.');
     }
-  }, [language]);
+  }, []);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -63,7 +63,7 @@ export function useRecorder({ language, onTranscriptReceived, onError }) {
       const ext = mimeType.includes('ogg') ? '.ogg' : '.webm';
       const formData = new FormData();
       formData.append('audio', blob, `recording${ext}`);
-      formData.append('language', language);
+      // No language sent, let backend detect
 
       const res = await axios.post(`${API_BASE}/transcribe`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
