@@ -164,6 +164,29 @@ export default function History({ refreshTrigger }) {
     }
   };
 
+  const handleDelete = async (itemId, e) => {
+    e.stopPropagation();
+
+    const result = await Swal.fire({
+      title: 'Delete this transcription?',
+      text: 'This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await axios.delete(`${API_BASE}/history/${itemId}`);
+      setItems(prev => prev.filter(item => item.id !== itemId));
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Oops...', text: 'Failed to delete transcription.' });
+    }
+  };
+
   const handleClearSpeakers = async () => {
     const result = await Swal.fire({
       title: 'Reset Speakers?',
@@ -280,6 +303,26 @@ export default function History({ refreshTrigger }) {
                         }}
                       >
                         {isPlaying ? '⏹️' : '▶️'} {isPlaying ? 'Stop' : 'Play'}
+                      </button>
+                      <button
+                        className="delete-btn"
+                        onClick={(e) => handleDelete(item.id, e)}
+                        title="Delete transcription"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          opacity: 0.6,
+                        }}
+                      >
+                        🗑
                       </button>
                     </>
                   )}

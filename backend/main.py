@@ -315,6 +315,23 @@ def clear_history():
     return JSONResponse(content={"deleted": result.deleted_count})
 
 
+@app.delete("/history/{item_id}")
+def delete_transcription(item_id: str):
+    """Delete a single transcription and its audio file."""
+    doc = collection.find_one({"id": item_id})
+    if not doc:
+        return JSONResponse(status_code=404, content={"error": "Transcription not found"})
+
+    audio_file = doc.get("audio_filename")
+    if audio_file:
+        file_path = AUDIO_DIR / audio_file
+        if file_path.exists():
+            file_path.unlink()
+
+    collection.delete_one({"id": item_id})
+    return JSONResponse(content={"deleted": 1, "id": item_id})
+
+
 @app.get("/speakers")
 def get_speakers():
     """List all registered speakers (without raw embeddings)."""
