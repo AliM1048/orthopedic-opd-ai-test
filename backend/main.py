@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import whisper
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -39,6 +39,10 @@ client = MongoClient(MONGO_URI)
 db = client["whisper_db"]
 collection = db["transcriptions"]
 speakers_collection = db["speakers"]
+
+# Audio storage directory
+AUDIO_DIR = Path("audio")
+AUDIO_DIR.mkdir(exist_ok=True)
 
 # ──────────────────────────────────────────────
 # Load models once at startup
@@ -225,6 +229,13 @@ async def transcribe(
         tmp.write(content)
         tmp_path = tmp.name
 
+    # Save original audio file
+    audio_id = str(uuid.uuid4())
+    audio_filename = f"{audio_id}{suffix}"
+    audio_path = AUDIO_DIR / audio_filename
+    with open(audio_path, "wb") as f:
+        f.write(content)
+
     wav_path = None
     try:
         # ── Step 1: Whisper transcription ──────────────────────────────
@@ -265,6 +276,7 @@ async def transcribe(
                 result.get("segments", [{}])[-1].get("end", 0)
                 if result.get("segments") else 0
             ),
+            "audio_filename": audio_filename,
         }
 
         collection.insert_one(doc)
@@ -287,7 +299,18 @@ def get_history(limit: int = 50):
 
 @app.delete("/history")
 def clear_history():
-    """Delete all transcriptions."""
+    """Delete all transcriptions and their audio files."""
+    # Get all audio filenames before deleting
+    docs = list(collection.find({}, {"audio_filename": 1}))
+    audio_files = [doc.get("audio_filename") for doc in docs if doc.get("audio_filename")]
+
+    # Delete audio files
+    for filename in audio_files:
+        file_path = AUDIO_DIR / filename
+        if file_path.exists():
+            file_path.unlink()
+
+    # Delete transcriptions
     result = collection.delete_many({})
     return JSONResponse(content={"deleted": result.deleted_count})
 
@@ -307,3 +330,17 @@ def clear_speakers():
     """
     result = speakers_collection.delete_many({})
     return JSONResponse(content={"deleted": result.deleted_count})
+
+
+@app.get("/audio/{filename}")
+def get_audio(filename: str):
+    """Serve audio files for playback."""
+    file_path = AUDIO_DIR / filename
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content={"error": "Audio file not found"})
+    
+    # Determine media type based on file extension
+    suffix = file_path.suffix.lower()
+    media_type = "audio/webm" if suffix == ".webm" else "audio/wav" if suffix == ".wav" else "audio/mpeg"
+    
+    return FileResponse(file_path, media_type=media_type)

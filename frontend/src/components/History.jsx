@@ -67,6 +67,8 @@ function formatTime(isoStr) {
 export default function History({ refreshTrigger }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [playingId, setPlayingId] = useState(null);
+  const [audioElements, setAudioElements] = useState({});
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -80,9 +82,66 @@ export default function History({ refreshTrigger }) {
     }
   };
 
+  const playAudio = async (item) => {
+    if (!item.audio_filename) return;
+
+    // Stop any currently playing audio
+    if (playingId) {
+      const currentAudio = audioElements[playingId];
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      setPlayingId(null);
+    }
+
+    try {
+      const audio = new Audio(`${API_BASE}/audio/${item.audio_filename}`);
+      audio.addEventListener('ended', () => {
+        setPlayingId(null);
+        setAudioElements(prev => {
+          const newElements = { ...prev };
+          delete newElements[item.id];
+          return newElements;
+        });
+      });
+      
+      setAudioElements(prev => ({ ...prev, [item.id]: audio }));
+      setPlayingId(item.id);
+      await audio.play();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      setPlayingId(null);
+    }
+  };
+
+  const stopAudio = (itemId) => {
+    const audio = audioElements[itemId];
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setPlayingId(null);
+    setAudioElements(prev => {
+      const newElements = { ...prev };
+      delete newElements[itemId];
+      return newElements;
+    });
+  };
+
   useEffect(() => {
     fetchHistory();
   }, [refreshTrigger]);
+
+  // Cleanup audio elements on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(audioElements).forEach(audio => {
+        audio.pause();
+        audio.currentTime = 0;
+      });
+    };
+  }, [audioElements]);
 
   const handleClear = async () => {
     const result = await Swal.fire({
@@ -170,6 +229,7 @@ export default function History({ refreshTrigger }) {
         {items.map((item) => {
           const lang = LANG_INFO[item.language] || { flag: '🌐', name: item.language };
           const isArabic = item.language === 'ar';
+          const isPlaying = playingId === item.id;
           return (
             <div key={item.id} className="history-item">
               <div className="history-lang-icon">{lang.flag}</div>
@@ -197,6 +257,30 @@ export default function History({ refreshTrigger }) {
                     <>
                       <span className="history-meta-tag">·</span>
                       <span className="history-meta-tag">{Math.round(item.duration_seconds)}s</span>
+                    </>
+                  )}
+                  {item.audio_filename && (
+                    <>
+                      <span className="history-meta-tag">·</span>
+                      <button
+                        className="play-btn"
+                        onClick={() => isPlaying ? stopAudio(item.id) : playAudio(item)}
+                        title={isPlaying ? "Stop audio" : "Play audio"}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: isPlaying ? '#ef4444' : '#22c55e',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        {isPlaying ? '⏹️' : '▶️'} {isPlaying ? 'Stop' : 'Play'}
+                      </button>
                     </>
                   )}
                 </div>
