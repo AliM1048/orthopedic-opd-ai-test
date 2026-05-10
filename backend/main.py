@@ -151,14 +151,17 @@ def find_matching_speaker(embedding: np.ndarray):
     best_score = -1.0
 
     for doc in speakers_collection.find({}):
-        stored_embeddings = [np.array(e) for e in doc["embeddings"]]
+        embs = doc.get("embeddings", [])
+        if not embs:
+            continue
+        stored_embeddings = [np.array(e) for e in embs]
         avg_embedding = np.mean(stored_embeddings, axis=0)
         score = cosine_similarity(embedding, avg_embedding)
         num_embs = len(stored_embeddings)
-        print(f"  🔍 vs {doc['speaker_id']} (profile: {num_embs} embeddings) → score: {score:.4f}")
+        print(f"  🔍 vs {doc.get('speaker_id', 'unknown')} (profile: {num_embs} embeddings) → score: {score:.4f}")
         if score > best_score:
             best_score = score
-            best_id = doc["speaker_id"]
+            best_id = doc.get("speaker_id")
 
     return best_id, best_score
 

@@ -16,6 +16,42 @@ export default function App() {
     setError(null);
     // Trigger history refresh
     setHistoryRefresh((r) => r + 1);
+
+    // Google command detection across languages
+    if (data && data.text) {
+      console.log("Raw Transcript:", data.text);
+      const text = data.text.toLowerCase().replace(/[.,!?;:'"()[\]{}¿¡]/g, '');
+      console.log("Cleaned Transcript:", text);
+      
+      const googleCommands = [
+        "go to google",
+        "open google",
+        "aller sur google",
+        "ouvre google",
+        "ouvrir google",
+        "allez sur google",
+        "اذهب الى جوجل",
+        "اذهب إلى جوجل",
+        "افتح جوجل",
+        "إفتح جوجل",
+        "روح على جوجل"
+      ];
+
+      const shouldOpenGoogle = googleCommands.some(cmd => text.includes(cmd));
+      console.log("Detected Google command?", shouldOpenGoogle);
+      
+      if (shouldOpenGoogle) {
+        // Try opening in a new tab first
+        const newWin = window.open('https://www.google.com', '_blank');
+        
+        // If the browser blocks the popup (because it happens after an async fetch), 
+        // fallback to redirecting the current tab.
+        if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+          console.log("Popup blocked! Redirecting current tab instead.");
+          window.location.href = 'https://www.google.com';
+        }
+      }
+    }
   };
 
   const handleError = (msg) => {
