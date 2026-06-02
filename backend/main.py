@@ -15,9 +15,17 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 
+from database import engine, Base
+from routers.patients import router as patients_router
+from routers.assessments import router as assessments_router
+from routers.evaluations import router as evaluations_router
+from routers.diagnostics import router as diagnostics_router
+from routers.treatments import router as treatments_router
+from routers.lookup import router as lookup_router
+
 load_dotenv()
 
-app = FastAPI(title="Whisper STT API")
+app = FastAPI(title="Orthopedic OPD AI - Backend")
 
 # CORS
 app.add_middleware(
@@ -32,6 +40,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# OPD Routers
+app.include_router(patients_router)
+app.include_router(assessments_router)
+app.include_router(evaluations_router)
+app.include_router(diagnostics_router)
+app.include_router(treatments_router)
+app.include_router(lookup_router)
+
+
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
+
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
@@ -207,7 +229,11 @@ def get_or_create_speaker(embedding: np.ndarray):
 
 @app.get("/")
 def root():
-    return {"status": "Whisper STT API is running", "speaker_threshold": SPEAKER_SIMILARITY_THRESHOLD}
+    return {
+        "status": "Orthopedic OPD AI API is running",
+        "whisper_stt": {"speaker_threshold": SPEAKER_SIMILARITY_THRESHOLD},
+        "opd_api": "/api/patients",
+    }
 
 
 @app.post("/transcribe")

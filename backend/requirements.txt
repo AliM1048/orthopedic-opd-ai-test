@@ -7,3 +7,5 @@ python-dotenv
 resemblyzer
 pydub
 numpy
+sqlalchemy
+psycopg2-binary

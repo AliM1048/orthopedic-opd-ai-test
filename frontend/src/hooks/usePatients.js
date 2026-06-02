@@ -1,12 +1,18 @@
-import { useState, useCallback } from 'react';
-import { MOCK_PATIENTS } from '../data/mockData';
+import { useState, useCallback, useEffect } from 'react';
+import axios from 'axios';
 
-// ─── usePatients ─────────────────────────────────────────────────────────────
-// Manages the patient list state. In a real app, replace the mock with API calls.
-// API shape: GET /api/patients  →  { patients: Patient[] }
-// ─────────────────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:8000';
+
 export function usePatients() {
-  const [patients, setPatients] = useState(MOCK_PATIENTS);
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/patients`)
+      .then((res) => setPatients(res.data.patients))
+      .catch(() => setPatients([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const getPatient = useCallback(
     (id) => patients.find((p) => p.id === id) || null,
@@ -17,6 +23,13 @@ export function usePatients() {
     setPatients((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
     );
+    axios.patch(`${API_BASE}/api/patients/${id}/status`, { status })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === id ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   const addAssessment = useCallback((patientId, assessment) => {
@@ -27,6 +40,13 @@ export function usePatients() {
           : p
       )
     );
+    axios.post(`${API_BASE}/api/patients/${patientId}/assessments`, assessment)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   const addEvaluation = useCallback((patientId, evaluation) => {
@@ -37,6 +57,13 @@ export function usePatients() {
           : p
       )
     );
+    axios.post(`${API_BASE}/api/patients/${patientId}/evaluations`, evaluation)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   const addDiagnostic = useCallback((patientId, diagnostic) => {
@@ -47,6 +74,13 @@ export function usePatients() {
           : p
       )
     );
+    axios.post(`${API_BASE}/api/patients/${patientId}/diagnostics`, diagnostic)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   const updateDiagnostic = useCallback((patientId, diagnosticId, updates) => {
@@ -62,6 +96,13 @@ export function usePatients() {
           : p
       )
     );
+    axios.patch(`${API_BASE}/api/patients/${patientId}/diagnostics/${diagnosticId}`, updates)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   const addTreatment = useCallback((patientId, treatment) => {
@@ -72,10 +113,18 @@ export function usePatients() {
           : p
       )
     );
+    axios.post(`${API_BASE}/api/patients/${patientId}/treatments`, treatment)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
   }, []);
 
   return {
     patients,
+    loading,
     getPatient,
     updateStatus,
     addAssessment,
