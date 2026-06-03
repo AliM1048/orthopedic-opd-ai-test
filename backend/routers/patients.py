@@ -6,7 +6,9 @@ from models import Patient, Assessment, Evaluation, Diagnostic, Treatment
 from schemas import (
     PatientOut, PatientListResponse, UpdateStatusRequest,
     AssessmentOut, EvaluationOut, DiagnosticOut, TreatmentOut,
+    PatientCreate,
 )
+import uuid
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
@@ -41,6 +43,34 @@ def list_patients(search: str = "", db: Session = Depends(get_db)):
     return PatientListResponse(
         patients=[_build_patient(p, db) for p in patients]
     )
+
+
+@router.post("", response_model=PatientOut)
+def create_patient(body: PatientCreate, db: Session = Depends(get_db)):
+    # create a new patient with generated UUID
+    pid = str(uuid.uuid4())
+    patient = Patient(
+        id=pid,
+        name=body.name,
+        age=body.age,
+        gender=body.gender,
+        dob=body.dob,
+        phone=body.phone,
+        mrn=body.mrn,
+        email=body.email,
+        address=body.address,
+        bloodType=body.bloodType,
+        allergies=body.allergies,
+        appointmentTime=body.appointmentTime,
+        appointmentDate=body.appointmentDate,
+        status="pending",
+        bodyArea=body.bodyArea,
+        avatar=body.avatar,
+    )
+    db.add(patient)
+    db.commit()
+    db.refresh(patient)
+    return _build_patient(patient, db)
 
 
 @router.get("/{patient_id}", response_model=PatientOut)

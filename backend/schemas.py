@@ -83,6 +83,26 @@ class PatientListResponse(BaseModel):
     patients: list[PatientOut]
 
 
+class PatientCreate(BaseModel):
+    name: str
+    age: int
+    gender: str
+    dob: str
+    phone: str
+    mrn: str
+    email: str
+    address: str
+    bloodType: str
+    allergies: str
+    appointmentTime: str
+    appointmentDate: str
+    bodyArea: str
+    avatar: str
+
+    class Config:
+        from_attributes = True
+
+
 class UpdateStatusRequest(BaseModel):
     status: str
 

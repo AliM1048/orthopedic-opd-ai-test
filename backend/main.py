@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import whisper
@@ -16,12 +16,14 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence
 
 from database import engine, Base
+from auth import get_current_user
 from routers.patients import router as patients_router
 from routers.assessments import router as assessments_router
 from routers.evaluations import router as evaluations_router
 from routers.diagnostics import router as diagnostics_router
 from routers.treatments import router as treatments_router
 from routers.lookup import router as lookup_router
+from routers.auth import router as auth_router
 
 load_dotenv()
 
@@ -41,13 +43,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OPD Routers
-app.include_router(patients_router)
-app.include_router(assessments_router)
-app.include_router(evaluations_router)
-app.include_router(diagnostics_router)
-app.include_router(treatments_router)
-app.include_router(lookup_router)
+# Auth Router (public)
+app.include_router(auth_router)
+
+# OPD Routers (protected)
+app.include_router(patients_router, dependencies=[Depends(get_current_user)])
+app.include_router(assessments_router, dependencies=[Depends(get_current_user)])
+app.include_router(evaluations_router, dependencies=[Depends(get_current_user)])
+app.include_router(diagnostics_router, dependencies=[Depends(get_current_user)])
+app.include_router(treatments_router, dependencies=[Depends(get_current_user)])
+app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
 
 
 @app.on_event("startup")
