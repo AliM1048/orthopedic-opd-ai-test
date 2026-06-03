@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Swal from "sweetalert2";
+import { MdDelete } from "react-icons/md";
 
 const API_BASE = 'http://localhost:8000';
 
@@ -309,20 +310,29 @@ export default function History({ refreshTrigger }) {
                         onClick={(e) => handleDelete(item.id, e)}
                         title="Delete transcription"
                         style={{
-                          background: 'none',
-                          border: 'none',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '2px solid #ef4444',
                           color: '#ef4444',
                           cursor: 'pointer',
-                          fontSize: '14px',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
+                          fontSize: '12px',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          opacity: 0.6,
+                          gap: '6px',
+                          fontWeight: '600',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#ef4444';
+                          e.target.style.color = '#fff';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'rgba(239, 68, 68, 0.1)';
+                          e.target.style.color = '#ef4444';
                         }}
                       >
-                        🗑
+                        <MdDelete />
                       </button>
                     </>
                   )}

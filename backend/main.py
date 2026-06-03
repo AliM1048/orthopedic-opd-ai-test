@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import whisper
@@ -15,9 +15,19 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 
+from database import engine, Base
+from auth import get_current_user
+from routers.patients import router as patients_router
+from routers.assessments import router as assessments_router
+from routers.evaluations import router as evaluations_router
+from routers.diagnostics import router as diagnostics_router
+from routers.treatments import router as treatments_router
+from routers.lookup import router as lookup_router
+from routers.auth import router as auth_router
+
 load_dotenv()
 
-app = FastAPI(title="Whisper STT API")
+app = FastAPI(title="Orthopedic OPD AI - Backend")
 
 # CORS
 app.add_middleware(
@@ -32,6 +42,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Auth Router (public)
+app.include_router(auth_router)
+
+# OPD Routers (protected)
+app.include_router(patients_router, dependencies=[Depends(get_current_user)])
+app.include_router(assessments_router, dependencies=[Depends(get_current_user)])
+app.include_router(evaluations_router, dependencies=[Depends(get_current_user)])
+app.include_router(diagnostics_router, dependencies=[Depends(get_current_user)])
+app.include_router(treatments_router, dependencies=[Depends(get_current_user)])
+app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
+
+
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
+
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
@@ -151,14 +178,17 @@ def find_matching_speaker(embedding: np.ndarray):
     best_score = -1.0
 
     for doc in speakers_collection.find({}):
-        stored_embeddings = [np.array(e) for e in doc["embeddings"]]
+        embs = doc.get("embeddings", [])
+        if not embs:
+            continue
+        stored_embeddings = [np.array(e) for e in embs]
         avg_embedding = np.mean(stored_embeddings, axis=0)
         score = cosine_similarity(embedding, avg_embedding)
         num_embs = len(stored_embeddings)
-        print(f"  🔍 vs {doc['speaker_id']} (profile: {num_embs} embeddings) → score: {score:.4f}")
+        print(f"  🔍 vs {doc.get('speaker_id', 'unknown')} (profile: {num_embs} embeddings) → score: {score:.4f}")
         if score > best_score:
             best_score = score
-            best_id = doc["speaker_id"]
+            best_id = doc.get("speaker_id")
 
     return best_id, best_score
 
@@ -204,7 +234,11 @@ def get_or_create_speaker(embedding: np.ndarray):
 
 @app.get("/")
 def root():
-    return {"status": "Whisper STT API is running", "speaker_threshold": SPEAKER_SIMILARITY_THRESHOLD}
+    return {
+        "status": "Orthopedic OPD AI API is running",
+        "whisper_stt": {"speaker_threshold": SPEAKER_SIMILARITY_THRESHOLD},
+        "opd_api": "/api/patients",
+    }
 
 
 @app.post("/transcribe")
