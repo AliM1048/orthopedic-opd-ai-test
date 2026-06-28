@@ -15,7 +15,11 @@ import TreatmentPathway from './pages/TreatmentPathway';
 import AllPatients from './pages/AllPatients';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  });
+
   const {
     patients,
     updateStatus,
@@ -23,11 +27,16 @@ export default function App() {
     addEvaluation,
     addDiagnostic,
     addTreatment
-  } = usePatients();
+    ,
+    createPatient
+  } = usePatients(token);
 
-  const handleLogin = () => setIsAuthenticated(true);
+  const handleLogin = (accessToken, userData) => {
+    setToken(accessToken);
+    setUser(userData);
+  };
 
-  if (!isAuthenticated) {
+  if (!token) {
     return (
       <BrowserRouter>
         <Login onLogin={handleLogin} />
@@ -37,11 +46,11 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <DashboardLayout>
+      <DashboardLayout user={user}>
         <Routes>
           <Route
             path="/"
-            element={<NurseDashboard patients={patients} onUpdateStatus={updateStatus} />}
+            element={<NurseDashboard patients={patients} onUpdateStatus={updateStatus} createPatient={createPatient} />}
           />
           <Route
             path="/patient/:id"

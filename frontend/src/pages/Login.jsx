@@ -1,15 +1,29 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Activity, Stethoscope, HeartPulse } from 'lucide-react';
+import api from '../api';
 
 export default function Login({ onLogin }) {
   const [role, setRole] = useState('nurse');
-  const navigate = useNavigate();
+  const [email, setEmail] = useState('nurse.sara@ortho.com');
+  const [password, setPassword] = useState('password');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (onLogin) onLogin(role);
-    navigate('/');
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      const { access_token, user } = res.data;
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      if (onLogin) onLogin(access_token, user);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -26,12 +40,12 @@ export default function Login({ onLogin }) {
         <h2 className="login-title">Welcome Back</h2>
         <p className="login-sub">Sign in to access the orthopedic patient management system.</p>
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit}>
           <div className="login-role-grid">
             <button
               type="button"
               className={`role-btn ${role === 'nurse' ? 'selected' : ''}`}
-              onClick={() => setRole('nurse')}
+              onClick={() => { setRole('nurse'); setEmail('nurse.sara@ortho.com'); setPassword('password'); }}
             >
               <div className="role-btn-icon"><HeartPulse size={24} /></div>
               <div className="role-btn-label">Nurse</div>
@@ -39,7 +53,7 @@ export default function Login({ onLogin }) {
             <button
               type="button"
               className={`role-btn ${role === 'physician' ? 'selected' : ''}`}
-              onClick={() => setRole('physician')}
+              onClick={() => { setRole('physician'); setEmail('physician.khalid@ortho.com'); setPassword('password'); }}
             >
               <div className="role-btn-icon"><Stethoscope size={24} /></div>
               <div className="role-btn-label">Physician</div>
@@ -47,17 +61,35 @@ export default function Login({ onLogin }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <input className="form-control" type="email" placeholder="name@hospital.com" defaultValue="nurse.sara@ortho.com" />
+            <label className="form-label">Username</label>
+            <input
+              className="form-control"
+              type="text"
+              placeholder="User"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
 
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input className="form-control" type="password" placeholder="••••••••" defaultValue="password" />
+            <input
+              className="form-control"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg w-full" style={{ justifyContent: 'center', marginTop: 8 }}>
-            Sign In
+          {error && (
+            <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 8, textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary btn-lg w-full" style={{ justifyContent: 'center', marginTop: 8 }} disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 

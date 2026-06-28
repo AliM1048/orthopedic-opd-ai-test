@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Stethoscope,
   FileText, Pill, LogOut, Activity
@@ -19,8 +19,16 @@ const NAV_ITEMS = [
   ]},
 ];
 
-export default function DashboardLayout({ children }) {
+export default function DashboardLayout({ children, user }) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/');
+    window.location.reload();
+  };
 
   return (
     <div className="app-shell">
@@ -57,11 +65,14 @@ export default function DashboardLayout({ children }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <div className="sidebar-avatar">NS</div>
+            <div className="sidebar-avatar">{user?.name?.split(' ').map((w) => w[0]).join('').slice(0, 2) || 'NS'}</div>
             <div>
-              <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>Nurse Sara</div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>Orthopedic Ward</div>
+              <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>{user?.name || 'User'}</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>{user?.role === 'physician' ? 'Physician' : 'Orthopedic Ward'}</div>
             </div>
+            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4, marginLeft: 'auto' }} title="Sign out">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
