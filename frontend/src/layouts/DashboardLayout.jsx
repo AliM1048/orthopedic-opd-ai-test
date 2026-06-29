@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Stethoscope,
-  FileText, Pill, LogOut, Activity
+  LogOut, Activity
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -11,8 +11,6 @@ const NAV_ITEMS = [
   ]},
   { label: 'PHYSICIAN', items: [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
-    { to: '/diagnostics', icon: FileText,    text: 'Diagnostics' },
-    { to: '/treatment',   icon: Pill,        text: 'Treatment Plan' },
   ]},
   { label: 'RECORDS', items: [
     { to: '/patients',    icon: Users,    text: 'All Patients' },

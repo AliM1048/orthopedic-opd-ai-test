@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-openai-whisper
+faster-whisper
 pymongo
 python-multipart
 python-dotenv
@@ -12,3 +12,4 @@ psycopg2-binary
 pyjwt
 passlib[bcrypt]
 bcrypt
+requests

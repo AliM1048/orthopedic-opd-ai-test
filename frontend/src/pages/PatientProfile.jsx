@@ -67,12 +67,6 @@ export default function PatientProfile({ patients }) {
           <button className="btn btn-outline" onClick={() => navigate(`/evaluation?patient=${patient.id}`)}>
             <Stethoscope size={16} /> Physician Evaluation
           </button>
-          <button className="btn btn-outline" onClick={() => navigate(`/diagnostics?patient=${patient.id}`)}>
-            <FileText size={16} /> Request Diagnostics
-          </button>
-          <button className="btn btn-outline" onClick={() => navigate(`/treatment?patient=${patient.id}`)}>
-            <Pill size={16} /> Treatment Plan
-          </button>
         </div>
 
         <div className="grid-2" style={{ gap: 24 }}>

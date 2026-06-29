@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mic, Square, Save, FileText } from 'lucide-react';
-import { useRecorder } from '../hooks/useRecorder';
+import { ArrowLeft, Mic, Square, Save, FileText, X, Plus } from 'lucide-react';
+import { useDictation } from '../hooks/useDictation';
+import { DIAGNOSTIC_TESTS, TREATMENT_OPTIONS } from '../data/mockData';
 
 function formatTimer(seconds) {
   const m = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -9,7 +10,11 @@ function formatTimer(seconds) {
   return `${m}:${s}`;
 }
 
-export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
+function uid() {
+  return `t${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+export default function PhysicianEvaluation({ patients, onAddEvaluation, onAddDiagnostic, onAddTreatment }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
@@ -17,35 +22,101 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
 
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
-  const [transcript, setTranscript] = useState(null);
+  const [selectedTests, setSelectedTests] = useState([]);
+  const [treatments, setTreatments] = useState([]);
+  const [dictation, setDictation] = useState(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
-  const handleTranscriptReceived = (data) => {
-    setTranscript(data);
+  const handleDictationResult = (data) => {
     setError(null);
-    // Append transcription to notes
-    if (data?.text) {
-      setNotes((prev) => (prev ? prev + '\n' + data.text : data.text));
+    setDictation(data);
+
+    const structured = data?.structured;
+    if (!structured) return;
+
+    if (structured.diagnosis) setDiagnosis(structured.diagnosis);
+    if (structured.notes) setNotes(structured.notes);
+    if (structured.diagnostic_tests?.length) setSelectedTests(structured.diagnostic_tests);
+    if (structured.treatments?.length) {
+      setTreatments(
+        structured.treatments.map((t) => ({
+          uid: uid(),
+          type: t.type,
+          duration: t.duration || '',
+          details: t.details || '',
+          followUpDate: t.followUpDate || '',
+        }))
+      );
     }
   };
 
-  const handleError = (msg) => setError(msg);
+  const { isRecording, isProcessing, elapsedSeconds, liveCaption, startRecording, stopRecording } =
+    useDictation({ patientId, onResult: handleDictationResult, onError: setError });
 
-  const { isRecording, isProcessing, elapsedSeconds, startRecording, stopRecording } =
-    useRecorder({ onTranscriptReceived: handleTranscriptReceived, onError: handleError });
+  const toggleTest = (id) => {
+    setSelectedTests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
-  const handleSave = () => {
+  const addTreatmentRow = () => {
+    setTreatments((prev) => [...prev, { uid: uid(), type: '', duration: '', details: '', followUpDate: '' }]);
+  };
+
+  const updateTreatmentRow = (rowId, field, value) => {
+    setTreatments((prev) => prev.map((t) => (t.uid === rowId ? { ...t, [field]: value } : t)));
+  };
+
+  const removeTreatmentRow = (rowId) => {
+    setTreatments((prev) => prev.filter((t) => t.uid !== rowId));
+  };
+
+  const handleSaveAll = () => {
     if (!diagnosis.trim() && !notes.trim()) return;
+
     const evaluation = {
       id: `ev${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       physician: 'Dr. Khalid Mansour',
       notes: notes.trim(),
       diagnosis: diagnosis.trim(),
-      audioUrl: null
+      audioUrl: null,
     };
     if (onAddEvaluation) onAddEvaluation(patientId, evaluation);
+
+    selectedTests.forEach((testId) => {
+      const test = DIAGNOSTIC_TESTS.find((t) => t.id === testId);
+      if (!test) return;
+      if (onAddDiagnostic) {
+        onAddDiagnostic(patientId, {
+          id: `d${Date.now()}-${testId}`,
+          type: test.name,
+          date: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          result: null,
+        });
+      }
+    });
+
+    treatments
+      .filter((t) => t.type)
+      .forEach((t) => {
+        const option = TREATMENT_OPTIONS.find((o) => o.id === t.type);
+        if (!option) return;
+        if (onAddTreatment) {
+          onAddTreatment(patientId, {
+            id: `tr${Date.now()}-${t.type}`,
+            type: option.name,
+            date: new Date().toISOString().split('T')[0],
+            physician: 'Dr. Khalid Mansour',
+            duration: t.duration || 'TBD',
+            details: t.details?.trim() || '',
+            followUpDate: t.followUpDate || null,
+            status: 'active',
+          });
+        }
+      });
+
     setSaved(true);
   };
 
@@ -67,15 +138,18 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
   if (saved) {
     return (
       <>
-        <div className="topbar"><div className="topbar-left"><h1>Evaluation Saved</h1></div></div>
+        <div className="topbar"><div className="topbar-left"><h1>Visit Recorded</h1></div></div>
         <div className="page-body">
           <div className="card" style={{ textAlign: 'center', padding: 48 }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Evaluation Recorded</h2>
-            <p className="text-muted mb-4">Physician evaluation for {patient.name} has been saved.</p>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Visit Recorded</h2>
+            <p className="text-muted mb-4">
+              Evaluation saved for {patient.name}
+              {selectedTests.length > 0 && ` · ${selectedTests.length} diagnostic test${selectedTests.length !== 1 ? 's' : ''} requested`}
+              {treatments.filter((t) => t.type).length > 0 && ` · ${treatments.filter((t) => t.type).length} treatment${treatments.filter((t) => t.type).length !== 1 ? 's' : ''} started`}.
+            </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
-              <button className="btn btn-outline" onClick={() => navigate(`/diagnostics?patient=${patient.id}`)}>Request Diagnostics</button>
               <button className="btn btn-outline" onClick={() => navigate('/')}>Dashboard</button>
             </div>
           </div>
@@ -137,23 +211,14 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
             </div>
           )}
 
-          {/* Diagnosis */}
-          <div className="card mb-4">
-            <div className="form-group">
-              <label className="form-label">Diagnosis</label>
-              <input
-                className="form-control"
-                placeholder="e.g., Osteoarthritis Grade 3, Rotator Cuff Tear…"
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Voice Recorder */}
+          {/* Voice Dictation — single take covers diagnosis + diagnostics + treatment */}
           <div className="voice-recorder-card mb-4">
-            <h3>🎙 Voice Notes — Whisper AI</h3>
-            <p>Record your clinical observations. Speech will be transcribed automatically.</p>
+            <h3>🎙 Record Full Visit — Whisper AI</h3>
+            <p>
+              One recording covers everything. Say <strong>&ldquo;Diagnosis…&rdquo;</strong>, then{' '}
+              <strong>&ldquo;Diagnostics…&rdquo;</strong> to order tests, then <strong>&ldquo;Treatment plan…&rdquo;</strong> to
+              prescribe — all fields below fill in automatically.
+            </p>
 
             <button
               className={`record-btn-medical ${isRecording ? 'recording' : ''}`}
@@ -172,11 +237,20 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
             {isRecording && (
               <>
                 <div className="record-timer-medical">{formatTimer(elapsedSeconds)}</div>
-                <div className="record-status-medical">Recording… Click to stop</div>
+                <div className="record-status-medical">Recording the full visit… Click to stop</div>
               </>
             )}
-            {isProcessing && <div className="record-status-medical">Transcribing with Whisper AI…</div>}
-            {!isRecording && !isProcessing && <div className="record-status-medical">Click the mic to start recording</div>}
+            {isProcessing && <div className="record-status-medical">Transcribing & structuring with Whisper + AI…</div>}
+            {!isRecording && !isProcessing && <div className="record-status-medical">Click the mic and dictate the whole visit</div>}
+
+            {isRecording && (
+              <div className="transcript-result">
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="spin-ring" style={{ width: 10, height: 10, borderWidth: 2, margin: 0 }} /> Live — what the mic is hearing
+                </div>
+                {liveCaption || <span style={{ opacity: 0.5 }}>Listening…</span>}
+              </div>
+            )}
 
             {error && (
               <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 12, marginTop: 16, color: '#fca5a5', fontSize: 13 }}>
@@ -184,14 +258,44 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
               </div>
             )}
 
-            {transcript && (
-              <div className="transcript-result">
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {transcript.language && `Detected: ${transcript.language}`}
-                </div>
-                {transcript.text}
+            {dictation && !dictation.structured?.ai_structured && (
+              <div style={{ background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 8, padding: 12, marginTop: 16, color: '#fcd34d', fontSize: 13 }}>
+                ⚠️ AI structuring is unavailable right now (the local LLM may not be running), so diagnostic tests
+                and treatment plan weren&apos;t auto-filled. The transcript was added to Clinical Notes — fill the
+                sections below manually.
               </div>
             )}
+
+            {dictation && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm mt-3"
+                onClick={() => setShowTranscript((s) => !s)}
+              >
+                {showTranscript ? 'Hide transcript' : 'View raw transcript'}
+              </button>
+            )}
+            {dictation && showTranscript && (
+              <div className="transcript-result">
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
+                  {dictation.language && `Detected: ${dictation.language_name || dictation.language}`}
+                </div>
+                {dictation.text}
+              </div>
+            )}
+          </div>
+
+          {/* Diagnosis */}
+          <div className="card mb-4">
+            <div className="form-group">
+              <label className="form-label">Diagnosis</label>
+              <input
+                className="form-control"
+                placeholder="e.g., Osteoarthritis Grade 3, Rotator Cuff Tear…"
+                value={diagnosis}
+                onChange={(e) => setDiagnosis(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Written Notes */}
@@ -200,19 +304,104 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
               <label className="form-label">Clinical Notes</label>
               <textarea
                 className="form-control"
-                rows={8}
-                placeholder="Type or use the voice recorder above to add notes. Transcribed audio will appear here automatically."
+                rows={6}
+                placeholder="Type or use the voice recorder above. Transcribed notes appear here automatically."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
           </div>
 
+          {/* Diagnostic Tests — auto-checked from dictation, doctor can adjust */}
+          <div className="card mb-4">
+            <div className="card-title" style={{ marginBottom: 4 }}>Diagnostic Tests</div>
+            <p className="text-muted mb-4">Auto-selected from your dictation. Click to add or remove.</p>
+            <div className="diag-grid">
+              {DIAGNOSTIC_TESTS.map((test) => (
+                <div
+                  key={test.id}
+                  className={`diag-card ${selectedTests.includes(test.id) ? 'selected' : ''}`}
+                  onClick={() => toggleTest(test.id)}
+                >
+                  <div className="diag-card-icon">{test.icon}</div>
+                  <div className="diag-card-name">{test.name}</div>
+                  <div className="diag-card-desc">{test.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Treatment Plan(s) — auto-filled from dictation, doctor can adjust */}
+          <div className="card mb-4">
+            <div className="flex justify-between items-center" style={{ marginBottom: 4 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>Treatment Plan</div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={addTreatmentRow}>
+                <Plus size={14} /> Add Treatment
+              </button>
+            </div>
+            <p className="text-muted mb-4">Auto-filled from your dictation. Adjust duration, follow-up, and instructions as needed.</p>
+
+            {treatments.length === 0 && (
+              <p className="text-muted text-sm">No treatment mentioned yet. Dictate a treatment plan above, or add one manually.</p>
+            )}
+
+            {treatments.map((t) => (
+              <div key={t.uid} className="card" style={{ marginBottom: 12, background: 'rgba(255,255,255,.03)' }}>
+                <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
+                  <select
+                    className="form-control"
+                    style={{ maxWidth: 240 }}
+                    value={t.type}
+                    onChange={(e) => updateTreatmentRow(t.uid, 'type', e.target.value)}
+                  >
+                    <option value="">Select treatment type…</option>
+                    {TREATMENT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeTreatmentRow(t.uid)}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Duration</label>
+                    <input
+                      className="form-control"
+                      placeholder="e.g., 6 weeks"
+                      value={t.duration}
+                      onChange={(e) => updateTreatmentRow(t.uid, 'duration', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Follow-Up Date</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={t.followUpDate || ''}
+                      onChange={(e) => updateTreatmentRow(t.uid, 'followUpDate', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Instructions & Details</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    placeholder="Medication schedule, recovery plan, instructions…"
+                    value={t.details}
+                    onChange={(e) => updateTreatmentRow(t.uid, 'details', e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* Actions */}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <button className="btn btn-ghost" onClick={() => navigate(-1)}>Cancel</button>
-            <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={!diagnosis.trim() && !notes.trim()}>
-              <Save size={18} /> Save Evaluation
+            <button className="btn btn-primary btn-lg" onClick={handleSaveAll} disabled={!diagnosis.trim() && !notes.trim()}>
+              <Save size={18} /> Confirm & Save All
             </button>
           </div>
         </div>

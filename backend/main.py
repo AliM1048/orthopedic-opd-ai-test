@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, Form, Depends
+from fastapi import FastAPI, File, UploadFile, Form, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
-import whisper
+from faster_whisper import WhisperModel
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from resemblyzer import VoiceEncoder, preprocess_wav
@@ -17,6 +17,7 @@ from pydub.silence import split_on_silence
 
 from database import engine, Base
 from auth import get_current_user
+from llm_extract import extract_structured, warm_up_ollama
 from routers.patients import router as patients_router
 from routers.assessments import router as assessments_router
 from routers.evaluations import router as evaluations_router
@@ -74,8 +75,16 @@ AUDIO_DIR.mkdir(exist_ok=True)
 # ──────────────────────────────────────────────
 # Load models once at startup
 # ──────────────────────────────────────────────
-print("Loading Whisper model...")
-whisper_model = whisper.load_model("base")
+# faster-whisper (CTranslate2 backend) is a drop-in replacement for
+# openai-whisper that runs ~4x faster on CPU via int8 quantization, while
+# also giving us built-in VAD so long single-take dictations don't drift
+# into the silence-hallucination loops plain Whisper is prone to.
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
+
+print(f"Loading faster-whisper model ({WHISPER_MODEL_SIZE}, {WHISPER_DEVICE}/{WHISPER_COMPUTE_TYPE})...")
+whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE)
 print("✅ Whisper model loaded!")
 
 print("Loading Resemblyzer voice encoder...")
@@ -96,6 +105,62 @@ LANGUAGE_MAP = {
     "ar": "arabic",
     "fr": "french",
 }
+
+# Biases Whisper's decoder toward orthopedic vocabulary it otherwise rarely
+# sees in training data (drug names, "osteoarthritis", "physiotherapy", the
+# diagnostic test names, etc.), plus the spoken section cues this app relies
+# on. This is the single highest-leverage accuracy fix available without
+# fine-tuning: Whisper conditions each decode on this text as if it were
+# preceding context, so these words/phrases become measurably more likely
+# even though no audio of them was actually heard yet.
+CLINICAL_VOCAB_PROMPT = (
+    "Diagnosis. Diagnostics. Treatment plan. "
+    "Osteoarthritis, rotator cuff tear, ACL tear, meniscus tear, herniated disc, "
+    "lumbar disc herniation, sciatica, fracture, dislocation, tendinitis, bursitis, "
+    "carpal tunnel syndrome, scoliosis, spinal stenosis. "
+    "X-ray, MRI, CT scan, ultrasound, laboratory tests. "
+    "Surgery, medication, physiotherapy, injection therapy, corticosteroid, "
+    "rest and monitoring, long-term rehabilitation, follow-up."
+)
+
+
+# ──────────────────────────────────────────────
+# Whisper helper
+# ──────────────────────────────────────────────
+
+def run_whisper(path: str, language: str | None = None, fast: bool = False) -> dict:
+    """Run faster-whisper and normalise its output to the
+    {text, language, segments} shape the rest of this module expects.
+
+    vad_filter skips silence so a long single-take dictation (diagnosis +
+    diagnostics + treatment in one recording) doesn't trip Whisper's known
+    hallucination/repetition failure mode on long audio. condition_on_previous_text
+    is disabled for the same reason: it stops one bad guess from poisoning the
+    rest of a long transcript. beam_size=5 trades a little speed for materially
+    cleaner text, which matters more here since this transcript drives downstream
+    LLM extraction.
+
+    fast=True drops to greedy decoding (beam_size=1) for the live-caption
+    preview path, where we re-transcribe the growing recording every few
+    seconds and a rough-but-fast result matters more than the cleanest text.
+    """
+    segments_iter, info = whisper_model.transcribe(
+        path,
+        language=language,
+        beam_size=1 if fast else 5,
+        vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 500},
+        condition_on_previous_text=False,
+        initial_prompt=CLINICAL_VOCAB_PROMPT,
+    )
+    segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments_iter]
+    text = " ".join(seg["text"].strip() for seg in segments).strip()
+    return {
+        "text": text,
+        "language": info.language,
+        "language_probability": info.language_probability,
+        "segments": segments,
+    }
 
 
 # ──────────────────────────────────────────────
@@ -273,21 +338,10 @@ async def transcribe(
     wav_path = None
     try:
         # ── Step 1: Whisper transcription ──────────────────────────────
-        transcribe_kwargs = {"fp16": False}
-        if language:
-            transcribe_kwargs["language"] = LANGUAGE_MAP[language]
-
-        result = whisper_model.transcribe(tmp_path, **transcribe_kwargs)
-        text = result["text"].strip()
-        detected_language = result.get("language", language or "unknown")
-
-        detected_code = None
-        for code, lang in LANGUAGE_MAP.items():
-            if lang == detected_language:
-                detected_code = code
-                break
-        if not detected_code:
-            detected_code = detected_language
+        result = run_whisper(tmp_path, language=language)
+        text = result["text"]
+        detected_code = result.get("language", language or "unknown")
+        detected_language = LANGUAGE_MAP.get(detected_code, detected_code)
 
         # ── Step 2: Convert to 16 kHz WAV ─────────────────────────────
         wav_path = convert_to_wav(tmp_path)
@@ -305,6 +359,127 @@ async def transcribe(
             "speaker_id": speaker_id,
             "is_new_speaker": is_new,
             "similarity_score": round(similarity_score, 4),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "duration_seconds": (
+                result.get("segments", [{}])[-1].get("end", 0)
+                if result.get("segments") else 0
+            ),
+            "audio_filename": audio_filename,
+        }
+
+        collection.insert_one(doc)
+        doc.pop("_id", None)
+
+        return JSONResponse(content=doc)
+
+    finally:
+        os.unlink(tmp_path)
+        if wav_path and os.path.exists(wav_path):
+            os.unlink(wav_path)
+
+
+@app.post("/llm/warmup")
+def llm_warmup(background_tasks: BackgroundTasks):
+    """
+    Call this the moment the doctor clicks the mic. Ollama unloads idle models
+    after ~5 minutes; a cold reload can take long enough to blow past the
+    extraction timeout in /dictate. Kicking off the load now means the model
+    is usually warm by the time the doctor finishes a 10-60s dictation.
+    """
+    background_tasks.add_task(warm_up_ollama)
+    return JSONResponse(content={"status": "warming"})
+
+
+@app.post("/transcribe/preview")
+async def transcribe_preview(
+    audio: UploadFile = File(...),
+):
+    """
+    Throwaway transcription of the recording-so-far, used purely to show the
+    doctor a live "what the mic is hearing" caption while they're still
+    talking. No speaker ID, no LLM structuring, nothing persisted to Mongo or
+    disk — just transcribe and return text as fast as possible.
+
+    Forced to English: physicians dictate in English, and skipping Whisper's
+    language auto-detection pass is both faster and avoids the model
+    occasionally mis-detecting language on short/ambiguous preview clips.
+    """
+    suffix = os.path.splitext(audio.filename)[-1] if audio.filename else ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await audio.read())
+        tmp_path = tmp.name
+
+    try:
+        result = run_whisper(tmp_path, language="en", fast=True)
+        return JSONResponse(content={"text": result["text"], "language": result.get("language")})
+    except Exception as e:
+        # A handful of these can legitimately fail to decode (the recorder may
+        # hand us a momentarily truncated container mid-recording) - that's
+        # fine, the live caption just skips a beat instead of erroring out.
+        return JSONResponse(status_code=200, content={"text": "", "language": None, "warning": str(e)})
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/dictate")
+async def dictate(
+    audio: UploadFile = File(...),
+    patient_id: str = Form(default=None),
+):
+    """
+    One-take physician dictation: the doctor speaks diagnosis, diagnostics to
+    order, and the treatment plan in a single recording instead of filling out
+    three separate screens.
+
+    1. Transcribe with faster-whisper (forced to English — physicians dictate
+       in English, and forcing it skips Whisper's language-detection pass and
+       avoids it ever mis-detecting language on accented or noisy audio).
+    2. Identify the speaker via Resemblyzer (best-effort; never blocks the result).
+    3. Hand the transcript to llm_extract.extract_structured(), which splits it by
+       spoken section markers and uses a local LLM to map free speech onto the
+       app's diagnosis/diagnostic-test/treatment fields.
+    4. Persist the recording + structured result and return it so the physician
+       only has to review and confirm, instead of typing/clicking through every field.
+    """
+    suffix = os.path.splitext(audio.filename)[-1] if audio.filename else ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await audio.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    audio_id = str(uuid.uuid4())
+    audio_filename = f"{audio_id}{suffix}"
+    audio_path = AUDIO_DIR / audio_filename
+    with open(audio_path, "wb") as f:
+        f.write(content)
+
+    wav_path = None
+    try:
+        result = run_whisper(tmp_path, language="en")
+        text = result["text"]
+        detected_code = result.get("language", "en")
+        detected_language = LANGUAGE_MAP.get(detected_code, detected_code)
+
+        speaker_id, similarity_score = None, 0.0
+        try:
+            wav_path = convert_to_wav(tmp_path)
+            embedding = get_segment_embeddings(wav_path, result.get("segments", []))
+            speaker_id, _, similarity_score = get_or_create_speaker(embedding)
+        except Exception as e:
+            print(f"⚠️ Speaker ID skipped for this dictation: {e}")
+
+        structured = extract_structured(text)
+
+        doc = {
+            "id": str(uuid.uuid4()),
+            "mode": "dictation",
+            "patient_id": patient_id,
+            "text": text,
+            "language": detected_code,
+            "language_name": detected_language.capitalize() if detected_language != "unknown" else "Unknown",
+            "speaker_id": speaker_id,
+            "similarity_score": round(similarity_score, 4),
+            "structured": structured,
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "duration_seconds": (
                 result.get("segments", [{}])[-1].get("end", 0)

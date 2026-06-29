@@ -10,8 +10,6 @@ import NurseDashboard from './pages/NurseDashboard';
 import PatientProfile from './pages/PatientProfile';
 import PreVisitAssessment from './pages/PreVisitAssessment';
 import PhysicianEvaluation from './pages/PhysicianEvaluation';
-import DiagnosticRequests from './pages/DiagnosticRequests';
-import TreatmentPathway from './pages/TreatmentPathway';
 import AllPatients from './pages/AllPatients';
 
 export default function App() {
@@ -72,23 +70,7 @@ export default function App() {
               <PhysicianEvaluation
                 patients={patients}
                 onAddEvaluation={addEvaluation}
-              />
-            }
-          />
-          <Route
-            path="/diagnostics"
-            element={
-              <DiagnosticRequests
-                patients={patients}
                 onAddDiagnostic={addDiagnostic}
-              />
-            }
-          />
-          <Route
-            path="/treatment"
-            element={
-              <TreatmentPathway
-                patients={patients}
                 onAddTreatment={addTreatment}
               />
             }
