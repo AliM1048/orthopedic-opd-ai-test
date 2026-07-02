@@ -81,7 +81,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
               <div className="card-title">Scheduled Patients</div>
               <div className="card-subtitle">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Patient</button>
               <div className="search-bar">
               <Search size={16} color="#94a3b8" />

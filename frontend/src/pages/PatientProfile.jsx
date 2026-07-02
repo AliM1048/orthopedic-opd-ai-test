@@ -1,11 +1,26 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill } from 'lucide-react';
+import { ArrowLeft, Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
+
+function latestByDate(items) {
+  if (!items || items.length === 0) return null;
+  return [...items].sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
+const TABS = [
+  { key: 'overview', label: 'Overview', icon: LayoutGrid },
+  { key: 'assessments', label: 'Assessments', icon: ClipboardList },
+  { key: 'evaluations', label: 'Evaluations', icon: Stethoscope },
+  { key: 'diagnostics', label: 'Diagnostics', icon: FileText },
+  { key: 'treatments', label: 'Treatments', icon: Pill },
+];
 
 export default function PatientProfile({ patients }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const patient = patients.find((p) => p.id === id);
+  const [activeTab, setActiveTab] = useState('overview');
 
   if (!patient) {
     return (
@@ -21,6 +36,12 @@ export default function PatientProfile({ patients }) {
       </>
     );
   }
+
+  const latestEvaluation = latestByDate(patient.evaluations);
+  const latestTreatment = latestByDate(patient.treatments);
+  const latestAssessment = latestByDate(patient.assessments);
+  const lastVisit = latestByDate([...patient.evaluations, ...patient.assessments, ...patient.treatments]);
+  const hasAllergies = patient.allergies && patient.allergies.toLowerCase() !== 'none';
 
   return (
     <>
@@ -49,13 +70,25 @@ export default function PatientProfile({ patients }) {
               <p className="text-muted">{patient.age} years old · {patient.gender} · {patient.bodyArea}</p>
             </div>
           </div>
-          <div className="info-grid">
-            <div className="info-item"><label><Calendar size={12} /> Date of Birth</label><span>{patient.dob}</span></div>
-            <div className="info-item"><label><Phone size={12} /> Phone</label><span>{patient.phone}</span></div>
-            <div className="info-item"><label><Mail size={12} /> Email</label><span>{patient.email}</span></div>
-            <div className="info-item"><label><MapPin size={12} /> Address</label><span>{patient.address}</span></div>
-            <div className="info-item"><label><Droplets size={12} /> Blood Type</label><span>{patient.bloodType}</span></div>
-            <div className="info-item"><label><AlertCircle size={12} /> Allergies</label><span>{patient.allergies || 'None'}</span></div>
+
+          {/* At-a-glance summary — the key things a physician needs before seeing the patient */}
+          <div className="profile-summary-banner">
+            <div className="summary-chip">
+              <label>Current Diagnosis</label>
+              <span>{latestEvaluation ? latestEvaluation.diagnosis : 'None on file'}</span>
+            </div>
+            <div className="summary-chip">
+              <label>Active Treatment</label>
+              <span>{latestTreatment ? `${latestTreatment.type} · ${latestTreatment.duration}` : 'None on file'}</span>
+            </div>
+            <div className={`summary-chip ${hasAllergies ? 'danger' : ''}`}>
+              <label>Allergies</label>
+              <span>{patient.allergies || 'None'}</span>
+            </div>
+            <div className="summary-chip">
+              <label>Last Visit</label>
+              <span>{lastVisit ? lastVisit.date : 'No visits yet'}</span>
+            </div>
           </div>
         </div>
 
@@ -69,8 +102,69 @@ export default function PatientProfile({ patients }) {
           </button>
         </div>
 
-        <div className="grid-2" style={{ gap: 24 }}>
-          {/* Assessments */}
+        {/* Tabs */}
+        <div className="tabs">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              className={`tab-btn ${activeTab === key ? 'active' : ''}`}
+              onClick={() => setActiveTab(key)}
+            >
+              <Icon size={14} style={{ display: 'inline', marginRight: 6, verticalAlign: -2 }} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'overview' && (
+          <div className="grid-2" style={{ gap: 24 }}>
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Contact & Details</div>
+              </div>
+              <div className="info-grid">
+                <div className="info-item"><label><Calendar size={12} /> Date of Birth</label><span>{patient.dob}</span></div>
+                <div className="info-item"><label><Phone size={12} /> Phone</label><span>{patient.phone}</span></div>
+                <div className="info-item"><label><Mail size={12} /> Email</label><span>{patient.email}</span></div>
+                <div className="info-item"><label><MapPin size={12} /> Address</label><span>{patient.address}</span></div>
+                <div className="info-item"><label><Droplets size={12} /> Blood Type</label><span>{patient.bloodType}</span></div>
+                <div className="info-item"><label><AlertCircle size={12} /> Allergies</label><span>{patient.allergies || 'None'}</span></div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Latest Summary</div>
+              </div>
+              <div className="timeline">
+                <div className="timeline-item">
+                  <div className="timeline-dot green" />
+                  <div className="timeline-date">Last Assessment</div>
+                  <div className="timeline-title">
+                    {latestAssessment ? `${latestAssessment.type} — ${latestAssessment.bodyArea} (${latestAssessment.date})` : 'No assessments yet'}
+                  </div>
+                  {latestAssessment && <div className="timeline-body">Score: {latestAssessment.score}/{latestAssessment.maxScore}</div>}
+                </div>
+                <div className="timeline-item">
+                  <div className="timeline-dot" />
+                  <div className="timeline-date">Last Evaluation</div>
+                  <div className="timeline-title">{latestEvaluation ? latestEvaluation.diagnosis : 'No evaluations yet'}</div>
+                  {latestEvaluation && <div className="timeline-body">{latestEvaluation.notes}</div>}
+                </div>
+                <div className="timeline-item" style={{ marginBottom: 0 }}>
+                  <div className="timeline-dot purple" />
+                  <div className="timeline-date">Active Treatment</div>
+                  <div className="timeline-title">
+                    {latestTreatment ? `${latestTreatment.type} — ${latestTreatment.duration}` : 'No treatments yet'}
+                  </div>
+                  {latestTreatment?.followUpDate && <div className="timeline-body">Follow-up: {latestTreatment.followUpDate}</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'assessments' && (
           <div className="card">
             <div className="card-header">
               <div className="card-title"><ClipboardList size={16} style={{ display: 'inline', marginRight: 6 }} />Assessments</div>
@@ -90,8 +184,9 @@ export default function PatientProfile({ patients }) {
               </div>
             )}
           </div>
+        )}
 
-          {/* Evaluations */}
+        {activeTab === 'evaluations' && (
           <div className="card">
             <div className="card-header">
               <div className="card-title"><Stethoscope size={16} style={{ display: 'inline', marginRight: 6 }} />Physician Evaluations</div>
@@ -111,8 +206,9 @@ export default function PatientProfile({ patients }) {
               </div>
             )}
           </div>
+        )}
 
-          {/* Diagnostics */}
+        {activeTab === 'diagnostics' && (
           <div className="card">
             <div className="card-header">
               <div className="card-title"><FileText size={16} style={{ display: 'inline', marginRight: 6 }} />Diagnostic Tests</div>
@@ -135,8 +231,9 @@ export default function PatientProfile({ patients }) {
               </table>
             )}
           </div>
+        )}
 
-          {/* Treatments */}
+        {activeTab === 'treatments' && (
           <div className="card">
             <div className="card-header">
               <div className="card-title"><Pill size={16} style={{ display: 'inline', marginRight: 6 }} />Treatment Plans</div>
@@ -157,7 +254,7 @@ export default function PatientProfile({ patients }) {
               </div>
             )}
           </div>
-        </div>
+        )}
       </div>
     </>
   );

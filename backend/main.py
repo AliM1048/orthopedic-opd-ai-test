@@ -167,6 +167,29 @@ def run_whisper(path: str, language: str | None = None, fast: bool = False) -> d
 # Audio helpers
 # ──────────────────────────────────────────────
 
+def transcribe_with_fallback(path: str, language: str | None = None, fast: bool = False) -> dict:
+    """run_whisper(), retrying once on a clean ffmpeg re-encode if PyAV's
+    decoder rejects the raw upload.
+
+    faster-whisper decodes audio via PyAV, which is stricter than ffmpeg
+    about MediaRecorder's chunked WebM output — a browser hiccup mid-recording
+    (dropped frame, device hand-off) can produce a container PyAV refuses
+    with "Invalid data found when processing input" even though the audio is
+    otherwise intact and ffmpeg (which pydub shells out to) can read it fine.
+    Re-encoding through pydub/ffmpeg first and retrying sidesteps that.
+    """
+    try:
+        return run_whisper(path, language=language, fast=fast)
+    except Exception as e:
+        print(f"⚠️ Whisper couldn't decode the upload directly ({e}); retrying via ffmpeg re-encode")
+        reencoded_path = path + "_reencoded.wav"
+        AudioSegment.from_file(path).export(reencoded_path, format="wav")
+        try:
+            return run_whisper(reencoded_path, language=language, fast=fast)
+        finally:
+            os.unlink(reencoded_path)
+
+
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio format to a 16 kHz mono WAV (required by Resemblyzer).
     Also removes silence / background noise for cleaner embeddings."""
@@ -338,7 +361,10 @@ async def transcribe(
     wav_path = None
     try:
         # ── Step 1: Whisper transcription ──────────────────────────────
-        result = run_whisper(tmp_path, language=language)
+        try:
+            result = transcribe_with_fallback(tmp_path, language=language)
+        except Exception as e:
+            return JSONResponse(status_code=422, content={"detail": f"Could not process the recording audio: {e}"})
         text = result["text"]
         detected_code = result.get("language", language or "unknown")
         detected_language = LANGUAGE_MAP.get(detected_code, detected_code)
@@ -455,7 +481,10 @@ async def dictate(
 
     wav_path = None
     try:
-        result = run_whisper(tmp_path, language="en")
+        try:
+            result = transcribe_with_fallback(tmp_path, language="en")
+        except Exception as e:
+            return JSONResponse(status_code=422, content={"detail": f"Could not process the recording audio: {e}"})
         text = result["text"]
         detected_code = result.get("language", "en")
         detected_language = LANGUAGE_MAP.get(detected_code, detected_code)

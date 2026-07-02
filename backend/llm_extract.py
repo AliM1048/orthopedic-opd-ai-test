@@ -121,6 +121,86 @@ def _apply_details_fallback(treatments: list, fallback_details: str) -> None:
             return
 
 
+# "follow-up date"/"follow up on" is itself a spoken cue, same idea as the
+# details cue above — but unlike free-text details, a date said as a raw
+# number sequence ("13, 12, 20, 26") is a fixed-shape value a regex can parse
+# far more reliably than a small local LLM reading garbled ASR text (Whisper
+# commonly splits a spoken year like "twenty twenty-six" into two separate
+# two-digit numbers). Deterministic parsing wins over the AI guess here, the
+# same as keyword_match already does for diagnostic tests/treatment types.
+_FOLLOWUP_DATE_CUE_PATTERN = re.compile(r"\bfollow[\s-]?up\s*(?:date|visit)?\b\s*[:,]?\s*", re.I)
+
+
+def _numbers_to_iso_date(numbers: list[int], today: datetime) -> str | None:
+    """Reconstruct a day/month/year date from a raw sequence of spoken
+    numbers. Re-merges a split year (e.g. [20, 26] -> 2026) before assigning
+    the remaining one or two numbers to day/month, preferring whichever
+    ordering is actually valid (a value over 12 can only be a day)."""
+    nums = list(numbers)
+    year = None
+
+    if len(nums) >= 2 and 19 <= nums[-2] <= 21 and 0 <= nums[-1] <= 99:
+        year = nums[-2] * 100 + nums[-1]
+        nums = nums[:-2]
+    elif nums and nums[-1] >= 1000:
+        year = nums[-1]
+        nums = nums[:-1]
+    elif nums and 0 <= nums[-1] <= 99:
+        year = 2000 + nums[-1]
+        nums = nums[:-1]
+
+    if year is None or not (today.year - 1 <= year <= today.year + 5):
+        return None
+
+    if len(nums) == 2:
+        a, b = nums
+        if 1 <= a <= 12 and 1 <= b <= 31 and b > 12:
+            month, day = a, b
+        elif 1 <= b <= 12 and 1 <= a <= 31:
+            day, month = a, b
+        else:
+            return None
+    elif len(nums) == 1 and 1 <= nums[0] <= 31:
+        day, month = nums[0], today.month
+    else:
+        return None
+
+    try:
+        return datetime(year, month, day).strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def extract_followup_date_cue(treatment_text: str, today: datetime) -> str | None:
+    """Return an ISO date parsed from whatever was said after a "follow-up
+    date" cue in the treatment section, or None if the cue wasn't used or
+    couldn't be parsed as a date."""
+    m = _FOLLOWUP_DATE_CUE_PATTERN.search(treatment_text)
+    if not m:
+        return None
+    tail = treatment_text[m.end():]
+    cutoff = len(tail)
+    details_m = _DETAILS_CUE_PATTERN.search(tail)
+    if details_m:
+        cutoff = min(cutoff, details_m.start())
+    period = tail.find(".")
+    if period != -1:
+        cutoff = min(cutoff, period)
+    tail = tail[:cutoff]
+    numbers = [int(n) for n in re.findall(r"\d+", tail)]
+    return _numbers_to_iso_date(numbers, today)
+
+
+def _apply_followup_date_fallback(treatments: list, fallback_date: str | None) -> None:
+    """If the doctor used an explicit "follow-up date" cue and it parsed
+    cleanly, that value overrides whatever the LLM guessed for the last
+    treatment mentioned — see extract_followup_date_cue for why the
+    deterministic parse is trusted over the AI here."""
+    if not fallback_date or not treatments:
+        return
+    treatments[-1]["followUpDate"] = fallback_date
+
+
 def segment_dictation(text: str) -> dict:
     """Split one continuous dictation into evaluation/diagnostics/treatment
     chunks. Anything spoken before the first marker is treated as evaluation,
@@ -272,10 +352,12 @@ def extract_structured(transcript: str) -> dict:
     only relied on for the genuinely free-text parts: the diagnosis label,
     clinical notes, and resolving things like "duration" / follow-up dates.
     """
+    today = datetime.utcnow()
     sections = segment_dictation(transcript)
     keyword_tests = keyword_match(sections["diagnostics"], DIAGNOSTIC_TEST_SYNONYMS)
     keyword_treatment_types = keyword_match(sections["treatment"], TREATMENT_SYNONYMS)
     fallback_details = extract_details_cue(sections["treatment"])
+    fallback_followup_date = extract_followup_date_cue(sections["treatment"], today)
 
     if not transcript.strip():
         return {
@@ -294,6 +376,7 @@ def extract_structured(transcript: str) -> dict:
             for t in keyword_treatment_types
         ]
         _apply_details_fallback(treatments, fallback_details)
+        _apply_followup_date_fallback(treatments, fallback_followup_date)
         return {
             "diagnosis": "",
             "notes": sections["evaluation"] or transcript,
@@ -327,6 +410,7 @@ def extract_structured(transcript: str) -> dict:
 
     treatments = list(treatments_by_type.values())
     _apply_details_fallback(treatments, fallback_details)
+    _apply_followup_date_fallback(treatments, fallback_followup_date)
 
     return {
         "diagnosis": _clean_str(parsed.get("diagnosis")),

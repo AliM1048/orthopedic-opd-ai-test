@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mic, Square, Save, FileText, X, Plus } from 'lucide-react';
+import { ArrowLeft, Mic, Save, FileText, X, Plus } from 'lucide-react';
 import { useDictation } from '../hooks/useDictation';
 import { DIAGNOSTIC_TESTS, TREATMENT_OPTIONS } from '../data/mockData';
-
-function formatTimer(seconds) {
-  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${m}:${s}`;
-}
+import DictationRecordingModal from '../components/DictationRecordingModal';
 
 function uid() {
   return `t${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -25,13 +20,15 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation, onAddDi
   const [selectedTests, setSelectedTests] = useState([]);
   const [treatments, setTreatments] = useState([]);
   const [dictation, setDictation] = useState(null);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showDictationModal, setShowDictationModal] = useState(false);
   const [error, setError] = useState(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const handleDictationResult = (data) => {
     setError(null);
     setDictation(data);
+    setShowDictationModal(false);
 
     const structured = data?.structured;
     if (!structured) return;
@@ -54,6 +51,23 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation, onAddDi
 
   const { isRecording, isProcessing, elapsedSeconds, liveCaption, startRecording, stopRecording } =
     useDictation({ patientId, onResult: handleDictationResult, onError: setError });
+
+  const handleStartDictation = () => {
+    setDictation(null);
+    setError(null);
+    setShowDictationModal(true);
+    startRecording();
+  };
+
+  const handleRetryDictation = () => {
+    setError(null);
+    startRecording();
+  };
+
+  const handleCloseDictationModal = () => {
+    setShowDictationModal(false);
+    setError(null);
+  };
 
   const toggleTest = (id) => {
     setSelectedTests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -211,55 +225,25 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation, onAddDi
             </div>
           )}
 
-          {/* Voice Dictation — single take covers diagnosis + diagnostics + treatment */}
-          <div className="voice-recorder-card mb-4">
-            <h3>🎙 Record Full Visit — Whisper AI</h3>
-            <p>
-              One recording covers everything. Say <strong>&ldquo;Diagnosis…&rdquo;</strong>, then{' '}
-              <strong>&ldquo;Diagnostics…&rdquo;</strong> to order tests, then <strong>&ldquo;Treatment plan…&rdquo;</strong> to
-              prescribe — all fields below fill in automatically.
-            </p>
-
-            <button
-              className={`record-btn-medical ${isRecording ? 'recording' : ''}`}
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <div className="spin-ring" style={{ width: 28, height: 28 }} />
-              ) : isRecording ? (
-                <Square size={28} />
-              ) : (
-                <Mic size={28} />
-              )}
-            </button>
-
-            {isRecording && (
-              <>
-                <div className="record-timer-medical">{formatTimer(elapsedSeconds)}</div>
-                <div className="record-status-medical">Recording the full visit… Click to stop</div>
-              </>
-            )}
-            {isProcessing && <div className="record-status-medical">Transcribing & structuring with Whisper + AI…</div>}
-            {!isRecording && !isProcessing && <div className="record-status-medical">Click the mic and dictate the whole visit</div>}
-
-            {isRecording && (
-              <div className="transcript-result">
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="spin-ring" style={{ width: 10, height: 10, borderWidth: 2, margin: 0 }} /> Live — what the mic is hearing
+          {/* Voice Dictation trigger — fills the chart fields below automatically */}
+          <div className="card mb-4">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Mic size={22} />
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div className="fw-700">Record Full Visit — Whisper AI</div>
+                <div className="text-muted">
+                  Say “Diagnosis…”, “Diagnostics…”, then “Treatment plan…” — the fields below fill in automatically when you stop.
                 </div>
-                {liveCaption || <span style={{ opacity: 0.5 }}>Listening…</span>}
               </div>
-            )}
-
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 12, marginTop: 16, color: '#fca5a5', fontSize: 13 }}>
-                ⚠️ {error}
-              </div>
-            )}
+              <button type="button" className="btn btn-primary" onClick={handleStartDictation}>
+                <Mic size={16} /> Start Dictation
+              </button>
+            </div>
 
             {dictation && !dictation.structured?.ai_structured && (
-              <div style={{ background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 8, padding: 12, marginTop: 16, color: '#fcd34d', fontSize: 13 }}>
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: 12, marginTop: 16, color: '#92400e', fontSize: 13 }}>
                 ⚠️ AI structuring is unavailable right now (the local LLM may not be running), so diagnostic tests
                 and treatment plan weren&apos;t auto-filled. The transcript was added to Clinical Notes — fill the
                 sections below manually.
@@ -276,14 +260,24 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation, onAddDi
               </button>
             )}
             {dictation && showTranscript && (
-              <div className="transcript-result">
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {dictation.language && `Detected: ${dictation.language_name || dictation.language}`}
-                </div>
-                {dictation.text}
+              <div className="transcript-result" style={{ color: 'var(--text-secondary)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                {dictation.language && `Detected: ${dictation.language_name || dictation.language}`}
+                <div style={{ marginTop: 4 }}>{dictation.text}</div>
               </div>
             )}
           </div>
+
+          <DictationRecordingModal
+            open={showDictationModal}
+            isRecording={isRecording}
+            isProcessing={isProcessing}
+            elapsedSeconds={elapsedSeconds}
+            liveCaption={liveCaption}
+            error={error}
+            onStopRecording={stopRecording}
+            onRetry={handleRetryDictation}
+            onClose={handleCloseDictationModal}
+          />
 
           {/* Diagnosis */}
           <div className="card mb-4">
