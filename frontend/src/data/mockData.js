@@ -131,95 +131,784 @@ export const MOCK_PATIENTS = [
   }
 ];
 
+// ─── Rich Assessment Config ───────────────────────────────────────────────────
+export const ASSESSMENT_CONFIG = {
+  Knee: {
+    id: 'knee-intake',
+    title: 'PROM Intake — Knee',
+    description: 'Please answer all questions honestly. Your responses help us provide the best possible care.',
+    sections: [
+      {
+        id: 'demographics',
+        title: 'Demographics',
+        icon: 'User',
+        questions: [
+          {
+            id: 'dem_onset', type: 'radio', required: true,
+            text: 'When did your knee pain start?',
+            description: 'Select the option that best describes when your symptoms began.',
+            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'More than 6 months']
+          },
+          {
+            id: 'dem_surgery', type: 'radio', required: true,
+            text: 'Have you had previous knee surgery?',
+            options: ['No', 'Yes — 1 surgery', 'Yes — 2 surgeries', 'Yes — 3 or more']
+          },
+          {
+            id: 'dem_injury', type: 'radio', required: true,
+            text: 'Was the onset of pain related to an injury?',
+            options: ['No injury', 'Mild injury', 'Significant trauma', 'Sports injury']
+          },
+          {
+            id: 'dem_occupation', type: 'text', required: false,
+            text: 'What is your current occupation?',
+            description: 'Optional — helps us understand your activity requirements.',
+            placeholder: 'e.g. Teacher, Construction worker, Office worker'
+          },
+          {
+            id: 'dem_activity', type: 'radio', required: true,
+            text: 'How would you describe your typical activity level?',
+            options: ['Sedentary (mostly sitting)', 'Light activity', 'Moderate activity', 'Heavy physical work / sport']
+          }
+        ]
+      },
+      {
+        id: 'symptoms',
+        title: 'Symptoms',
+        icon: 'Activity',
+        questions: [
+          {
+            id: 'sym_swelling', type: 'radio', required: true,
+            text: 'Do you experience swelling in the knee?',
+            options: ['No swelling', 'Occasional swelling', 'Frequent swelling', 'Constant swelling']
+          },
+          {
+            id: 'sym_locking', type: 'radio', required: true,
+            text: 'Do you experience locking or catching in the knee?',
+            description: 'Locking means the knee gets stuck and cannot fully straighten.',
+            options: ['Never', 'Rarely', 'Sometimes', 'Often']
+          },
+          {
+            id: 'sym_buckling', type: 'radio', required: true,
+            text: 'Has the knee given way (buckled) during activity?',
+            options: ['Never', 'Rarely', 'Sometimes', 'Frequently']
+          },
+          {
+            id: 'sym_stiffness', type: 'radio', required: true,
+            text: 'Do you experience morning stiffness?',
+            options: ['No stiffness', 'Less than 30 minutes', '30–60 minutes', 'More than 1 hour']
+          },
+          {
+            id: 'sym_description', type: 'textarea', required: false,
+            text: 'Describe any other symptoms you are experiencing.',
+            placeholder: 'e.g. Clicking sounds, warmth, redness, numbness…',
+            description: 'Any additional details will help your doctor.'
+          }
+        ]
+      },
+      {
+        id: 'pain',
+        title: 'Pain Assessment',
+        icon: 'Zap',
+        scoring: true,
+        questions: [
+          {
+            id: 'pain_rest', type: 'radio', required: true,
+            text: 'How would you rate your knee pain at rest?',
+            description: 'Consider pain when sitting, lying down, or relaxing.',
+            options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_activity', type: 'radio', required: true,
+            text: 'How would you rate your knee pain during activity?',
+            description: 'Consider pain when walking, climbing stairs, or exercising.',
+            options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_night', type: 'radio', required: true,
+            text: 'Do you experience night pain that affects your sleep?',
+            options: ['No night pain', 'Occasional', 'Frequent', 'Every night'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_scale', type: 'numeric', required: true,
+            text: 'On a scale of 0–10, what is your average pain level this week?',
+            description: '0 = No pain, 10 = Worst pain imaginable',
+            min: 0, max: 10, step: 1,
+            scoreValues: null
+          },
+          {
+            id: 'pain_medication', type: 'radio', required: true,
+            text: 'Are you currently taking pain medication for this knee?',
+            options: ['No medication', 'Over-the-counter, occasionally', 'Over-the-counter, regularly', 'Prescription required'],
+            scoreValues: [0, 1, 2, 3]
+          }
+        ]
+      },
+      {
+        id: 'quickdash',
+        title: 'QuickDASH',
+        icon: 'BarChart2',
+        scoring: true,
+        scoreCalculation: 'quickdash',
+        description: 'Please rate your ability to perform the following activities in the past week.',
+        questions: [
+          {
+            id: 'qdash_bend', type: 'radio', required: true,
+            text: 'Can you fully bend your knee?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_straighten', type: 'radio', required: true,
+            text: 'Can you fully straighten your knee?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_walk', type: 'radio', required: true,
+            text: 'How far can you walk without significant pain?',
+            description: 'During the past week.',
+            options: ['More than 1 km', '500 m – 1 km', '100 m – 500 m', 'Less than 100 m', 'Unable to walk'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_stairs', type: 'radio', required: true,
+            text: 'Can you climb stairs?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_sleep', type: 'radio', required: true,
+            text: 'During the past week, how much difficulty have you had sleeping because of pain in your knee?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_work', type: 'radio', required: true,
+            text: 'During the past week, to what extent has your knee problem interfered with your work?',
+            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            scoreValues: [1, 2, 3, 4, 5]
+          }
+        ]
+      },
+      {
+        id: 'qol',
+        title: 'Quality of Life',
+        icon: 'Heart',
+        questions: [
+          {
+            id: 'qol_daily', type: 'radio', required: true,
+            text: 'How does the knee pain affect your daily activities?',
+            options: ['No impact', 'Mild impact', 'Moderate impact', 'Cannot perform daily activities']
+          },
+          {
+            id: 'qol_aid', type: 'radio', required: true,
+            text: 'Do you use a walking aid?',
+            options: ['None needed', 'Occasionally', 'Most of the time', 'Always required']
+          },
+          {
+            id: 'qol_social', type: 'radio', required: true,
+            text: 'How has your social life been affected by your knee problem?',
+            options: ['Not affected', 'Slightly affected', 'Moderately affected', 'Severely affected']
+          },
+          {
+            id: 'qol_overall', type: 'radio', required: true,
+            text: 'Overall, how is your quality of life affected?',
+            options: ['Not affected', 'Slightly affected', 'Moderately affected', 'Severely affected']
+          },
+          {
+            id: 'qol_mood', type: 'radio', required: false,
+            text: 'Has your knee problem affected your mood or mental well-being?',
+            options: ['Not at all', 'Occasionally', 'Often', 'Significantly']
+          }
+        ]
+      },
+      {
+        id: 'other',
+        title: 'Other',
+        icon: 'MoreHorizontal',
+        questions: [
+          {
+            id: 'oth_conditions', type: 'checkbox', required: false,
+            text: 'Do you have any of the following diagnosed conditions?',
+            description: 'Select all that apply.',
+            options: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Diabetes', 'Osteoporosis', 'Heart disease', 'None of the above']
+          },
+          {
+            id: 'oth_physio', type: 'radio', required: true,
+            text: 'Have you had physical therapy for this knee before?',
+            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing PT']
+          },
+          {
+            id: 'oth_injection', type: 'radio', required: false,
+            text: 'Have you had any injections into the knee?',
+            options: ['No', 'Cortisone injection(s)', 'Hyaluronic acid', 'PRP therapy']
+          },
+          {
+            id: 'oth_notes', type: 'textarea', required: false,
+            text: 'Is there anything else you would like the doctor to know?',
+            placeholder: 'Any additional concerns, questions, or context…'
+          }
+        ]
+      }
+    ]
+  },
+
+  Shoulder: {
+    id: 'shoulder-intake',
+    title: 'PROM Intake — Shoulder',
+    description: 'Please answer all questions honestly about your shoulder condition.',
+    sections: [
+      {
+        id: 'demographics',
+        title: 'Demographics',
+        icon: 'User',
+        questions: [
+          {
+            id: 'dem_onset', type: 'radio', required: true,
+            text: 'How long have you had this shoulder problem?',
+            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+          },
+          {
+            id: 'dem_surgery', type: 'radio', required: true,
+            text: 'Have you had previous shoulder surgery?',
+            options: ['No', 'Yes — once', 'Yes — twice', 'Yes — multiple times']
+          },
+          {
+            id: 'dem_injury', type: 'radio', required: true,
+            text: 'Was the pain caused by a specific injury?',
+            options: ['No injury', 'Gradual onset', 'Specific incident', 'Sports injury']
+          },
+          {
+            id: 'dem_dominant', type: 'radio', required: true,
+            text: 'Which is your dominant hand?',
+            options: ['Right', 'Left', 'Ambidextrous']
+          },
+          {
+            id: 'dem_affected', type: 'radio', required: true,
+            text: 'Which shoulder is affected?',
+            options: ['Right only', 'Left only', 'Both shoulders']
+          }
+        ]
+      },
+      {
+        id: 'symptoms',
+        title: 'Symptoms',
+        icon: 'Activity',
+        questions: [
+          {
+            id: 'sym_raise', type: 'radio', required: true,
+            text: 'Can you raise your arm above shoulder height?',
+            options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot raise']
+          },
+          {
+            id: 'sym_behind', type: 'radio', required: true,
+            text: 'Can you reach behind your back?',
+            options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot reach']
+          },
+          {
+            id: 'sym_weakness', type: 'radio', required: true,
+            text: 'Do you experience shoulder weakness?',
+            options: ['No weakness', 'Mild weakness', 'Moderate weakness', 'Significant weakness']
+          },
+          {
+            id: 'sym_clicking', type: 'radio', required: true,
+            text: 'Do you experience clicking or popping in the shoulder?',
+            options: ['Never', 'Rarely', 'Sometimes', 'Always']
+          },
+          {
+            id: 'sym_numbness', type: 'radio', required: true,
+            text: 'Do you experience numbness or tingling in your arm or hand?',
+            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+          }
+        ]
+      },
+      {
+        id: 'pain',
+        title: 'Pain Assessment',
+        icon: 'Zap',
+        scoring: true,
+        questions: [
+          {
+            id: 'pain_rest', type: 'radio', required: true,
+            text: 'How would you rate your shoulder pain at rest?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_activity', type: 'radio', required: true,
+            text: 'How would you rate your shoulder pain during movement?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_night', type: 'radio', required: true,
+            text: 'Do you have night pain affecting sleep?',
+            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_scale', type: 'numeric', required: true,
+            text: 'Rate your average pain level this week (0–10).',
+            description: '0 = No pain, 10 = Worst pain imaginable',
+            min: 0, max: 10, step: 1
+          }
+        ]
+      },
+      {
+        id: 'quickdash',
+        title: 'QuickDASH',
+        icon: 'BarChart2',
+        scoring: true,
+        scoreCalculation: 'quickdash',
+        description: 'Rate your ability to perform the following activities in the past week.',
+        questions: [
+          {
+            id: 'qdash_overhead', type: 'radio', required: true,
+            text: 'Can you perform overhead activities (e.g. reaching a high shelf)?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_dressing', type: 'radio', required: true,
+            text: 'How much difficulty do you have dressing yourself?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_carry', type: 'radio', required: true,
+            text: 'Can you carry a heavy bag or object?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_sleep', type: 'radio', required: true,
+            text: 'How much difficulty have you had sleeping because of shoulder pain?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_work', type: 'radio', required: true,
+            text: 'To what extent has your shoulder problem interfered with your work?',
+            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            scoreValues: [1, 2, 3, 4, 5]
+          }
+        ]
+      },
+      {
+        id: 'qol',
+        title: 'Quality of Life',
+        icon: 'Heart',
+        questions: [
+          {
+            id: 'qol_instability', type: 'radio', required: true,
+            text: 'Does the shoulder feel unstable (like it might dislocate)?',
+            options: ['No', 'Rarely', 'Sometimes', 'Frequently']
+          },
+          {
+            id: 'qol_sport', type: 'radio', required: false,
+            text: 'Do you participate in sports or recreational activities?',
+            options: ['No sports', 'Light activity', 'Regular sport', 'Competitive sport']
+          },
+          {
+            id: 'qol_overall', type: 'radio', required: true,
+            text: 'How is your overall quality of life affected by this shoulder problem?',
+            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+          }
+        ]
+      },
+      {
+        id: 'other',
+        title: 'Other',
+        icon: 'MoreHorizontal',
+        questions: [
+          {
+            id: 'oth_conditions', type: 'checkbox', required: false,
+            text: 'Do you have any of the following diagnosed conditions?',
+            description: 'Select all that apply.',
+            options: ['Diabetes', 'Rheumatoid Arthritis', 'Osteoporosis', 'Heart disease', 'None of the above']
+          },
+          {
+            id: 'oth_physio', type: 'radio', required: true,
+            text: 'Have you had physiotherapy for this shoulder?',
+            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+          },
+          {
+            id: 'oth_work', type: 'radio', required: true,
+            text: 'How is your work affected?',
+            options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work']
+          },
+          {
+            id: 'oth_notes', type: 'textarea', required: false,
+            text: 'Is there anything else you would like the doctor to know?',
+            placeholder: 'Any additional concerns or context…'
+          }
+        ]
+      }
+    ]
+  },
+
+  Spine: {
+    id: 'spine-intake',
+    title: 'PROM Intake — Spine',
+    description: 'Please answer all questions honestly about your back or neck condition.',
+    sections: [
+      {
+        id: 'demographics',
+        title: 'Demographics',
+        icon: 'User',
+        questions: [
+          {
+            id: 'dem_onset', type: 'radio', required: true,
+            text: 'How long have you had this spine problem?',
+            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+          },
+          {
+            id: 'dem_surgery', type: 'radio', required: true,
+            text: 'Have you had previous spine surgery?',
+            options: ['No', 'Yes — once', 'Yes — twice', 'Yes — multiple times']
+          },
+          {
+            id: 'dem_injury', type: 'radio', required: true,
+            text: 'Was the onset related to an injury?',
+            options: ['No injury', 'Lifting injury', 'Trauma / accident', 'Gradual onset']
+          },
+          {
+            id: 'dem_region', type: 'radio', required: true,
+            text: 'Which region is primarily affected?',
+            options: ['Lower back (lumbar)', 'Mid back (thoracic)', 'Neck (cervical)', 'Multiple regions']
+          }
+        ]
+      },
+      {
+        id: 'symptoms',
+        title: 'Symptoms',
+        icon: 'Activity',
+        questions: [
+          {
+            id: 'sym_radiation', type: 'radio', required: true,
+            text: 'Do you experience pain radiating down your leg or arm?',
+            options: ['No radiation', 'Occasional', 'Frequent', 'Constant']
+          },
+          {
+            id: 'sym_numbness', type: 'radio', required: true,
+            text: 'Do you experience numbness or tingling in your limbs?',
+            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+          },
+          {
+            id: 'sym_weakness', type: 'radio', required: true,
+            text: 'Do you experience muscle weakness in your arms or legs?',
+            options: ['No weakness', 'Mild', 'Moderate', 'Significant']
+          },
+          {
+            id: 'sym_bladder', type: 'radio', required: true,
+            text: 'Do you have any bowel or bladder issues?',
+            description: 'Important for ruling out serious conditions.',
+            options: ['None', 'Occasional urgency', 'Frequent issues', 'Loss of control']
+          },
+          {
+            id: 'sym_cough', type: 'radio', required: false,
+            text: 'Does the pain worsen when coughing or sneezing?',
+            options: ['No', 'Rarely', 'Sometimes', 'Always']
+          }
+        ]
+      },
+      {
+        id: 'pain',
+        title: 'Pain Assessment',
+        icon: 'Zap',
+        scoring: true,
+        questions: [
+          {
+            id: 'pain_rest', type: 'radio', required: true,
+            text: 'How would you rate your back/neck pain at rest?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_activity', type: 'radio', required: true,
+            text: 'How would you rate your pain during activity?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_night', type: 'radio', required: true,
+            text: 'Do you experience night pain?',
+            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_scale', type: 'numeric', required: true,
+            text: 'Rate your average pain level this week (0–10).',
+            min: 0, max: 10, step: 1
+          }
+        ]
+      },
+      {
+        id: 'quickdash',
+        title: 'QuickDASH',
+        icon: 'BarChart2',
+        scoring: true,
+        scoreCalculation: 'quickdash',
+        description: 'Rate your ability to perform the following activities in the past week.',
+        questions: [
+          {
+            id: 'qdash_sit', type: 'radio', required: true,
+            text: 'How long can you sit comfortably?',
+            options: ['Over 1 hour', '30–60 minutes', '10–30 minutes', 'Less than 10 minutes', 'Cannot sit'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_stand', type: 'radio', required: true,
+            text: 'How long can you stand comfortably?',
+            options: ['Over 1 hour', '30–60 minutes', '10–30 minutes', 'Less than 10 minutes', 'Cannot stand'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_bend', type: 'radio', required: true,
+            text: 'Can you bend forward comfortably?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Cannot bend'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_sleep', type: 'radio', required: true,
+            text: 'How much difficulty have you had sleeping because of spine pain?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_work', type: 'radio', required: true,
+            text: 'To what extent has your spine problem interfered with your work?',
+            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            scoreValues: [1, 2, 3, 4, 5]
+          }
+        ]
+      },
+      {
+        id: 'qol',
+        title: 'Quality of Life',
+        icon: 'Heart',
+        questions: [
+          {
+            id: 'qol_morning', type: 'radio', required: true,
+            text: 'Do you experience morning stiffness?',
+            options: ['No', 'Less than 30 minutes', '30–60 minutes', 'Over 1 hour']
+          },
+          {
+            id: 'qol_work', type: 'radio', required: true,
+            text: 'How is your work affected?',
+            options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work']
+          },
+          {
+            id: 'qol_overall', type: 'radio', required: true,
+            text: 'How is your overall quality of life affected?',
+            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+          }
+        ]
+      },
+      {
+        id: 'other',
+        title: 'Other',
+        icon: 'MoreHorizontal',
+        questions: [
+          {
+            id: 'oth_conditions', type: 'checkbox', required: false,
+            text: 'Do you have any of the following diagnosed conditions?',
+            description: 'Select all that apply.',
+            options: ['Osteoporosis', 'Diabetes', 'Rheumatoid Arthritis', 'Heart disease', 'None of the above']
+          },
+          {
+            id: 'oth_physio', type: 'radio', required: true,
+            text: 'Have you had physiotherapy for this condition?',
+            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+          },
+          {
+            id: 'oth_notes', type: 'textarea', required: false,
+            text: 'Is there anything else you would like the doctor to know?',
+            placeholder: 'Any additional concerns or context…'
+          }
+        ]
+      }
+    ]
+  },
+
+  Other: {
+    id: 'general-intake',
+    title: 'PROM Intake — General',
+    description: 'Please answer all questions honestly about your condition.',
+    sections: [
+      {
+        id: 'demographics',
+        title: 'Demographics',
+        icon: 'User',
+        questions: [
+          {
+            id: 'dem_onset', type: 'radio', required: true,
+            text: 'When did the problem start?',
+            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+          },
+          {
+            id: 'dem_injury', type: 'radio', required: true,
+            text: 'Was the onset related to an injury?',
+            options: ['No', 'Minor injury', 'Significant trauma', 'Gradual onset']
+          },
+          {
+            id: 'dem_surgery', type: 'radio', required: true,
+            text: 'Have you had previous surgery for this condition?',
+            options: ['No', 'Yes — once', 'Yes — multiple times', 'Surgery scheduled']
+          }
+        ]
+      },
+      {
+        id: 'symptoms',
+        title: 'Symptoms',
+        icon: 'Activity',
+        questions: [
+          {
+            id: 'sym_swelling', type: 'radio', required: true,
+            text: 'Do you experience swelling in the affected area?',
+            options: ['No swelling', 'Occasional', 'Frequent', 'Constant']
+          },
+          {
+            id: 'sym_numbness', type: 'radio', required: true,
+            text: 'Do you have numbness or tingling?',
+            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+          },
+          {
+            id: 'sym_recurring', type: 'radio', required: true,
+            text: 'Have you had this issue before?',
+            options: ['No', 'Once before', 'Multiple times', 'Recurring condition']
+          }
+        ]
+      },
+      {
+        id: 'pain',
+        title: 'Pain Assessment',
+        icon: 'Zap',
+        scoring: true,
+        questions: [
+          {
+            id: 'pain_rest', type: 'radio', required: true,
+            text: 'How would you rate your pain at rest?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_activity', type: 'radio', required: true,
+            text: 'How would you rate your pain during activity?',
+            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_night', type: 'radio', required: true,
+            text: 'Do you experience night pain?',
+            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
+            scoreValues: [0, 1, 2, 3]
+          },
+          {
+            id: 'pain_scale', type: 'numeric', required: true,
+            text: 'Rate your average pain level this week (0–10).',
+            min: 0, max: 10, step: 1
+          }
+        ]
+      },
+      {
+        id: 'quickdash',
+        title: 'QuickDASH',
+        icon: 'BarChart2',
+        scoring: true,
+        scoreCalculation: 'quickdash',
+        description: 'Rate your ability to perform the following activities in the past week.',
+        questions: [
+          {
+            id: 'qdash_daily', type: 'radio', required: true,
+            text: 'How does the pain affect your daily activities?',
+            options: ['No impact', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Cannot perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_sleep', type: 'radio', required: true,
+            text: 'How much difficulty have you had sleeping because of pain?',
+            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            scoreValues: [1, 2, 3, 4, 5]
+          },
+          {
+            id: 'qdash_work', type: 'radio', required: true,
+            text: 'To what extent has your problem interfered with your work?',
+            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            scoreValues: [1, 2, 3, 4, 5]
+          }
+        ]
+      },
+      {
+        id: 'qol',
+        title: 'Quality of Life',
+        icon: 'Heart',
+        questions: [
+          {
+            id: 'qol_aid', type: 'radio', required: true,
+            text: 'Do you use a walking aid or support?',
+            options: ['No', 'Occasionally', 'Most of the time', 'Always']
+          },
+          {
+            id: 'qol_overall', type: 'radio', required: true,
+            text: 'How is your overall quality of life affected?',
+            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+          }
+        ]
+      },
+      {
+        id: 'other',
+        title: 'Other',
+        icon: 'MoreHorizontal',
+        questions: [
+          {
+            id: 'oth_conditions', type: 'checkbox', required: false,
+            text: 'Do you have any of the following diagnosed conditions?',
+            options: ['Arthritis', 'Diabetes', 'Osteoporosis', 'Heart disease', 'None of the above']
+          },
+          {
+            id: 'oth_physio', type: 'radio', required: true,
+            text: 'Have you had physiotherapy before?',
+            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+          },
+          {
+            id: 'oth_weather', type: 'radio', required: false,
+            text: 'Does weather affect your pain?',
+            options: ['No', 'Sometimes', 'Often', 'Always']
+          },
+          {
+            id: 'oth_notes', type: 'textarea', required: false,
+            text: 'Is there anything else you would like the doctor to know?',
+            placeholder: 'Any additional concerns or context…'
+          }
+        ]
+      }
+    ]
+  }
+};
+
+// Legacy format (kept for backward compatibility if needed)
 export const ASSESSMENT_QUESTIONS = {
-  Knee: [
-    { id: 'q1', text: 'How would you rate your knee pain at rest?', options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'] },
-    { id: 'q2', text: 'How would you rate your knee pain during activity?', options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'] },
-    { id: 'q3', text: 'Can you fully bend your knee?', options: ['Yes, fully', 'Mostly but limited', 'Only slightly', 'Cannot bend'] },
-    { id: 'q4', text: 'Can you fully straighten your knee?', options: ['Yes, fully', 'Mostly but limited', 'Only slightly', 'Cannot straighten'] },
-    { id: 'q5', text: 'Do you experience swelling in the knee?', options: ['No swelling', 'Occasional', 'Frequent', 'Constant'] },
-    { id: 'q6', text: 'Do you experience locking or catching in the knee?', options: ['Never', 'Rarely', 'Sometimes', 'Often'] },
-    { id: 'q7', text: 'How far can you walk without significant pain?', options: ['More than 1 km', '500m - 1 km', '100m - 500m', 'Less than 100m'] },
-    { id: 'q8', text: 'Can you climb stairs?', options: ['Yes, normally', 'With mild difficulty', 'With significant difficulty', 'Cannot climb'] },
-    { id: 'q9', text: 'Do you use a walking aid?', options: ['None needed', 'Occasionally', 'Most of the time', 'Always required'] },
-    { id: 'q10', text: 'Has the knee given way (buckled) during activity?', options: ['Never', 'Rarely', 'Sometimes', 'Frequently'] },
-    { id: 'q11', text: 'Do you experience night pain affecting sleep?', options: ['No night pain', 'Occasional', 'Frequent', 'Every night'] },
-    { id: 'q12', text: 'Have you had previous knee surgery?', options: ['No', 'Yes, 1 surgery', 'Yes, 2 surgeries', 'Yes, 3 or more'] },
-    { id: 'q13', text: 'Are you currently taking pain medication for this knee?', options: ['No medication', 'OTC occasionally', 'OTC regularly', 'Prescription required'] },
-    { id: 'q14', text: 'How does the pain affect your daily activities?', options: ['No impact', 'Mild impact', 'Moderate impact', 'Cannot perform daily activities'] },
-    { id: 'q15', text: 'When did the pain start?', options: ['Less than 1 week', '1-4 weeks', '1-6 months', 'More than 6 months'] },
-    { id: 'q16', text: 'Was the onset of pain related to an injury?', options: ['No injury', 'Mild injury', 'Significant trauma', 'Sports injury'] },
-    { id: 'q17', text: 'Do you have any diagnosed conditions (e.g., arthritis, diabetes)?', options: ['None', 'Arthritis', 'Diabetes', 'Multiple conditions'] },
-    { id: 'q18', text: 'Have you had physical therapy for this knee before?', options: ['Never', 'Once', 'Multiple times', 'Currently undergoing PT'] },
-    { id: 'q19', text: 'How is your overall quality of life affected?', options: ['Not affected', 'Slightly affected', 'Moderately affected', 'Severely affected'] },
-    { id: 'q20', text: 'What is your work/activity level?', options: ['Sedentary', 'Light activity', 'Moderate activity', 'Heavy physical work'] }
-  ],
-  Shoulder: [
-    { id: 'q1', text: 'How would you rate your shoulder pain at rest?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q2', text: 'How would you rate your shoulder pain during movement?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q3', text: 'Can you raise your arm above shoulder height?', options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot raise'] },
-    { id: 'q4', text: 'Can you reach behind your back?', options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot reach'] },
-    { id: 'q5', text: 'Do you experience shoulder weakness?', options: ['No weakness', 'Mild weakness', 'Moderate weakness', 'Significant weakness'] },
-    { id: 'q6', text: 'Do you experience clicking or popping in the shoulder?', options: ['Never', 'Rarely', 'Sometimes', 'Always'] },
-    { id: 'q7', text: 'Do you have night pain affecting sleep?', options: ['No', 'Occasionally', 'Frequently', 'Every night'] },
-    { id: 'q8', text: 'Can you perform overhead activities?', options: ['Yes, normally', 'With mild difficulty', 'With great difficulty', 'Cannot perform'] },
-    { id: 'q9', text: 'How does the pain affect dressing yourself?', options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Requires assistance'] },
-    { id: 'q10', text: 'Was the pain caused by a specific injury?', options: ['No injury', 'Gradual onset', 'Specific incident', 'Sports injury'] },
-    { id: 'q11', text: 'Have you had previous shoulder surgery?', options: ['No', 'Yes, 1 time', 'Yes, 2 times', 'Yes, multiple'] },
-    { id: 'q12', text: 'Do you experience numbness in your arm or hand?', options: ['No', 'Occasionally', 'Frequently', 'Constantly'] },
-    { id: 'q13', text: 'Are you currently taking medication for this shoulder?', options: ['No', 'OTC occasionally', 'OTC regularly', 'Prescription required'] },
-    { id: 'q14', text: 'How long have you had this shoulder problem?', options: ['Less than 1 week', '1-4 weeks', '1-6 months', 'Over 6 months'] },
-    { id: 'q15', text: 'Does the shoulder feel unstable (like it might dislocate)?', options: ['No', 'Rarely', 'Sometimes', 'Frequently'] },
-    { id: 'q16', text: 'Have you had physiotherapy for this shoulder?', options: ['Never', 'Once', 'Multiple times', 'Currently undergoing'] },
-    { id: 'q17', text: 'How is your work affected?', options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work'] },
-    { id: 'q18', text: 'Do you participate in sports?', options: ['No sports', 'Light activity', 'Regular sport', 'Competitive sport'] },
-    { id: 'q19', text: 'Do you have any diagnosed conditions (e.g., diabetes, arthritis)?', options: ['None', 'Arthritis', 'Diabetes', 'Multiple'] },
-    { id: 'q20', text: 'How is your overall quality of life affected?', options: ['Not affected', 'Slightly', 'Moderately', 'Severely'] }
-  ],
-  Spine: [
-    { id: 'q1', text: 'How would you rate your back/neck pain at rest?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q2', text: 'How would you rate your back/neck pain during activity?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q3', text: 'Do you experience pain radiating down your leg or arm?', options: ['No radiation', 'Occasional', 'Frequent', 'Constant'] },
-    { id: 'q4', text: 'Do you experience numbness or tingling in your limbs?', options: ['No', 'Occasionally', 'Frequently', 'Constantly'] },
-    { id: 'q5', text: 'Can you bend forward comfortably?', options: ['Yes, fully', 'Partially', 'Only slightly', 'Cannot bend'] },
-    { id: 'q6', text: 'Do you experience muscle weakness in your arms or legs?', options: ['No weakness', 'Mild', 'Moderate', 'Significant'] },
-    { id: 'q7', text: 'Do you experience night pain?', options: ['No', 'Occasionally', 'Frequently', 'Every night'] },
-    { id: 'q8', text: 'How long can you sit comfortably?', options: ['Over 1 hour', '30-60 min', '10-30 min', 'Less than 10 min'] },
-    { id: 'q9', text: 'How long can you stand comfortably?', options: ['Over 1 hour', '30-60 min', '10-30 min', 'Less than 10 min'] },
-    { id: 'q10', text: 'Was the onset related to an injury?', options: ['No injury', 'Lifting injury', 'Trauma', 'Accident'] },
-    { id: 'q11', text: 'Have you had previous spine surgery?', options: ['No', 'Yes, 1 time', 'Yes, 2 times', 'Yes, multiple'] },
-    { id: 'q12', text: 'Do you have any bowel or bladder issues?', options: ['None', 'Occasional urgency', 'Frequent issues', 'Loss of control'] },
-    { id: 'q13', text: 'Are you currently taking pain medication?', options: ['No', 'OTC occasionally', 'OTC regularly', 'Prescription required'] },
-    { id: 'q14', text: 'How long have you had this spine problem?', options: ['Less than 1 week', '1-4 weeks', '1-6 months', 'Over 6 months'] },
-    { id: 'q15', text: 'Does the pain worsen when coughing or sneezing?', options: ['No', 'Rarely', 'Sometimes', 'Always'] },
-    { id: 'q16', text: 'Have you had physiotherapy for this condition?', options: ['Never', 'Once', 'Multiple times', 'Currently undergoing'] },
-    { id: 'q17', text: 'How is your work affected?', options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work'] },
-    { id: 'q18', text: 'Do you have diagnosed conditions (e.g., diabetes, osteoporosis)?', options: ['None', 'Osteoporosis', 'Diabetes', 'Multiple'] },
-    { id: 'q19', text: 'Do you experience stiffness in the morning?', options: ['No', 'Less than 30 min', '30-60 min', 'Over 1 hour'] },
-    { id: 'q20', text: 'How is your overall quality of life affected?', options: ['Not affected', 'Slightly', 'Moderately', 'Severely'] }
-  ],
-  Other: [
-    { id: 'q1', text: 'How would you rate your pain at rest?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q2', text: 'How would you rate your pain during activity?', options: ['No pain', 'Mild', 'Moderate', 'Severe'] },
-    { id: 'q3', text: 'How does the pain affect your daily activities?', options: ['No impact', 'Mild impact', 'Moderate impact', 'Cannot perform'] },
-    { id: 'q4', text: 'Do you experience swelling in the affected area?', options: ['No swelling', 'Occasional', 'Frequent', 'Constant'] },
-    { id: 'q5', text: 'When did the problem start?', options: ['Less than 1 week', '1-4 weeks', '1-6 months', 'Over 6 months'] },
-    { id: 'q6', text: 'Was the onset related to an injury?', options: ['No', 'Minor injury', 'Significant trauma', 'Gradual onset'] },
-    { id: 'q7', text: 'Have you had this issue before?', options: ['No', 'Once before', 'Multiple times', 'Recurring condition'] },
-    { id: 'q8', text: 'Are you currently taking pain medication?', options: ['No', 'OTC occasionally', 'OTC regularly', 'Prescription required'] },
-    { id: 'q9', text: 'Have you had previous surgery for this condition?', options: ['No', 'Yes, once', 'Yes, multiple', 'Scheduled surgery'] },
-    { id: 'q10', text: 'Do you experience night pain?', options: ['No', 'Occasionally', 'Frequently', 'Every night'] },
-    { id: 'q11', text: 'Do you use a walking aid or support?', options: ['No', 'Occasionally', 'Most of the time', 'Always'] },
-    { id: 'q12', text: 'Have you had physiotherapy before?', options: ['Never', 'Once', 'Multiple times', 'Currently undergoing'] },
-    { id: 'q13', text: 'How is your work affected?', options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work'] },
-    { id: 'q14', text: 'Do you have numbness or tingling?', options: ['No', 'Occasionally', 'Frequently', 'Constantly'] },
-    { id: 'q15', text: 'Do you have any diagnosed conditions?', options: ['None', 'Arthritis', 'Diabetes', 'Multiple conditions'] },
-    { id: 'q16', text: 'How is your overall quality of life affected?', options: ['Not affected', 'Slightly', 'Moderately', 'Severely'] },
-    { id: 'q17', text: 'Do you experience stiffness in the morning?', options: ['No stiffness', 'Less than 30 min', '30-60 min', 'Over 1 hour'] },
-    { id: 'q18', text: 'Does weather affect your pain?', options: ['No', 'Sometimes', 'Often', 'Always'] },
-    { id: 'q19', text: 'Do you have pain when pressing on the affected area?', options: ['No', 'Mild tenderness', 'Moderate tenderness', 'Severe tenderness'] },
-    { id: 'q20', text: 'What is your activity level?', options: ['Sedentary', 'Light activity', 'Moderate activity', 'Heavy work/sport'] }
-  ]
+  Knee: ASSESSMENT_CONFIG.Knee.sections.flatMap(s => s.questions.map(q => ({
+    id: q.id, text: q.text,
+    options: q.options || ['No', 'Mild', 'Moderate', 'Severe']
+  }))),
+  Shoulder: ASSESSMENT_CONFIG.Shoulder.sections.flatMap(s => s.questions.map(q => ({
+    id: q.id, text: q.text,
+    options: q.options || ['No', 'Mild', 'Moderate', 'Severe']
+  }))),
+  Spine: ASSESSMENT_CONFIG.Spine.sections.flatMap(s => s.questions.map(q => ({
+    id: q.id, text: q.text,
+    options: q.options || ['No', 'Mild', 'Moderate', 'Severe']
+  }))),
+  Other: ASSESSMENT_CONFIG.Other.sections.flatMap(s => s.questions.map(q => ({
+    id: q.id, text: q.text,
+    options: q.options || ['No', 'Mild', 'Moderate', 'Severe']
+  })))
 };
 
 export const BODY_AREAS = ['Knee', 'Shoulder', 'Spine', 'Other'];
@@ -247,3 +936,33 @@ export const TREATMENT_OPTIONS = [
   { id: 'rest',      name: 'Rest & Monitoring',     icon: '🛌', desc: 'Conservative management with follow-up' },
   { id: 'rehab',     name: 'Long-term Rehab',       icon: '♻️', desc: 'Extended rehabilitation program' }
 ];
+
+// ─── Score Calculation Utilities ──────────────────────────────────────────────
+export function calculateQuickDASH(answers, questions) {
+  const scoredQuestions = questions.filter(q => q.scoreValues);
+  if (scoredQuestions.length === 0) return null;
+  
+  const answered = scoredQuestions.filter(q => answers[q.id] !== undefined && answers[q.id] !== null);
+  if (answered.length < scoredQuestions.length) return null;
+  
+  const sum = answered.reduce((acc, q) => {
+    const idx = Array.isArray(answers[q.id]) ? answers[q.id][0] : answers[q.id];
+    return acc + (q.scoreValues[idx] || 0);
+  }, 0);
+  
+  // QuickDASH formula: (sum/n - 1) * 25, giving 0–100
+  const score = ((sum / answered.length) - 1) * 25;
+  return Math.round(score * 10) / 10;
+}
+
+export function calculateSectionScore(answers, questions) {
+  const scoredQs = questions.filter(q => q.scoreValues);
+  if (!scoredQs.length) return null;
+  const total = scoredQs.reduce((acc, q) => {
+    const idx = answers[q.id];
+    if (idx === undefined || idx === null) return acc;
+    return acc + (q.scoreValues[idx] || 0);
+  }, 0);
+  const max = scoredQs.reduce((acc, q) => acc + Math.max(...q.scoreValues), 0);
+  return { score: total, max };
+}

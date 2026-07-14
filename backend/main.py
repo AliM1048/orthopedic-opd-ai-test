@@ -67,8 +67,18 @@ def on_startup():
 
 
 # MongoDB
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-client = MongoClient(MONGO_URI)
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
+try:
+    print(f"Connecting to MongoDB at {MONGO_URI}...")
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+    # Force an actual connection check
+    client.admin.command("ping")
+    print("✅ Successfully connected to MongoDB!")
+except Exception as e:
+    print(f"⚠️  Could not connect to MongoDB: {e}")
+    print("↩️  Falling back to local file-based database (backend/data/db.json)...")
+    from local_db import LocalMongoClient
+    client = LocalMongoClient(MONGO_URI)
 db = client["whisper_db"]
 collection = db["transcriptions"]
 speakers_collection = db["speakers"]

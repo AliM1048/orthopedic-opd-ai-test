@@ -72,3 +72,13 @@ class Treatment(Base):
     details = Column(Text, nullable=True)
     followUpDate = Column(String, nullable=True)
     status = Column(String, nullable=False, default="active")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=True)
+    email = Column(String, nullable=False, unique=True, index=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False)

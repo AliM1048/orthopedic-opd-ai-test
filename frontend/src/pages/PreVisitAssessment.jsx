@@ -1,7 +1,33 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
-import { ASSESSMENT_QUESTIONS, BODY_AREAS } from '../data/mockData';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+
+import { ASSESSMENT_CONFIG, calculateQuickDASH } from '../data/mockData';
+import PatientSummaryCard from '../components/assessment/PatientSummaryCard';
+import VisitSummaryCard from '../components/assessment/VisitSummaryCard';
+import AssessmentHeader from '../components/assessment/AssessmentHeader';
+import AssessmentSidebar from '../components/assessment/AssessmentSidebar';
+import QuestionRenderer from '../components/assessment/QuestionRenderer';
+import AssessmentNavigation from '../components/assessment/AssessmentNavigation';
+import SummaryPage from '../components/assessment/SummaryPage';
+
+const DRAFT_KEY = (patientId) => `assessment_draft_${patientId}`;
+
+function getInitialAnswers(patientId) {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY(patientId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function countAnswered(section, answers) {
+  return section.questions.filter(q => {
+    const a = answers[q.id];
+    return a !== undefined && a !== null && a !== '' && !(Array.isArray(a) && a.length === 0);
+  }).length;
+}
 
 export default function PreVisitAssessment({ patients, onAddAssessment, onUpdateStatus }) {
   const navigate = useNavigate();
@@ -9,73 +35,205 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
   const patientId = searchParams.get('patient');
   const isFollowUp = searchParams.get('type') === 'followup';
 
-  const patient = patients.find((p) => p.id === patientId);
+  const patient = patients.find(p => p.id === patientId);
+  const config = useMemo(() =>
+    ASSESSMENT_CONFIG[patient?.bodyArea] || ASSESSMENT_CONFIG['Other'],
+    [patient]
+  );
 
-  const [bodyArea, setBodyArea] = useState(patient?.bodyArea || 'Knee');
-  const [answers, setAnswers] = useState({});
-  const [currentStep, setCurrentStep] = useState(0); // 0 = select body area, 1..20 = questions, 21 = review
+  const sections = useMemo(() => config?.sections || [], [config]);
+  const allQuestions = useMemo(() => sections.flatMap(s => s.questions), [sections]);
+
+  const [answers, setAnswers] = useState(() => getInitialAnswers(patientId));
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [chiefComplaint, setChiefComplaint] = useState(patient?.bodyArea ? `${patient.bodyArea} pain` : 'Pain');
+  const [errors, setErrors] = useState({});
+  const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveFlash, setSaveFlash] = useState(false);
 
-  const questions = useMemo(() => ASSESSMENT_QUESTIONS[bodyArea] || ASSESSMENT_QUESTIONS['Other'], [bodyArea]);
-  const totalSteps = questions.length + 2; // body area + questions + review
+  // Auto-persist to localStorage
+  useEffect(() => {
+    if (patientId) {
+      localStorage.setItem(DRAFT_KEY(patientId), JSON.stringify(answers));
+    }
+  }, [answers, patientId]);
 
-  const answeredCount = Object.keys(answers).length;
-  const score = useMemo(() => Object.values(answers).reduce((sum, v) => sum + v, 0), [answers]);
-  const maxScore = questions.length * 3;
+  const currentQuestion = allQuestions[currentQuestionIndex];
+  
+  const currentSection = useMemo(() => {
+    if (!currentQuestion) return sections[0];
+    return sections.find(s => s.questions.some(q => q.id === currentQuestion.id)) || sections[0];
+  }, [currentQuestion, sections]);
 
-  const handleSelectOption = (qId, optionIdx) => {
-    setAnswers((prev) => ({ ...prev, [qId]: optionIdx }));
+  const currentSectionId = currentSection?.id || '';
+  const currentSectionIndex = sections.findIndex(s => s.id === currentSectionId);
+
+  const totalQuestions = allQuestions.length;
+  const answeredQuestions = sections.reduce((acc, s) => acc + countAnswered(s, answers), 0);
+  const overallProgress = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
+
+  const handleAnswer = useCallback((questionId, value) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+    setErrors(prev => ({ ...prev, [questionId]: null }));
+  }, []);
+
+  const validateQuestion = (question) => {
+    if (!question) return true;
+    if (question.required) {
+      const a = answers[question.id];
+      const isEmpty = a === undefined || a === null || a === '' || (Array.isArray(a) && a.length === 0);
+      if (isEmpty) {
+        setErrors(prev => ({ ...prev, [question.id]: 'This question is required.' }));
+        return false;
+      }
+    }
+    return true;
   };
 
-  const handleSubmit = () => {
+  const handleNext = () => {
+    if (!validateQuestion(currentQuestion)) return;
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setErrors({});
+    } else {
+      setShowSummary(true);
+    }
+  };
+
+  const handlePrev = () => {
+    if (showSummary) {
+      setShowSummary(false);
+      return;
+    }
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      setErrors({});
+    }
+  };
+
+  const handleSelectSection = (sectionId) => {
+    setShowSummary(false);
+    const section = sections.find(s => s.id === sectionId);
+    if (section && section.questions.length > 0) {
+      const firstQId = section.questions[0].id;
+      const idx = allQuestions.findIndex(q => q.id === firstQId);
+      if (idx !== -1) {
+        setCurrentQuestionIndex(idx);
+      }
+    }
+    setErrors({});
+  };
+
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    await new Promise(r => setTimeout(r, 600));
+    localStorage.setItem(DRAFT_KEY(patientId), JSON.stringify(answers));
+    setIsSaving(false);
+    setSaveFlash(true);
+    setTimeout(() => setSaveFlash(false), 2000);
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    await new Promise(r => setTimeout(r, 800));
+
+    // Build structured result
+    const quickdashSection = sections.find(s => s.scoreCalculation === 'quickdash');
+    const quickdashScore = quickdashSection
+      ? calculateQuickDASH(answers, quickdashSection.questions)
+      : null;
+
+    const totalScore = sections.reduce((acc, s) => {
+      return acc + s.questions.reduce((qacc, q) => {
+        if (q.scoreValues && answers[q.id] !== undefined && answers[q.id] !== null) {
+          return qacc + (q.scoreValues[answers[q.id]] || 0);
+        }
+        return qacc;
+      }, 0);
+    }, 0);
+
+    const maxScore = sections.reduce((acc, s) => {
+      return acc + s.questions.reduce((qacc, q) => {
+        if (q.scoreValues) return qacc + Math.max(...q.scoreValues);
+        return qacc;
+      }, 0);
+    }, 0);
+
     const assessment = {
       id: `a${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       type: isFollowUp ? 'Follow-Up' : 'Pre-Visit',
-      score,
+      score: totalScore,
       maxScore,
-      bodyArea,
+      quickdashScore,
+      bodyArea: patient?.bodyArea,
       completedBy: 'Nurse Sara',
-      answers
+      chiefComplaint,
+      answers,
+      sections: config.title
     };
+
     if (onAddAssessment) onAddAssessment(patientId, assessment);
     if (onUpdateStatus) onUpdateStatus(patientId, 'assessment-completed');
+
+    // Clear draft
+    localStorage.removeItem(DRAFT_KEY(patientId));
+
+    setIsSubmitting(false);
     setSubmitted(true);
   };
 
+  // ── No patient guard ─────────────────────────────────────────────────────────
   if (!patient) {
     return (
       <>
-        <div className="topbar"><div className="topbar-left"><h1>Assessment</h1></div></div>
+        <div className="topbar">
+          <div className="topbar-left">
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={18} />
+            </button>
+            <h1>Assessment</h1>
+          </div>
+        </div>
         <div className="page-body">
           <div className="empty-state">
             <div className="empty-state-icon">📋</div>
-            <p>No patient selected. Go to the dashboard first.</p>
-            <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Dashboard</button>
+            <p>No patient selected. Return to the dashboard first.</p>
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>
+              Go to Dashboard
+            </button>
           </div>
         </div>
       </>
     );
   }
 
+  // ── Submitted screen ──────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <>
-        <div className="topbar"><div className="topbar-left"><h1>Assessment Completed</h1></div></div>
+        <div className="topbar">
+          <div className="topbar-left"><h1>Assessment Completed</h1></div>
+        </div>
         <div className="page-body">
-          <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Assessment Submitted</h2>
-            <p className="text-muted mb-4">
-              {isFollowUp ? 'Follow-up' : 'Pre-visit'} assessment for {patient.name} has been saved.
-            </p>
-            <div style={{ display: 'inline-flex', gap: 8, background: 'var(--primary-light)', padding: '12px 24px', borderRadius: 12, marginBottom: 24 }}>
-              <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary)' }}>{score}</span>
-              <span style={{ color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>/ {maxScore}</span>
+          <div className="card" style={{ textAlign: 'center', padding: '64px 48px', maxWidth: 560, margin: '0 auto' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <CheckCircle2 size={40} color="var(--primary)" />
             </div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Assessment Submitted</h2>
+            <p className="text-muted" style={{ marginBottom: 24 }}>
+              {isFollowUp ? 'Follow-up' : 'Pre-visit'} assessment for <strong>{patient.name}</strong> has been saved.
+            </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
-              <button className="btn btn-outline" onClick={() => navigate('/')}>Dashboard</button>
+              <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>
+                View Profile
+              </button>
+              <button className="btn btn-outline" onClick={() => navigate('/')}>
+                Dashboard
+              </button>
             </div>
           </div>
         </div>
@@ -83,116 +241,124 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
     );
   }
 
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+  const hasErrors = Object.values(errors).some(Boolean);
+
   return (
     <>
+      {/* Top Bar */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
+            <ArrowLeft size={18} />
+          </button>
           <div>
             <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
             <p>{patient.name} · {patient.mrn}</p>
           </div>
         </div>
-        <div className="topbar-right">
-          <span className="text-sm text-muted">{answeredCount}/{questions.length} answered</span>
-        </div>
+        {saveFlash && (
+          <div className="topbar-right">
+            <div className="save-flash">
+              <CheckCircle2 size={14} /> Draft saved
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="page-body">
-        {/* Progress bar */}
-        <div style={{ background: 'var(--border)', borderRadius: 99, height: 6, marginBottom: 28, overflow: 'hidden' }}>
-          <div style={{ width: `${(currentStep / (totalSteps - 1)) * 100}%`, height: '100%', background: 'var(--primary)', borderRadius: 99, transition: 'width 0.3s ease' }} />
+      <div className="page-body" style={{ padding: '20px 24px' }}>
+        {/* Top Info Cards */}
+        <div className="intake-top-cards">
+          <PatientSummaryCard patient={patient} />
+          <VisitSummaryCard
+            patient={patient}
+            isFollowUp={isFollowUp}
+            chiefComplaint={chiefComplaint}
+            onChangeComplaint={setChiefComplaint}
+          />
         </div>
 
-        {/* Step 0: Body Area */}
-        {currentStep === 0 && (
-          <div className="card" style={{ maxWidth: 600, margin: '0 auto' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Select Body Area</h3>
-            <p className="text-muted mb-4">Choose the area that best matches the patient's primary concern.</p>
-            <div className="options-grid">
-              {BODY_AREAS.map((area) => (
-                <button
-                  key={area}
-                  className={`option-btn ${bodyArea === area ? 'selected' : ''}`}
-                  onClick={() => setBodyArea(area)}
-                >
-                  <span className="option-radio" />
-                  {area}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
-              <button className="btn btn-primary" onClick={() => setCurrentStep(1)}>
-                Start Assessment <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Assessment Header */}
+        <AssessmentHeader
+          config={config}
+          overallProgress={overallProgress}
+          totalQuestions={totalQuestions}
+          answeredQuestions={answeredQuestions}
+        />
 
-        {/* Question Steps */}
-        {currentStep >= 1 && currentStep <= questions.length && (
-          <div className="card" style={{ maxWidth: 600, margin: '0 auto' }}>
-            <div className={`question-card ${answers[questions[currentStep - 1].id] !== undefined ? 'answered' : ''}`} style={{ border: 'none', padding: 0 }}>
-              <div className="question-num">Question {currentStep} of {questions.length}</div>
-              <div className="question-text">{questions[currentStep - 1].text}</div>
-              <div className="options-grid">
-                {questions[currentStep - 1].options.map((opt, idx) => (
-                  <button
-                    key={idx}
-                    className={`option-btn ${answers[questions[currentStep - 1].id] === idx ? 'selected' : ''}`}
-                    onClick={() => handleSelectOption(questions[currentStep - 1].id, idx)}
-                  >
-                    <span className="option-radio" />
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-              <button className="btn btn-ghost" onClick={() => setCurrentStep((s) => s - 1)}>Back</button>
-              <button
-                className="btn btn-primary"
-                onClick={() => setCurrentStep((s) => s + 1)}
-                disabled={answers[questions[currentStep - 1].id] === undefined}
-              >
-                {currentStep === questions.length ? 'Review' : 'Next'} <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Main Two-Column Layout */}
+        <div className="intake-workspace">
+          {/* Left Sidebar */}
+          <AssessmentSidebar
+            sections={sections}
+            currentSectionId={showSummary ? '__summary__' : currentSectionId}
+            answers={answers}
+            onSelectSection={handleSelectSection}
+          />
 
-        {/* Review Step */}
-        {currentStep === questions.length + 1 && (
-          <div style={{ maxWidth: 600, margin: '0 auto' }}>
-            <div className="card mb-4">
-              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Review Assessment</h3>
-              <p className="text-muted mb-4">Review the answers before submitting.</p>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--primary-light)', padding: '12px 20px', borderRadius: 10, marginBottom: 20 }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary)' }}>{score}</span>
-                <span className="text-muted"> / {maxScore} points</span>
-                <span style={{ marginLeft: 'auto' }} className="text-sm">{bodyArea}</span>
-              </div>
-
-              {questions.map((q, i) => (
-                <div key={q.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Q{i + 1}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{q.text}</div>
-                  <div style={{ fontSize: 13, color: answers[q.id] !== undefined ? 'var(--primary)' : 'var(--danger)' }}>
-                    {answers[q.id] !== undefined ? (
-                      <><Check size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />{q.options[answers[q.id]]}</>
-                    ) : 'Not answered'}
+          {/* Right Panel */}
+          <div className="intake-main">
+            {showSummary ? (
+              <SummaryPage
+                config={config}
+                answers={answers}
+                patient={patient}
+                isFollowUp={isFollowUp}
+                onBack={handlePrev}
+                onSubmit={handleSubmit}
+                isSubmitting={isSubmitting}
+              />
+            ) : (
+              <>
+                {/* Section header */}
+                <div className="intake-section-header">
+                  <div>
+                    <div className="intake-section-title">{currentSection?.title}</div>
+                    {currentSection?.description && (
+                      <div className="intake-section-desc">{currentSection.description}</div>
+                    )}
+                  </div>
+                  <div className="intake-section-progress">
+                    Question {currentQuestionIndex + 1} of {totalQuestions}
                   </div>
                 </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button className="btn btn-ghost" onClick={() => setCurrentStep(questions.length)}>Back</button>
-              <button className="btn btn-primary btn-lg" onClick={handleSubmit} disabled={answeredCount < questions.length}>
-                Submit Assessment
-              </button>
-            </div>
+
+                {/* Questions */}
+                <div className="intake-questions">
+                  {currentQuestion && (
+                    <QuestionRenderer
+                      key={currentQuestion.id}
+                      question={currentQuestion}
+                      sectionIdx={currentSectionIndex}
+                      questionIdx={currentQuestionIndex}
+                      totalSectionQuestions={totalQuestions}
+                      value={answers[currentQuestion.id]}
+                      onChange={(val) => handleAnswer(currentQuestion.id, val)}
+                      error={errors[currentQuestion.id]}
+                    />
+                  )}
+                </div>
+
+                {/* Navigation */}
+                <AssessmentNavigation
+                  canGoPrev={currentQuestionIndex > 0}
+                  canGoNext={true}
+                  isLastSection={isLastQuestion}
+                  isSaving={isSaving}
+                  hasErrors={hasErrors}
+                  onPrev={handlePrev}
+                  onNext={handleNext}
+                  onSaveDraft={handleSaveDraft}
+                  onSubmit={() => {
+                    if (validateQuestion(currentQuestion)) {
+                      setShowSummary(true);
+                    }
+                  }}
+                />
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </>
   );

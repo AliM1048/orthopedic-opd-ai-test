@@ -3,32 +3,37 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from passlib.context import CryptContext
+import bcrypt
 
 SECRET_KEY = os.getenv("JWT_SECRET", "orthopedic-opd-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 # ── Hardcoded users (in production, store in database) ────────────────────────
 USERS = {
     "nurse.sara@ortho.com": {
         "name": "Nurse Sara",
         "role": "nurse",
-        "hashed_password": pwd_context.hash("password"),
+        "hashed_password": hash_password("password"),
     },
     "physician.khalid@ortho.com": {
         "name": "Dr. Khalid Mansour",
         "role": "physician",
-        "hashed_password": pwd_context.hash("password"),
+        "hashed_password": hash_password("password"),
     },
 }
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def authenticate_user(email: str, password: str):
