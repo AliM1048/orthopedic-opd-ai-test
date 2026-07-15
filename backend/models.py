@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, JSON, Text
+from sqlalchemy import Column, String, Integer, JSON, Text, Boolean
 from database import Base
 
 
@@ -34,6 +34,7 @@ class Assessment(Base):
     maxScore = Column(Integer, nullable=False)
     bodyArea = Column(String, nullable=False)
     completedBy = Column(String, nullable=False)
+    chiefComplaint = Column(String, nullable=True)
     answers = Column(JSON, nullable=True)
 
 
@@ -47,6 +48,7 @@ class Evaluation(Base):
     notes = Column(Text, nullable=True)
     diagnosis = Column(String, nullable=True)
     audioUrl = Column(String, nullable=True)
+    sentToPatient = Column(Boolean, nullable=False, default=False)
 
 
 class Diagnostic(Base):

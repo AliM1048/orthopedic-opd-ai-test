@@ -1215,35 +1215,6 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   color: var(--text-secondary);
 }
 
-/* ── Vitals Table ─────────────────────────────────────────────────────── */
-.pe-vitals-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.pe-vitals-table tr + tr td {
-  padding-top: 10px;
-}
-
-.pe-vt-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  padding-right: 12px;
-  white-space: nowrap;
-}
-
-.pe-vt-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-align: right;
-}
-
-.pe-vt-unit {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
-}
 
 /* ── Dictation UI (middle col) ─────────────────────────────────── */
 

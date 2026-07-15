@@ -126,6 +126,28 @@ export function usePatients(token) {
       .catch(() => {});
   }, []);
 
+  const markEvaluationSent = useCallback((patientId, evaluationId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              evaluations: p.evaluations.map((e) =>
+                e.id === evaluationId ? { ...e, sentToPatient: true } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/evaluations/${evaluationId}`, { sentToPatient: true })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
   const createPatient = useCallback((patientData) => {
     // optimistic UI: add placeholder until server returns
     return api.post('/api/patients', patientData)
@@ -146,8 +168,8 @@ export function usePatients(token) {
     addEvaluation,
     addDiagnostic,
     updateDiagnostic,
-    addTreatment
-    ,
+    addTreatment,
+    markEvaluationSent,
     createPatient
   };
 }

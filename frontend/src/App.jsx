@@ -24,8 +24,8 @@ export default function App() {
     addAssessment,
     addEvaluation,
     addDiagnostic,
-    addTreatment
-    ,
+    addTreatment,
+    markEvaluationSent,
     createPatient
   } = usePatients(token);
 
@@ -69,9 +69,11 @@ export default function App() {
             element={
               <PhysicianEvaluation
                 patients={patients}
+                user={user}
                 onAddEvaluation={addEvaluation}
                 onAddDiagnostic={addDiagnostic}
                 onAddTreatment={addTreatment}
+                onMarkEvaluationSent={markEvaluationSent}
               />
             }
           />

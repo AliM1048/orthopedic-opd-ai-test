@@ -10,6 +10,7 @@ class AssessmentOut(BaseModel):
     maxScore: int
     bodyArea: str
     completedBy: str
+    chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
 
     class Config:
@@ -23,6 +24,7 @@ class EvaluationOut(BaseModel):
     notes: Optional[str] = None
     diagnosis: Optional[str] = None
     audioUrl: Optional[str] = None
+    sentToPatient: bool = False
 
     class Config:
         from_attributes = True
@@ -115,6 +117,7 @@ class AssessmentCreate(BaseModel):
     maxScore: int
     bodyArea: str
     completedBy: str
+    chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
 
 
@@ -125,6 +128,10 @@ class EvaluationCreate(BaseModel):
     notes: Optional[str] = None
     diagnosis: Optional[str] = None
     audioUrl: Optional[str] = None
+
+
+class EvaluationUpdate(BaseModel):
+    sentToPatient: Optional[bool] = None
 
 
 class DiagnosticCreate(BaseModel):

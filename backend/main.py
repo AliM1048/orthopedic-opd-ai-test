@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 # from pydub.silence import split_on_silence
 
+from sqlalchemy import text
 from database import engine, Base
 from auth import get_current_user
 from llm_extract import extract_structured, warm_up_ollama
@@ -64,6 +65,16 @@ app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all() only creates brand-new tables — it never
+    # alters columns on tables that already exist. These two columns were
+    # added to models.py after the assessments/evaluations tables were first
+    # created, so patch them in directly (no Alembic in this project).
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"chiefComplaint\" VARCHAR"))
+            conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"sentToPatient\" BOOLEAN NOT NULL DEFAULT FALSE"))
+    except Exception as e:
+        print(f"⚠️  Column migration skipped/failed (safe to ignore on a fresh DB): {e}")
 
 
 # MongoDB
