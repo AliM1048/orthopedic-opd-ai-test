@@ -10,10 +10,28 @@ export const MOCK_PATIENTS = [
     avatar: '#1a6fdb',
     assessments: [
       {
+        id: 'a000', date: '2026-02-10', type: 'Initial Intake',
+        score: 85, maxScore: 100, bodyArea: 'Knee', completedBy: 'Nurse Sara',
+        answers: { pain_scale: 3 }
+      },
+      {
+        id: 'a001a', date: '2026-04-01', type: 'Follow-Up',
+        score: 65, maxScore: 100, bodyArea: 'Knee', completedBy: 'Nurse Maha',
+        answers: { pain_scale: 5 }
+      },
+      {
         id: 'a001', date: '2026-05-10', type: 'Pre-Visit',
-        score: 14, maxScore: 20,
+        score: 42, maxScore: 100,
         bodyArea: 'Knee', completedBy: 'Nurse Sara',
-        answers: { q1: 2, q2: 1, q3: 3, q4: 2 }
+        chiefComplaint: 'ألم شديد في الركبة اليمنى عند المشي وصعود الدرج، مع تورم متكرر وتيبس صباحي.',
+        answers: {
+          dem_onset: 3, dem_surgery: 0, dem_injury: 1, dem_activity: 1,
+          sym_swelling: 3, sym_locking: 2, sym_buckling: 3, sym_stiffness: 3,
+          pain_rest: 3, pain_activity: 4, pain_night: 3, pain_scale: 7, pain_medication: 3,
+          qdash_bend: 3, qdash_straighten: 2, qdash_walk: 3, qdash_stairs: 3, qdash_sleep: 3, qdash_work: 3,
+          qol_daily: 3, qol_aid: 1, qol_social: 3, qol_overall: 3, qol_mood: 3,
+          oth_physio: 2, oth_injection: 1
+        }
       }
     ],
     evaluations: [
@@ -45,10 +63,23 @@ export const MOCK_PATIENTS = [
     avatar: '#10b981',
     assessments: [
       {
+        id: 'a002a', date: '2026-03-15', type: 'Initial Intake',
+        score: 48, maxScore: 100, bodyArea: 'Shoulder', completedBy: 'Nurse Maha',
+        answers: { pain_scale: 7 }
+      },
+      {
         id: 'a002', date: '2026-05-14', type: 'Pre-Visit',
-        score: 11, maxScore: 20,
+        score: 74, maxScore: 100,
         bodyArea: 'Shoulder', completedBy: 'Nurse Sara',
-        answers: { q1: 1, q2: 2, q3: 1, q4: 3 }
+        chiefComplaint: 'ألم في الكتف الأيمن يزداد عند رفع الذراع أعلى من مستوى الرأس أو الوصول خلف الظهر.',
+        answers: {
+          dem_onset: 2, dem_surgery: 0, dem_injury: 1, dem_dominant: 0, dem_affected: 0,
+          sym_raise: 2, sym_behind: 2, sym_weakness: 2, sym_clicking: 2, sym_numbness: 1,
+          pain_rest: 2, pain_activity: 3, pain_night: 2, pain_scale: 5,
+          qdash_overhead: 3, qdash_dressing: 2, qdash_carry: 3, qdash_sleep: 2, qdash_work: 2,
+          qol_instability: 2, qol_sport: 2, qol_overall: 2,
+          oth_physio: 4, oth_work: 2
+        }
       }
     ],
     evaluations: [], diagnostics: [], treatments: []
@@ -63,12 +94,21 @@ export const MOCK_PATIENTS = [
     avatar: '#f59e0b',
     assessments: [
       {
-        id: 'a003', date: '2026-04-01', type: 'Pre-Visit', score: 16, maxScore: 20,
-        bodyArea: 'Spine', completedBy: 'Nurse Maha', answers: {}
+        id: 'a003', date: '2026-04-01', type: 'Pre-Visit', score: 54, maxScore: 100,
+        bodyArea: 'Spine', completedBy: 'Nurse Maha', answers: { pain_scale: 6 }
       },
       {
-        id: 'a004', date: '2026-05-14', type: 'Follow-Up', score: 10, maxScore: 20,
-        bodyArea: 'Spine', completedBy: 'Nurse Sara', answers: {}
+        id: 'a004', date: '2026-05-14', type: 'Follow-Up', score: 82, maxScore: 100,
+        bodyArea: 'Spine', completedBy: 'Nurse Sara',
+        chiefComplaint: 'تحسن ملحوظ في ألم أسفل الظهر بعد العلاج الطبيعي، مع انخفاض الألم الممتد للساق.',
+        answers: {
+          dem_onset: 3, dem_surgery: 0, dem_injury: 1, dem_region: 0,
+          sym_radiation: 1, sym_numbness: 1, sym_weakness: 1, sym_bladder: 0, sym_cough: 1,
+          pain_rest: 1, pain_activity: 2, pain_night: 1, pain_scale: 3,
+          qdash_sit: 1, qdash_stand: 1, qdash_bend: 2, qdash_sleep: 1, qdash_work: 1,
+          qol_morning: 1, qol_work: 1, qol_overall: 1,
+          oth_physio: 2
+        }
       }
     ],
     evaluations: [
@@ -98,7 +138,22 @@ export const MOCK_PATIENTS = [
     appointmentTime: '01:00 PM', appointmentDate: '2026-05-15',
     status: 'pending', bodyArea: 'Knee',
     avatar: '#6366f1',
-    assessments: [], evaluations: [], diagnostics: [], treatments: []
+    assessments: [
+      {
+        id: 'a004b', date: '2026-05-15', type: 'Pre-Visit', score: 60, maxScore: 100,
+        bodyArea: 'Knee', completedBy: 'Nurse Sara',
+        chiefComplaint: 'ألم خفيف إلى متوسط في الركبة بعد التمارين الرياضية.',
+        answers: {
+          dem_onset: 1, dem_surgery: 0, dem_injury: 4, dem_activity: 3,
+          sym_swelling: 1, sym_locking: 0, sym_buckling: 1, sym_stiffness: 1,
+          pain_rest: 1, pain_activity: 3, pain_night: 1, pain_scale: 4, pain_medication: 1,
+          qdash_bend: 1, qdash_straighten: 1, qdash_walk: 1, qdash_stairs: 2, qdash_sleep: 1, qdash_work: 1,
+          qol_daily: 1, qol_aid: 0, qol_social: 1, qol_overall: 1, qol_mood: 1,
+          oth_physio: 0
+        }
+      }
+    ],
+    evaluations: [], diagnostics: [], treatments: []
   },
   {
     id: 'p005', name: 'Yousef Al-Khatib', age: 45, gender: 'Male',
@@ -109,7 +164,19 @@ export const MOCK_PATIENTS = [
     status: 'completed', bodyArea: 'Shoulder',
     avatar: '#ef4444',
     assessments: [
-      { id: 'a005', date: '2026-05-01', type: 'Pre-Visit', score: 8, maxScore: 20, bodyArea: 'Shoulder', completedBy: 'Nurse Maha', answers: {} }
+      {
+        id: 'a005', date: '2026-05-01', type: 'Pre-Visit', score: 45, maxScore: 100,
+        bodyArea: 'Shoulder', completedBy: 'Nurse Maha',
+        chiefComplaint: 'ألم شديد في الكتف الأيسر ومحدودية حادة في الحركة.',
+        answers: {
+          dem_onset: 3, dem_surgery: 0, dem_injury: 2, dem_dominant: 0, dem_affected: 1,
+          sym_raise: 4, sym_behind: 4, sym_weakness: 4, sym_clicking: 3, sym_numbness: 2,
+          pain_rest: 4, pain_activity: 5, pain_night: 4, pain_scale: 8,
+          qdash_overhead: 4, qdash_dressing: 3, qdash_carry: 4, qdash_sleep: 4, qdash_work: 4,
+          qol_instability: 3, qol_sport: 0, qol_overall: 4,
+          oth_physio: 1, oth_work: 4
+        }
+      }
     ],
     evaluations: [
       {
@@ -135,115 +202,115 @@ export const MOCK_PATIENTS = [
 export const ASSESSMENT_CONFIG = {
   Knee: {
     id: 'knee-intake',
-    title: 'PROM Intake — Knee',
-    description: 'Please answer all questions honestly. Your responses help us provide the best possible care.',
+    title: 'تقييم الركبة — PROM',
+    description: 'يرجى الإجابة على جميع الأسئلة بصدق. إجاباتك تساعدنا في تقديم أفضل رعاية ممكنة.',
     sections: [
       {
         id: 'demographics',
-        title: 'Demographics',
+        title: 'البيانات الأساسية',
         icon: 'User',
         questions: [
           {
             id: 'dem_onset', type: 'radio', required: true,
-            text: 'When did your knee pain start?',
-            description: 'Select the option that best describes when your symptoms began.',
-            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'More than 6 months']
+            text: 'متى بدأ ألم ركبتك؟',
+            description: 'اختر الخيار الذي يصف بشكل أفضل متى بدأت أعراضك.',
+            options: ['أقل من أسبوع', '1–4 أسابيع', '1–3 أشهر', '3–6 أشهر', '6–12 شهراً', 'أكثر من سنة']
           },
           {
             id: 'dem_surgery', type: 'radio', required: true,
-            text: 'Have you had previous knee surgery?',
-            options: ['No', 'Yes — 1 surgery', 'Yes — 2 surgeries', 'Yes — 3 or more']
+            text: 'هل أجريت عملية جراحية سابقة في الركبة؟',
+            options: ['لا', 'نعم — عملية واحدة', 'نعم — عمليتان', 'نعم — 3 عمليات', 'نعم — 4 أو أكثر']
           },
           {
             id: 'dem_injury', type: 'radio', required: true,
-            text: 'Was the onset of pain related to an injury?',
-            options: ['No injury', 'Mild injury', 'Significant trauma', 'Sports injury']
+            text: 'هل كان بداية الألم مرتبطة بإصابة؟',
+            options: ['لا توجد إصابة', 'إصابة خفيفة', 'صدمة متوسطة', 'صدمة شديدة', 'إصابة رياضية', 'إصابة في العمل', 'حادث سيارة']
           },
           {
             id: 'dem_occupation', type: 'text', required: false,
-            text: 'What is your current occupation?',
-            description: 'Optional — helps us understand your activity requirements.',
-            placeholder: 'e.g. Teacher, Construction worker, Office worker'
+            text: 'ما هي مهنتك الحالية؟',
+            description: 'اختياري — يساعدنا في فهم متطلبات نشاطك.',
+            placeholder: 'مثلاً: مدرس، عامل بناء، موظف مكتب'
           },
           {
             id: 'dem_activity', type: 'radio', required: true,
-            text: 'How would you describe your typical activity level?',
-            options: ['Sedentary (mostly sitting)', 'Light activity', 'Moderate activity', 'Heavy physical work / sport']
+            text: 'كيف تصف مستوى نشاطك الجسدي المعتاد؟',
+            options: ['خامل (جالس في معظم الوقت)', 'نشاط خفيف (المشي)', 'نشاط متوسط', 'نشيط (تمرين منتظم)', 'عمل جسدي شاق', 'رياضة تنافسية']
           }
         ]
       },
       {
         id: 'symptoms',
-        title: 'Symptoms',
+        title: 'الأعراض',
         icon: 'Activity',
         questions: [
           {
             id: 'sym_swelling', type: 'radio', required: true,
-            text: 'Do you experience swelling in the knee?',
-            options: ['No swelling', 'Occasional swelling', 'Frequent swelling', 'Constant swelling']
+            text: 'هل تعاني من تورم في الركبة؟',
+            options: ['لا يوجد تورم', 'تورم أحياناً', 'تورم أسبوعي', 'تورم متكرر', 'تورم يومي', 'تورم مستمر']
           },
           {
             id: 'sym_locking', type: 'radio', required: true,
-            text: 'Do you experience locking or catching in the knee?',
-            description: 'Locking means the knee gets stuck and cannot fully straighten.',
-            options: ['Never', 'Rarely', 'Sometimes', 'Often']
+            text: 'هل تعاني من تقييد أو انحشار في الركبة؟',
+            description: 'التقييد يعني أن الركبة تنغلق ولا يمكن تمديدها بالكامل.',
+            options: ['أبداً', 'نادراً', 'أحياناً', 'كثيراً']
           },
           {
             id: 'sym_buckling', type: 'radio', required: true,
-            text: 'Has the knee given way (buckled) during activity?',
-            options: ['Never', 'Rarely', 'Sometimes', 'Frequently']
+            text: 'هل تعرضت ركبتك للانخلاع (الانطواء) أثناء النشاط؟',
+            options: ['أبداً', 'مرة أو مرتين', 'نادراً (شهرياً)', 'أحياناً (أسبوعياً)', 'بشكل متكرر', 'في كل نشاط تقريباً']
           },
           {
             id: 'sym_stiffness', type: 'radio', required: true,
-            text: 'Do you experience morning stiffness?',
-            options: ['No stiffness', 'Less than 30 minutes', '30–60 minutes', 'More than 1 hour']
+            text: 'هل تعاني من تيبس صباحي في الركبة؟',
+            options: ['لا يوجد تيبس', 'أقل من 15 دقيقة', '15–30 دقيقة', '30–60 دقيقة', 'ساعة إلى ساعتين', 'أكثر من ساعتين']
           },
           {
             id: 'sym_description', type: 'textarea', required: false,
-            text: 'Describe any other symptoms you are experiencing.',
-            placeholder: 'e.g. Clicking sounds, warmth, redness, numbness…',
-            description: 'Any additional details will help your doctor.'
+            text: 'صف أي أعراض أخرى تعاني منها.',
+            placeholder: 'مثلاً: أصوات طقطقة، دفء، احمرار، تنميل...',
+            description: 'أي تفاصيل إضافية ستساعد طبيبك.'
           }
         ]
       },
       {
         id: 'pain',
-        title: 'Pain Assessment',
+        title: 'تقييم الألم',
         icon: 'Zap',
         scoring: true,
         questions: [
           {
             id: 'pain_rest', type: 'radio', required: true,
-            text: 'How would you rate your knee pain at rest?',
-            description: 'Consider pain when sitting, lying down, or relaxing.',
-            options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم ألم ركبتك في حالة الراحة؟',
+            description: 'ضع في اعتبارك الألم عند الجلوس أو الاستلقاء أو الاسترخاء.',
+            options: ['لا ألم', 'ألم خفيف جداً', 'ألم خفيف', 'ألم متوسط', 'ألم شديد', 'ألم شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_activity', type: 'radio', required: true,
-            text: 'How would you rate your knee pain during activity?',
-            description: 'Consider pain when walking, climbing stairs, or exercising.',
-            options: ['No pain', 'Mild pain', 'Moderate pain', 'Severe pain'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم ألم ركبتك أثناء النشاط؟',
+            description: 'ضع في اعتبارك الألم عند المشي أو صعود الدرج أو ممارسة الرياضة.',
+            options: ['لا ألم', 'ألم خفيف جداً', 'ألم خفيف', 'ألم متوسط', 'ألم شديد', 'ألم شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_night', type: 'radio', required: true,
-            text: 'Do you experience night pain that affects your sleep?',
-            options: ['No night pain', 'Occasional', 'Frequent', 'Every night'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'هل تعاني من ألم ليلي يؤثر على نومك؟',
+            options: ['لا يوجد ألم ليلي', 'نادراً (مرة في الشهر)', 'أحياناً (أسبوعياً)', 'متكرر (عدة مرات/أسبوع)', 'في كل ليلة تقريباً', 'كل ليلة'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_scale', type: 'numeric', required: true,
-            text: 'On a scale of 0–10, what is your average pain level this week?',
-            description: '0 = No pain, 10 = Worst pain imaginable',
+            text: 'على مقياس من 0 إلى 10، ما هو متوسط مستوى الألم لديك هذا الأسبوع؟',
+            description: '0 = لا ألم، 10 = أشد ألم يمكن تخيله',
             min: 0, max: 10, step: 1,
             scoreValues: null
           },
           {
             id: 'pain_medication', type: 'radio', required: true,
-            text: 'Are you currently taking pain medication for this knee?',
-            options: ['No medication', 'Over-the-counter, occasionally', 'Over-the-counter, regularly', 'Prescription required'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'هل تتناول حالياً أدوية لتسكين ألم الركبة؟',
+            options: ['لا أدوية', 'أدوية بدون وصفة (أحياناً)', 'أدوية بدون وصفة (بانتظام)', 'دواء بوصفة طبية (أحياناً)', 'دواء بوصفة طبية (يومياً)', 'أدوية متعددة بوصفة طبية'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           }
         ]
       },
@@ -253,104 +320,104 @@ export const ASSESSMENT_CONFIG = {
         icon: 'BarChart2',
         scoring: true,
         scoreCalculation: 'quickdash',
-        description: 'Please rate your ability to perform the following activities in the past week.',
+        description: 'يرجى تقييم قدرتك على أداء الأنشطة التالية خلال الأسبوع الماضي.',
         questions: [
           {
             id: 'qdash_bend', type: 'radio', required: true,
-            text: 'Can you fully bend your knee?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'هل تستطيع ثني ركبتك بالكامل؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_straighten', type: 'radio', required: true,
-            text: 'Can you fully straighten your knee?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'هل تستطيع تمديد ركبتك بالكامل؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_walk', type: 'radio', required: true,
-            text: 'How far can you walk without significant pain?',
-            description: 'During the past week.',
-            options: ['More than 1 km', '500 m – 1 km', '100 m – 500 m', 'Less than 100 m', 'Unable to walk'],
+            text: 'ما المسافة التي تستطيع المشي فيها دون ألم شديد؟',
+            description: 'خلال الأسبوع الماضي.',
+            options: ['أكثر من 1 كم', '500 م – 1 كم', '100 م – 500 م', 'أقل من 100 م', 'غير قادر على المشي'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_stairs', type: 'radio', required: true,
-            text: 'Can you climb stairs?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'هل تستطيع صعود الدرج؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_sleep', type: 'radio', required: true,
-            text: 'During the past week, how much difficulty have you had sleeping because of pain in your knee?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'خلال الأسبوع الماضي، ما مقدار الصعوبة التي واجهتها في النوم بسبب ألم ركبتك؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على النوم'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_work', type: 'radio', required: true,
-            text: 'During the past week, to what extent has your knee problem interfered with your work?',
-            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            text: 'خلال الأسبوع الماضي، إلى أي مدى أثرت مشكلة ركبتك على عملك؟',
+            options: ['لم تؤثر إطلاقاً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير كبير', 'تأثير بالغ'],
             scoreValues: [1, 2, 3, 4, 5]
           }
         ]
       },
       {
         id: 'qol',
-        title: 'Quality of Life',
+        title: 'جودة الحياة',
         icon: 'Heart',
         questions: [
           {
             id: 'qol_daily', type: 'radio', required: true,
-            text: 'How does the knee pain affect your daily activities?',
-            options: ['No impact', 'Mild impact', 'Moderate impact', 'Cannot perform daily activities']
+            text: 'كيف يؤثر ألم الركبة على أنشطتك اليومية؟',
+            options: ['لا تأثير', 'تأثير خفيف جداً', 'تأثير خفيف', 'تأثير متوسط', 'تأثير كبير', 'لا أستطيع أداء أنشطتي اليومية']
           },
           {
             id: 'qol_aid', type: 'radio', required: true,
-            text: 'Do you use a walking aid?',
-            options: ['None needed', 'Occasionally', 'Most of the time', 'Always required']
+            text: 'هل تستخدم معيناً للمشي؟',
+            options: ['لا حاجة لمعين', 'عصا أحياناً', 'عصا باستمرار', 'مشاية أحياناً', 'مشاية دائماً', 'كرسي متحرك']
           },
           {
             id: 'qol_social', type: 'radio', required: true,
-            text: 'How has your social life been affected by your knee problem?',
-            options: ['Not affected', 'Slightly affected', 'Moderately affected', 'Severely affected']
+            text: 'كيف أثرت مشكلة ركبتك على حياتك الاجتماعية؟',
+            options: ['لم تتأثر', 'تأثير نادر', 'تأثير طفيف', 'تأثير متوسط', 'تأثير ملحوظ', 'تأثير شديد', 'عزلة تامة']
           },
           {
             id: 'qol_overall', type: 'radio', required: true,
-            text: 'Overall, how is your quality of life affected?',
-            options: ['Not affected', 'Slightly affected', 'Moderately affected', 'Severely affected']
+            text: 'بشكل عام، كيف تأثرت جودة حياتك؟',
+            options: ['لم تتأثر', 'تأثير طفيف', 'تأثير متوسط', 'تأثير شديد نسبياً', 'تأثير شديد جداً']
           },
           {
             id: 'qol_mood', type: 'radio', required: false,
-            text: 'Has your knee problem affected your mood or mental well-being?',
-            options: ['Not at all', 'Occasionally', 'Often', 'Significantly']
+            text: 'هل أثرت مشكلة ركبتك على مزاجك أو صحتك النفسية؟',
+            options: ['لا إطلاقاً', 'نادراً', 'أحياناً', 'كثيراً', 'بشكل متكرر', 'بشكل ملحوظ', 'تأثير شديد جداً']
           }
         ]
       },
       {
         id: 'other',
-        title: 'Other',
+        title: 'أخرى',
         icon: 'MoreHorizontal',
         questions: [
           {
             id: 'oth_conditions', type: 'checkbox', required: false,
-            text: 'Do you have any of the following diagnosed conditions?',
-            description: 'Select all that apply.',
-            options: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Diabetes', 'Osteoporosis', 'Heart disease', 'None of the above']
+            text: 'هل تعاني من أي من الحالات التالية المشخصة؟',
+            description: 'اختر كل ما ينطبق.',
+            options: ['هشاشة العظام (التنكسية)', 'التهاب المفاصل الروماتويدي', 'السكري', 'هشاشة العظام', 'أمراض القلب', 'لا شيء مما سبق']
           },
           {
             id: 'oth_physio', type: 'radio', required: true,
-            text: 'Have you had physical therapy for this knee before?',
-            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing PT']
+            text: 'هل خضعت للعلاج الطبيعي لهذه الركبة من قبل؟',
+            options: ['أبداً', 'مرة واحدة (قصيرة)', 'مرة واحدة (كاملة)', 'مرتان', 'مرات متعددة (3+)', 'خاضع للعلاج حالياً']
           },
           {
             id: 'oth_injection', type: 'radio', required: false,
-            text: 'Have you had any injections into the knee?',
-            options: ['No', 'Cortisone injection(s)', 'Hyaluronic acid', 'PRP therapy']
+            text: 'هل تلقيت أي حقن في الركبة؟',
+            options: ['لا', 'حقنة كورتيزون', 'حمض الهيالورونيك', 'علاج PRP', 'علاج بالخلايا الجذعية', 'أنواع متعددة من الحقن']
           },
           {
             id: 'oth_notes', type: 'textarea', required: false,
-            text: 'Is there anything else you would like the doctor to know?',
-            placeholder: 'Any additional concerns, questions, or context…'
+            text: 'هل هناك أي شيء آخر تود إطلاع الطبيب عليه؟',
+            placeholder: 'أي مخاوف أو أسئلة أو تفاصيل إضافية...'
           }
         ]
       }
@@ -359,101 +426,101 @@ export const ASSESSMENT_CONFIG = {
 
   Shoulder: {
     id: 'shoulder-intake',
-    title: 'PROM Intake — Shoulder',
-    description: 'Please answer all questions honestly about your shoulder condition.',
+    title: 'تقييم الكتف — PROM',
+    description: 'يرجى الإجابة على جميع الأسئلة بصدق حول حالة كتفك.',
     sections: [
       {
         id: 'demographics',
-        title: 'Demographics',
+        title: 'البيانات الأساسية',
         icon: 'User',
         questions: [
           {
             id: 'dem_onset', type: 'radio', required: true,
-            text: 'How long have you had this shoulder problem?',
-            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+            text: 'منذ متى وأنت تعاني من هذه المشكلة في الكتف؟',
+            options: ['أقل من أسبوع', '1–4 أسابيع', '1–3 أشهر', '3–6 أشهر', '6–12 شهراً', 'أكثر من سنة', 'سنوات عديدة (مزمن)']
           },
           {
             id: 'dem_surgery', type: 'radio', required: true,
-            text: 'Have you had previous shoulder surgery?',
-            options: ['No', 'Yes — once', 'Yes — twice', 'Yes — multiple times']
+            text: 'هل أجريت عملية جراحية سابقة في الكتف؟',
+            options: ['لا', 'نعم — مرة واحدة', 'نعم — مرتان', 'نعم — 3 مرات', 'نعم — 4 مرات أو أكثر']
           },
           {
             id: 'dem_injury', type: 'radio', required: true,
-            text: 'Was the pain caused by a specific injury?',
-            options: ['No injury', 'Gradual onset', 'Specific incident', 'Sports injury']
+            text: 'هل كان الألم ناتجاً عن إصابة محددة؟',
+            options: ['لا إصابة (تلقائي)', 'بداية تدريجية / إجهاد متكرر', 'حادثة محددة', 'إصابة رياضية', 'إصابة في العمل', 'حادث سيارة']
           },
           {
             id: 'dem_dominant', type: 'radio', required: true,
-            text: 'Which is your dominant hand?',
-            options: ['Right', 'Left', 'Ambidextrous']
+            text: 'ما هي يدك المهيمنة؟',
+            options: ['اليمنى', 'اليسرى', 'كلتا اليدين']
           },
           {
             id: 'dem_affected', type: 'radio', required: true,
-            text: 'Which shoulder is affected?',
-            options: ['Right only', 'Left only', 'Both shoulders']
+            text: 'أي كتف متأثر؟',
+            options: ['الأيمن فقط', 'الأيسر فقط', 'كلا الكتفين']
           }
         ]
       },
       {
         id: 'symptoms',
-        title: 'Symptoms',
+        title: 'الأعراض',
         icon: 'Activity',
         questions: [
           {
             id: 'sym_raise', type: 'radio', required: true,
-            text: 'Can you raise your arm above shoulder height?',
-            options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot raise']
+            text: 'هل تستطيع رفع ذراعك فوق مستوى الكتف؟',
+            options: ['نعم، بالكامل وبدون ألم', 'نعم، بالكامل مع ألم خفيف', 'جزئياً (حتى 90°)', 'جزئياً (أقل من 90°)', 'فقط مع ألم شديد', 'لا أستطيع الرفع إطلاقاً']
           },
           {
             id: 'sym_behind', type: 'radio', required: true,
-            text: 'Can you reach behind your back?',
-            options: ['Yes, fully', 'Partially', 'Only with pain', 'Cannot reach']
+            text: 'هل تستطيع الوصول خلف ظهرك؟',
+            options: ['نعم، بالكامل', 'نعم، مع انزعاج خفيف', 'جزئياً', 'فقط مع ألم شديد', 'لا أستطيع الوصول']
           },
           {
             id: 'sym_weakness', type: 'radio', required: true,
-            text: 'Do you experience shoulder weakness?',
-            options: ['No weakness', 'Mild weakness', 'Moderate weakness', 'Significant weakness']
+            text: 'هل تعاني من ضعف في الكتف؟',
+            options: ['لا ضعف', 'ضعف خفيف جداً', 'ضعف خفيف', 'ضعف متوسط', 'ضعف ملحوظ', 'ضعف شديد', 'لا أستطيع رفع الذراع']
           },
           {
             id: 'sym_clicking', type: 'radio', required: true,
-            text: 'Do you experience clicking or popping in the shoulder?',
-            options: ['Never', 'Rarely', 'Sometimes', 'Always']
+            text: 'هل تسمع صوت طقطقة أو فرقعة في الكتف؟',
+            options: ['أبداً', 'نادراً (بضع مرات)', 'أحياناً (أسبوعياً)', 'كثيراً (يومياً)', 'في معظم الأوقات', 'دائماً مع الحركة']
           },
           {
             id: 'sym_numbness', type: 'radio', required: true,
-            text: 'Do you experience numbness or tingling in your arm or hand?',
-            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+            text: 'هل تعاني من تنميل أو وخز في ذراعك أو يدك؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الأوقات', 'باستمرار']
           }
         ]
       },
       {
         id: 'pain',
-        title: 'Pain Assessment',
+        title: 'تقييم الألم',
         icon: 'Zap',
         scoring: true,
         questions: [
           {
             id: 'pain_rest', type: 'radio', required: true,
-            text: 'How would you rate your shoulder pain at rest?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم ألم كتفك في حالة الراحة؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_activity', type: 'radio', required: true,
-            text: 'How would you rate your shoulder pain during movement?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم ألم كتفك أثناء الحركة؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_night', type: 'radio', required: true,
-            text: 'Do you have night pain affecting sleep?',
-            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'هل تعاني من ألم ليلي يؤثر على نومك؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الليالي', 'كل ليلة'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_scale', type: 'numeric', required: true,
-            text: 'Rate your average pain level this week (0–10).',
-            description: '0 = No pain, 10 = Worst pain imaginable',
+            text: 'قيّم متوسط مستوى الألم هذا الأسبوع (0–10).',
+            description: '0 = لا ألم، 10 = أشد ألم يمكن تخيله',
             min: 0, max: 10, step: 1
           }
         ]
@@ -464,87 +531,87 @@ export const ASSESSMENT_CONFIG = {
         icon: 'BarChart2',
         scoring: true,
         scoreCalculation: 'quickdash',
-        description: 'Rate your ability to perform the following activities in the past week.',
+        description: 'قيّم قدرتك على أداء الأنشطة التالية خلال الأسبوع الماضي.',
         questions: [
           {
             id: 'qdash_overhead', type: 'radio', required: true,
-            text: 'Can you perform overhead activities (e.g. reaching a high shelf)?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'هل تستطيع أداء الأنشطة فوق مستوى الرأس (مثل الوصول لرف مرتفع)؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_dressing', type: 'radio', required: true,
-            text: 'How much difficulty do you have dressing yourself?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'ما مقدار الصعوبة التي تواجهها في ارتداء ملابسك؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_carry', type: 'radio', required: true,
-            text: 'Can you carry a heavy bag or object?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'هل تستطيع حمل حقيبة أو جسم ثقيل؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_sleep', type: 'radio', required: true,
-            text: 'How much difficulty have you had sleeping because of shoulder pain?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'ما مقدار الصعوبة التي واجهتها في النوم بسبب ألم الكتف؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على النوم'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_work', type: 'radio', required: true,
-            text: 'To what extent has your shoulder problem interfered with your work?',
-            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            text: 'إلى أي مدى أثرت مشكلة كتفك على عملك؟',
+            options: ['لم تؤثر إطلاقاً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير كبير', 'تأثير بالغ'],
             scoreValues: [1, 2, 3, 4, 5]
           }
         ]
       },
       {
         id: 'qol',
-        title: 'Quality of Life',
+        title: 'جودة الحياة',
         icon: 'Heart',
         questions: [
           {
             id: 'qol_instability', type: 'radio', required: true,
-            text: 'Does the shoulder feel unstable (like it might dislocate)?',
-            options: ['No', 'Rarely', 'Sometimes', 'Frequently']
+            text: 'هل تشعر أن كتفك غير مستقر (كأنه قد يخرج من مكانه)؟',
+            options: ['لا عدم استقرار', 'نادر جداً', 'نادر', 'أحياناً', 'كثيراً', 'بشكل متكرر', 'خرج من مكانه فعلاً']
           },
           {
             id: 'qol_sport', type: 'radio', required: false,
-            text: 'Do you participate in sports or recreational activities?',
-            options: ['No sports', 'Light activity', 'Regular sport', 'Competitive sport']
+            text: 'هل تمارس الرياضة أو الأنشطة الترفيهية؟',
+            options: ['لا رياضة / خامل', 'نشاط ترفيهي خفيف', 'تمرين منتظم متوسط', 'رياضة منتظمة (ترفيهية)', 'رياضة تنافسية هاوية', 'رياضي محترف / نخبوي']
           },
           {
             id: 'qol_overall', type: 'radio', required: true,
-            text: 'How is your overall quality of life affected by this shoulder problem?',
-            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+            text: 'كيف أثرت مشكلة كتفك على جودة حياتك بشكل عام؟',
+            options: ['لم تتأثر', 'تأثير طفيف جداً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير شديد']
           }
         ]
       },
       {
         id: 'other',
-        title: 'Other',
+        title: 'أخرى',
         icon: 'MoreHorizontal',
         questions: [
           {
             id: 'oth_conditions', type: 'checkbox', required: false,
-            text: 'Do you have any of the following diagnosed conditions?',
-            description: 'Select all that apply.',
-            options: ['Diabetes', 'Rheumatoid Arthritis', 'Osteoporosis', 'Heart disease', 'None of the above']
+            text: 'هل تعاني من أي من الحالات التالية المشخصة؟',
+            description: 'اختر كل ما ينطبق.',
+            options: ['السكري', 'التهاب المفاصل الروماتويدي', 'هشاشة العظام', 'أمراض القلب', 'لا شيء مما سبق']
           },
           {
             id: 'oth_physio', type: 'radio', required: true,
-            text: 'Have you had physiotherapy for this shoulder?',
-            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+            text: 'هل خضعت للعلاج الطبيعي لهذا الكتف من قبل؟',
+            options: ['أبداً', 'مرة واحدة (قصيرة)', 'مرة واحدة (كاملة)', 'مرتان', 'مرات متعددة (3+)', 'خاضع للعلاج حالياً']
           },
           {
             id: 'oth_work', type: 'radio', required: true,
-            text: 'How is your work affected?',
-            options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work']
+            text: 'كيف تأثر عملك؟',
+            options: ['لم يتأثر', 'تقييد خفيف جداً', 'تقييد خفيف', 'تقييد متوسط', 'تقييد ملحوظ', 'لا أستطيع العمل']
           },
           {
             id: 'oth_notes', type: 'textarea', required: false,
-            text: 'Is there anything else you would like the doctor to know?',
-            placeholder: 'Any additional concerns or context…'
+            text: 'هل هناك أي شيء آخر تود إطلاع الطبيب عليه؟',
+            placeholder: 'أي مخاوف أو تفاصيل إضافية...'
           }
         ]
       }
@@ -553,96 +620,96 @@ export const ASSESSMENT_CONFIG = {
 
   Spine: {
     id: 'spine-intake',
-    title: 'PROM Intake — Spine',
-    description: 'Please answer all questions honestly about your back or neck condition.',
+    title: 'تقييم العمود الفقري — PROM',
+    description: 'يرجى الإجابة على جميع الأسئلة بصدق حول حالة ظهرك أو رقبتك.',
     sections: [
       {
         id: 'demographics',
-        title: 'Demographics',
+        title: 'البيانات الأساسية',
         icon: 'User',
         questions: [
           {
             id: 'dem_onset', type: 'radio', required: true,
-            text: 'How long have you had this spine problem?',
-            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+            text: 'منذ متى وأنت تعاني من هذه المشكلة في العمود الفقري؟',
+            options: ['أقل من أسبوع', '1–4 أسابيع', '1–3 أشهر', '3–6 أشهر', '6–12 شهراً', 'أكثر من سنة', 'سنوات عديدة (مزمن)']
           },
           {
             id: 'dem_surgery', type: 'radio', required: true,
-            text: 'Have you had previous spine surgery?',
-            options: ['No', 'Yes — once', 'Yes — twice', 'Yes — multiple times']
+            text: 'هل أجريت عملية جراحية سابقة في العمود الفقري؟',
+            options: ['لا', 'نعم — مرة واحدة', 'نعم — مرتان', 'نعم — 3 مرات', 'نعم — 4 مرات أو أكثر']
           },
           {
             id: 'dem_injury', type: 'radio', required: true,
-            text: 'Was the onset related to an injury?',
-            options: ['No injury', 'Lifting injury', 'Trauma / accident', 'Gradual onset']
+            text: 'هل كانت البداية مرتبطة بإصابة؟',
+            options: ['لا إصابة (تلقائي)', 'إصابة رفع / انحناء', 'إصابة رياضية', 'حادث سيارة / صدمة', 'إصابة في العمل', 'بداية تدريجية / وضعية']
           },
           {
             id: 'dem_region', type: 'radio', required: true,
-            text: 'Which region is primarily affected?',
-            options: ['Lower back (lumbar)', 'Mid back (thoracic)', 'Neck (cervical)', 'Multiple regions']
+            text: 'أي منطقة هي الأكثر تأثراً؟',
+            options: ['أسفل الظهر (قطني)', 'وسط الظهر (صدري)', 'الرقبة (عنقي)', 'أسفل + وسط الظهر', 'الرقبة + أعلى الظهر', 'مناطق متعددة', 'العمود الفقري بأكمله']
           }
         ]
       },
       {
         id: 'symptoms',
-        title: 'Symptoms',
+        title: 'الأعراض',
         icon: 'Activity',
         questions: [
           {
             id: 'sym_radiation', type: 'radio', required: true,
-            text: 'Do you experience pain radiating down your leg or arm?',
-            options: ['No radiation', 'Occasional', 'Frequent', 'Constant']
+            text: 'هل تعاني من ألم ينتشر نزولاً إلى ساقك أو ذراعك؟',
+            options: ['لا انتشار', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الأوقات', 'باستمرار']
           },
           {
             id: 'sym_numbness', type: 'radio', required: true,
-            text: 'Do you experience numbness or tingling in your limbs?',
-            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+            text: 'هل تعاني من تنميل أو وخز في أطرافك؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الأوقات', 'باستمرار']
           },
           {
             id: 'sym_weakness', type: 'radio', required: true,
-            text: 'Do you experience muscle weakness in your arms or legs?',
-            options: ['No weakness', 'Mild', 'Moderate', 'Significant']
+            text: 'هل تعاني من ضعف عضلي في ذراعيك أو ساقيك؟',
+            options: ['لا ضعف', 'خفيف جداً', 'خفيف', 'متوسط', 'ملحوظ', 'ضعف شديد']
           },
           {
             id: 'sym_bladder', type: 'radio', required: true,
-            text: 'Do you have any bowel or bladder issues?',
-            description: 'Important for ruling out serious conditions.',
-            options: ['None', 'Occasional urgency', 'Frequent issues', 'Loss of control']
+            text: 'هل تعاني من أي مشاكل في المثانة أو الأمعاء؟',
+            description: 'مهم لاستبعاد الحالات الخطيرة.',
+            options: ['لا شيء', 'إلحاح بولي أحياناً', 'إلحاح معوي أحياناً', 'مشاكل بولية متكررة', 'مشاكل معوية متكررة', 'فقدان السيطرة على المثانة', 'فقدان السيطرة على الأمعاء']
           },
           {
             id: 'sym_cough', type: 'radio', required: false,
-            text: 'Does the pain worsen when coughing or sneezing?',
-            options: ['No', 'Rarely', 'Sometimes', 'Always']
+            text: 'هل يزداد الألم عند السعال أو العطس؟',
+            options: ['لا', 'نادراً (بين الحين والآخر)', 'أحياناً (أسبوعياً)', 'كثيراً', 'في معظم الأوقات', 'دائماً']
           }
         ]
       },
       {
         id: 'pain',
-        title: 'Pain Assessment',
+        title: 'تقييم الألم',
         icon: 'Zap',
         scoring: true,
         questions: [
           {
             id: 'pain_rest', type: 'radio', required: true,
-            text: 'How would you rate your back/neck pain at rest?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم ألم ظهرك / رقبتك في حالة الراحة؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_activity', type: 'radio', required: true,
-            text: 'How would you rate your pain during activity?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم الألم أثناء النشاط؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_night', type: 'radio', required: true,
-            text: 'Do you experience night pain?',
-            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'هل تعاني من ألم ليلي؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الليالي', 'كل ليلة'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_scale', type: 'numeric', required: true,
-            text: 'Rate your average pain level this week (0–10).',
+            text: 'قيّم متوسط مستوى الألم هذا الأسبوع (0–10).',
             min: 0, max: 10, step: 1
           }
         ]
@@ -653,82 +720,82 @@ export const ASSESSMENT_CONFIG = {
         icon: 'BarChart2',
         scoring: true,
         scoreCalculation: 'quickdash',
-        description: 'Rate your ability to perform the following activities in the past week.',
+        description: 'قيّم قدرتك على أداء الأنشطة التالية خلال الأسبوع الماضي.',
         questions: [
           {
             id: 'qdash_sit', type: 'radio', required: true,
-            text: 'How long can you sit comfortably?',
-            options: ['Over 1 hour', '30–60 minutes', '10–30 minutes', 'Less than 10 minutes', 'Cannot sit'],
+            text: 'كم من الوقت تستطيع الجلوس بشكل مريح؟',
+            options: ['أكثر من ساعة', '30–60 دقيقة', '10–30 دقيقة', 'أقل من 10 دقائق', 'لا أستطيع الجلوس'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_stand', type: 'radio', required: true,
-            text: 'How long can you stand comfortably?',
-            options: ['Over 1 hour', '30–60 minutes', '10–30 minutes', 'Less than 10 minutes', 'Cannot stand'],
+            text: 'كم من الوقت تستطيع الوقوف بشكل مريح؟',
+            options: ['أكثر من ساعة', '30–60 دقيقة', '10–30 دقيقة', 'أقل من 10 دقائق', 'لا أستطيع الوقوف'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_bend', type: 'radio', required: true,
-            text: 'Can you bend forward comfortably?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Cannot bend'],
+            text: 'هل تستطيع الانحناء للأمام بشكل مريح؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'لا أستطيع الانحناء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_sleep', type: 'radio', required: true,
-            text: 'How much difficulty have you had sleeping because of spine pain?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'ما مقدار الصعوبة التي واجهتها في النوم بسبب ألم العمود الفقري؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على النوم'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_work', type: 'radio', required: true,
-            text: 'To what extent has your spine problem interfered with your work?',
-            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            text: 'إلى أي مدى أثرت مشكلة عمودك الفقري على عملك؟',
+            options: ['لم تؤثر إطلاقاً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير كبير', 'تأثير بالغ'],
             scoreValues: [1, 2, 3, 4, 5]
           }
         ]
       },
       {
         id: 'qol',
-        title: 'Quality of Life',
+        title: 'جودة الحياة',
         icon: 'Heart',
         questions: [
           {
             id: 'qol_morning', type: 'radio', required: true,
-            text: 'Do you experience morning stiffness?',
-            options: ['No', 'Less than 30 minutes', '30–60 minutes', 'Over 1 hour']
+            text: 'هل تعاني من تيبس صباحي؟',
+            options: ['لا', 'أقل من 15 دقيقة', '15–30 دقيقة', '30–60 دقيقة', 'ساعة إلى ساعتين', 'أكثر من ساعتين']
           },
           {
             id: 'qol_work', type: 'radio', required: true,
-            text: 'How is your work affected?',
-            options: ['Not affected', 'Mild limitation', 'Moderate limitation', 'Cannot work']
+            text: 'كيف تأثر عملك؟',
+            options: ['لم يتأثر', 'تقييد خفيف جداً', 'تقييد خفيف', 'تقييد متوسط', 'تقييد ملحوظ', 'لا أستطيع العمل']
           },
           {
             id: 'qol_overall', type: 'radio', required: true,
-            text: 'How is your overall quality of life affected?',
-            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+            text: 'كيف تأثرت جودة حياتك بشكل عام؟',
+            options: ['لم تتأثر', 'تأثير طفيف', 'تأثير متوسط', 'تأثير ملحوظ', 'تأثير شديد']
           }
         ]
       },
       {
         id: 'other',
-        title: 'Other',
+        title: 'أخرى',
         icon: 'MoreHorizontal',
         questions: [
           {
             id: 'oth_conditions', type: 'checkbox', required: false,
-            text: 'Do you have any of the following diagnosed conditions?',
-            description: 'Select all that apply.',
-            options: ['Osteoporosis', 'Diabetes', 'Rheumatoid Arthritis', 'Heart disease', 'None of the above']
+            text: 'هل تعاني من أي من الحالات التالية المشخصة؟',
+            description: 'اختر كل ما ينطبق.',
+            options: ['هشاشة العظام', 'السكري', 'التهاب المفاصل الروماتويدي', 'أمراض القلب', 'لا شيء مما سبق']
           },
           {
             id: 'oth_physio', type: 'radio', required: true,
-            text: 'Have you had physiotherapy for this condition?',
-            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+            text: 'هل خضعت للعلاج الطبيعي لهذه الحالة من قبل؟',
+            options: ['أبداً', 'مرة واحدة (قصيرة)', 'مرة واحدة (كاملة)', 'مرتان', 'مرات متعددة (3+)', 'خاضع للعلاج حالياً']
           },
           {
             id: 'oth_notes', type: 'textarea', required: false,
-            text: 'Is there anything else you would like the doctor to know?',
-            placeholder: 'Any additional concerns or context…'
+            text: 'هل هناك أي شيء آخر تود إطلاع الطبيب عليه؟',
+            placeholder: 'أي مخاوف أو تفاصيل إضافية...'
           }
         ]
       }
@@ -737,80 +804,80 @@ export const ASSESSMENT_CONFIG = {
 
   Other: {
     id: 'general-intake',
-    title: 'PROM Intake — General',
-    description: 'Please answer all questions honestly about your condition.',
+    title: 'التقييم العام — PROM',
+    description: 'يرجى الإجابة على جميع الأسئلة بصدق حول حالتك.',
     sections: [
       {
         id: 'demographics',
-        title: 'Demographics',
+        title: 'البيانات الأساسية',
         icon: 'User',
         questions: [
           {
             id: 'dem_onset', type: 'radio', required: true,
-            text: 'When did the problem start?',
-            options: ['Less than 1 week', '1–4 weeks', '1–6 months', 'Over 6 months']
+            text: 'متى بدأت المشكلة؟',
+            options: ['أقل من أسبوع', '1–4 أسابيع', '1–3 أشهر', '3–6 أشهر', '6–12 شهراً', 'أكثر من سنة']
           },
           {
             id: 'dem_injury', type: 'radio', required: true,
-            text: 'Was the onset related to an injury?',
-            options: ['No', 'Minor injury', 'Significant trauma', 'Gradual onset']
+            text: 'هل كانت البداية مرتبطة بإصابة؟',
+            options: ['لا', 'إصابة بسيطة', 'إصابة متوسطة', 'صدمة شديدة', 'إصابة رياضية', 'حادث سيارة', 'بداية تدريجية / وضعية']
           },
           {
             id: 'dem_surgery', type: 'radio', required: true,
-            text: 'Have you had previous surgery for this condition?',
-            options: ['No', 'Yes — once', 'Yes — multiple times', 'Surgery scheduled']
+            text: 'هل أجريت عملية جراحية سابقة لهذه الحالة؟',
+            options: ['لا', 'نعم — مرة واحدة', 'نعم — مرتان', 'نعم — مرات متعددة', 'عملية مجدولة حالياً']
           }
         ]
       },
       {
         id: 'symptoms',
-        title: 'Symptoms',
+        title: 'الأعراض',
         icon: 'Activity',
         questions: [
           {
             id: 'sym_swelling', type: 'radio', required: true,
-            text: 'Do you experience swelling in the affected area?',
-            options: ['No swelling', 'Occasional', 'Frequent', 'Constant']
+            text: 'هل تعاني من تورم في المنطقة المتأثرة؟',
+            options: ['لا يوجد تورم', 'أحياناً', 'أسبوعياً', 'متكرر', 'يومي', 'مستمر']
           },
           {
             id: 'sym_numbness', type: 'radio', required: true,
-            text: 'Do you have numbness or tingling?',
-            options: ['No', 'Occasionally', 'Frequently', 'Constantly']
+            text: 'هل تعاني من تنميل أو وخز؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الأوقات', 'باستمرار']
           },
           {
             id: 'sym_recurring', type: 'radio', required: true,
-            text: 'Have you had this issue before?',
-            options: ['No', 'Once before', 'Multiple times', 'Recurring condition']
+            text: 'هل عانيت من هذه المشكلة من قبل؟',
+            options: ['لا، أول مرة', 'مرة واحدة قصيرة من قبل', 'مرة واحدة (نوبة طويلة)', 'مرتان من قبل', 'مرات متعددة', 'حالة متكررة / مزمنة']
           }
         ]
       },
       {
         id: 'pain',
-        title: 'Pain Assessment',
+        title: 'تقييم الألم',
         icon: 'Zap',
         scoring: true,
         questions: [
           {
             id: 'pain_rest', type: 'radio', required: true,
-            text: 'How would you rate your pain at rest?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم الألم في حالة الراحة؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_activity', type: 'radio', required: true,
-            text: 'How would you rate your pain during activity?',
-            options: ['No pain', 'Mild', 'Moderate', 'Severe'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'كيف تقيّم الألم أثناء النشاط؟',
+            options: ['لا ألم', 'خفيف جداً', 'خفيف', 'متوسط', 'شديد', 'شديد جداً'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_night', type: 'radio', required: true,
-            text: 'Do you experience night pain?',
-            options: ['No', 'Occasionally', 'Frequently', 'Every night'],
-            scoreValues: [0, 1, 2, 3]
+            text: 'هل تعاني من ألم ليلي؟',
+            options: ['لا', 'نادراً', 'أحياناً', 'بشكل متكرر', 'في معظم الليالي', 'كل ليلة'],
+            scoreValues: [0, 1, 2, 3, 4, 5]
           },
           {
             id: 'pain_scale', type: 'numeric', required: true,
-            text: 'Rate your average pain level this week (0–10).',
+            text: 'قيّم متوسط مستوى الألم هذا الأسبوع (0–10).',
             min: 0, max: 10, step: 1
           }
         ]
@@ -821,69 +888,69 @@ export const ASSESSMENT_CONFIG = {
         icon: 'BarChart2',
         scoring: true,
         scoreCalculation: 'quickdash',
-        description: 'Rate your ability to perform the following activities in the past week.',
+        description: 'قيّم قدرتك على أداء الأنشطة التالية خلال الأسبوع الماضي.',
         questions: [
           {
             id: 'qdash_daily', type: 'radio', required: true,
-            text: 'How does the pain affect your daily activities?',
-            options: ['No impact', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Cannot perform'],
+            text: 'كيف يؤثر الألم على أنشطتك اليومية؟',
+            options: ['لا تأثير', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'لا أستطيع الأداء'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_sleep', type: 'radio', required: true,
-            text: 'How much difficulty have you had sleeping because of pain?',
-            options: ['No difficulty', 'Mild difficulty', 'Moderate difficulty', 'Severe difficulty', 'Unable to perform'],
+            text: 'ما مقدار الصعوبة التي واجهتها في النوم بسبب الألم؟',
+            options: ['بدون صعوبة', 'صعوبة خفيفة', 'صعوبة متوسطة', 'صعوبة شديدة', 'غير قادر على النوم'],
             scoreValues: [1, 2, 3, 4, 5]
           },
           {
             id: 'qdash_work', type: 'radio', required: true,
-            text: 'To what extent has your problem interfered with your work?',
-            options: ['Not at all', 'Slightly', 'Moderately', 'Quite a bit', 'Extremely'],
+            text: 'إلى أي مدى أثرت مشكلتك على عملك؟',
+            options: ['لم تؤثر إطلاقاً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير كبير', 'تأثير بالغ'],
             scoreValues: [1, 2, 3, 4, 5]
           }
         ]
       },
       {
         id: 'qol',
-        title: 'Quality of Life',
+        title: 'جودة الحياة',
         icon: 'Heart',
         questions: [
           {
             id: 'qol_aid', type: 'radio', required: true,
-            text: 'Do you use a walking aid or support?',
-            options: ['No', 'Occasionally', 'Most of the time', 'Always']
+            text: 'هل تستخدم معيناً للمشي أو دعماً؟',
+            options: ['لا', 'عصا أحياناً', 'عصا باستمرار', 'مشاية', 'كرسي متحرك أحياناً', 'كرسي متحرك دائماً']
           },
           {
             id: 'qol_overall', type: 'radio', required: true,
-            text: 'How is your overall quality of life affected?',
-            options: ['Not affected', 'Slightly', 'Moderately', 'Severely']
+            text: 'كيف تأثرت جودة حياتك بشكل عام؟',
+            options: ['لم تتأثر', 'تأثير طفيف جداً', 'تأثير طفيف', 'تأثير متوسط', 'تأثير ملحوظ', 'تأثير شديد']
           }
         ]
       },
       {
         id: 'other',
-        title: 'Other',
+        title: 'أخرى',
         icon: 'MoreHorizontal',
         questions: [
           {
             id: 'oth_conditions', type: 'checkbox', required: false,
-            text: 'Do you have any of the following diagnosed conditions?',
-            options: ['Arthritis', 'Diabetes', 'Osteoporosis', 'Heart disease', 'None of the above']
+            text: 'هل تعاني من أي من الحالات التالية المشخصة؟',
+            options: ['التهاب المفاصل', 'السكري', 'هشاشة العظام', 'أمراض القلب', 'لا شيء مما سبق']
           },
           {
             id: 'oth_physio', type: 'radio', required: true,
-            text: 'Have you had physiotherapy before?',
-            options: ['Never', 'Once', 'Multiple times', 'Currently undergoing']
+            text: 'هل خضعت للعلاج الطبيعي من قبل؟',
+            options: ['أبداً', 'مرة واحدة (قصيرة)', 'مرة واحدة (كاملة)', 'مرات متعددة', 'خاضع للعلاج حالياً']
           },
           {
             id: 'oth_weather', type: 'radio', required: false,
-            text: 'Does weather affect your pain?',
-            options: ['No', 'Sometimes', 'Often', 'Always']
+            text: 'هل يؤثر الطقس على الألم؟',
+            options: ['لا تأثير', 'الطقس البارد فقط', 'الطقس الرطب / الممطر', 'الطقس الحار', 'أي تغيير في الطقس', 'دائماً يتأثر بالطقس']
           },
           {
             id: 'oth_notes', type: 'textarea', required: false,
-            text: 'Is there anything else you would like the doctor to know?',
-            placeholder: 'Any additional concerns or context…'
+            text: 'هل هناك أي شيء آخر تود إطلاع الطبيب عليه؟',
+            placeholder: 'أي مخاوف أو تفاصيل إضافية...'
           }
         ]
       }
