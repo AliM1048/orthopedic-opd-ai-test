@@ -1,12 +1,9 @@
 fastapi
 uvicorn[standard]
-faster-whisper
-pymongo
+openai
 python-multipart
 python-dotenv
-resemblyzer
 pydub
-numpy
 sqlalchemy
 psycopg2-binary
 pyjwt

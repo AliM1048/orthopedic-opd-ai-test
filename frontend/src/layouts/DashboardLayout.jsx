@@ -1,25 +1,35 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ClipboardList, Stethoscope,
-  LogOut, Activity
+  LayoutDashboard, Stethoscope,
+  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon
 } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { label: 'NURSE', items: [
     { to: '/',           icon: LayoutDashboard, text: 'Dashboard' },
-    { to: '/assessment', icon: ClipboardList,   text: 'New Assessment' },
   ]},
   { label: 'PHYSICIAN', items: [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
   ]},
   { label: 'RECORDS', items: [
-    { to: '/patients',    icon: Users,    text: 'All Patients' },
+    { to: '/analytics',   icon: Activity, text: 'Analytics' },
   ]},
 ];
 
 export default function DashboardLayout({ children, user }) {
-  const location = useLocation();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -29,7 +39,7 @@ export default function DashboardLayout({ children, user }) {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
       {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
@@ -38,6 +48,15 @@ export default function DashboardLayout({ children, user }) {
             <h2>OrthoOPD</h2>
             <p>Patient Management</p>
           </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ marginLeft: collapsed ? 0 : 'auto' }}
+          >
+            {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -49,12 +68,13 @@ export default function DashboardLayout({ children, user }) {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
+                  title={item.text}
                   className={({ isActive }) =>
                     `nav-item${isActive ? ' active' : ''}`
                   }
                 >
                   <item.icon size={18} />
-                  {item.text}
+                  <span>{item.text}</span>
                 </NavLink>
               ))}
             </div>
@@ -64,11 +84,20 @@ export default function DashboardLayout({ children, user }) {
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <div className="sidebar-avatar">{user?.name?.split(' ').map((w) => w[0]).join('').slice(0, 2) || 'NS'}</div>
-            <div>
+            <div className="sidebar-user-text">
               <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>{user?.name || 'User'}</div>
               <div style={{ fontSize: 11, color: '#64748b' }}>{user?.role === 'physician' ? 'Physician' : 'Orthopedic Ward'}</div>
             </div>
-            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4, marginLeft: 'auto' }} title="Sign out">
+            <button
+              type="button"
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{ marginLeft: collapsed ? 0 : 'auto' }}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button onClick={handleLogout} className="theme-toggle-btn" title="Sign out">
               <LogOut size={16} />
             </button>
           </div>

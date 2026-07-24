@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Activity, Stethoscope, HeartPulse } from 'lucide-react';
+import { Activity, Sun, Moon } from 'lucide-react';
 import api from '../api';
+import { useTheme } from '../hooks/useTheme';
 
 export default function Login({ onLogin }) {
-  const [role, setRole] = useState('nurse');
+  const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState('nurse.sara@ortho.com');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
@@ -28,6 +29,14 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-page">
+      <button
+        type="button"
+        className="login-theme-toggle"
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
       <div className="login-card">
         <div className="login-logo">
           <div className="login-logo-icon"><Activity size={24} /></div>
@@ -41,25 +50,6 @@ export default function Login({ onLogin }) {
         <p className="login-sub">Sign in to access the orthopedic patient management system.</p>
 
         <form onSubmit={handleSubmit}>
-          <div className="login-role-grid">
-            <button
-              type="button"
-              className={`role-btn ${role === 'nurse' ? 'selected' : ''}`}
-              onClick={() => { setRole('nurse'); setEmail('nurse.sara@ortho.com'); setPassword('password'); }}
-            >
-              <div className="role-btn-icon"><HeartPulse size={24} /></div>
-              <div className="role-btn-label">Nurse</div>
-            </button>
-            <button
-              type="button"
-              className={`role-btn ${role === 'physician' ? 'selected' : ''}`}
-              onClick={() => { setRole('physician'); setEmail('physician.khalid@ortho.com'); setPassword('password'); }}
-            >
-              <div className="role-btn-icon"><Stethoscope size={24} /></div>
-              <div className="role-btn-label">Physician</div>
-            </button>
-          </div>
-
           <div className="form-group">
             <label className="form-label">Username</label>
             <input
@@ -83,7 +73,7 @@ export default function Login({ onLogin }) {
           </div>
 
           {error && (
-            <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 8, textAlign: 'center' }}>
+            <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 8, textAlign: 'center' }}>
               {error}
             </div>
           )}
@@ -93,8 +83,8 @@ export default function Login({ onLogin }) {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 20 }}>
-          Demo credentials are pre-filled. Select a role and sign in.
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 20 }}>
+          Demo credentials are pre-filled — just sign in.
         </p>
       </div>
     </div>

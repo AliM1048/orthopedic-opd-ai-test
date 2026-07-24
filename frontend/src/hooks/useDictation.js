@@ -9,7 +9,7 @@ const API_BASE = 'http://localhost:8000';
 const PREVIEW_INTERVAL_MS = 4000;
 const PREVIEW_MIN_CHUNKS = 5; // ~0.5s at the 100ms timeslice below — skip near-empty previews
 
-export function useDictation({ patientId, onResult, onError }) {
+export function useDictation({ patientId, language = 'en', onResult, onError }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -21,10 +21,19 @@ export function useDictation({ patientId, onResult, onError }) {
   const previewTimerRef = useRef(null);
   const previewBusyRef = useRef(false);
 
+  // Web Audio graph for the live waveform visualization — runs in parallel
+  // with (not instead of) MediaRecorder; createMediaStreamSource taps the
+  // stream non-destructively so both can consume it at once. Exposed via
+  // analyserRef so a consumer (DictationRecordingModal) can read live
+  // frequency data in its own rAF loop without this hook re-rendering on
+  // every audio frame.
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+
   // Live "what the mic is hearing" caption: re-transcribes the recording-so-far
   // every few seconds while the doctor is still talking, so they get on-screen
   // feedback well before they click stop. Stays local — it hits our own
-  // faster-whisper backend, nothing leaves the machine.
+  // backend, nothing leaves the machine except the audio itself.
   const sendPreview = useCallback(async (mimeType) => {
     if (previewBusyRef.current || chunksRef.current.length < PREVIEW_MIN_CHUNKS) return;
     previewBusyRef.current = true;
@@ -33,6 +42,7 @@ export function useDictation({ patientId, onResult, onError }) {
       const ext = mimeType.includes('ogg') ? '.ogg' : '.webm';
       const formData = new FormData();
       formData.append('audio', blob, `preview${ext}`);
+      formData.append('language', language);
 
       const res = await axios.post(`${API_BASE}/transcribe/preview`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -43,6 +53,15 @@ export function useDictation({ patientId, onResult, onError }) {
       // update this tick, nothing else depends on it.
     } finally {
       previewBusyRef.current = false;
+    }
+  }, [language]);
+
+  const teardownAudioGraph = useCallback(() => {
+    analyserRef.current = null;
+    if (audioContextRef.current) {
+      const ctx = audioContextRef.current;
+      audioContextRef.current = null;
+      if (ctx.state !== 'closed') ctx.close().catch(() => {});
     }
   }, []);
 
@@ -66,11 +85,26 @@ export function useDictation({ patientId, onResult, onError }) {
       chunksRef.current = [];
       setLiveCaption('');
 
+      // A fresh AudioContext/AnalyserNode per recording — never reused across
+      // cycles (a doctor may record multiple takes per visit).
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.7;
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       recorder.onstop = async () => {
+        // Stop the live waveform before the tracks stop (once stopped, the
+        // analyser goes silent anyway) and tear down the audio graph.
+        teardownAudioGraph();
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: mimeType });
         await sendAudio(blob, mimeType);
@@ -90,7 +124,7 @@ export function useDictation({ patientId, onResult, onError }) {
     } catch (err) {
       onError('Microphone access denied. Please allow mic permissions.');
     }
-  }, [sendPreview]);
+  }, [sendPreview, teardownAudioGraph]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -108,6 +142,7 @@ export function useDictation({ patientId, onResult, onError }) {
       const formData = new FormData();
       formData.append('audio', blob, `dictation${ext}`);
       if (patientId) formData.append('patient_id', patientId);
+      formData.append('language', language);
 
       const res = await axios.post(`${API_BASE}/dictate`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -123,5 +158,5 @@ export function useDictation({ patientId, onResult, onError }) {
     }
   };
 
-  return { isRecording, isProcessing, elapsedSeconds, liveCaption, startRecording, stopRecording };
+  return { isRecording, isProcessing, elapsedSeconds, liveCaption, analyserRef, startRecording, stopRecording };
 }

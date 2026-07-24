@@ -6,10 +6,10 @@ export default function PatientSummaryCard({ patient }) {
   const initials = patient.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const statusMap = {
-    pending: { label: 'Pending Call', color: '#f59e0b', bg: '#fef3c7' },
-    'assessment-completed': { label: 'Assessed', color: '#10b981', bg: '#d1fae5' },
-    'follow-up': { label: 'Follow-Up', color: '#8b5cf6', bg: '#ede9fe' },
-    completed: { label: 'Completed', color: '#0ea5e9', bg: '#e0f2fe' },
+    pending: { label: 'Pending Call', color: 'var(--warning)', bg: 'color-mix(in srgb, var(--warning) 15%, var(--surface))' },
+    'assessment-completed': { label: 'Assessed', color: 'var(--success)', bg: 'color-mix(in srgb, var(--success) 15%, var(--surface))' },
+    'follow-up': { label: 'Follow-Up', color: 'var(--info)', bg: 'color-mix(in srgb, var(--info) 15%, var(--surface))' },
+    completed: { label: 'Completed', color: 'var(--accent)', bg: 'color-mix(in srgb, var(--accent) 15%, var(--surface))' },
   };
   const status = statusMap[patient.status] || statusMap.pending;
 

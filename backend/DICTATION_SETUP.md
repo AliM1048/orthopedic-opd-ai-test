@@ -4,18 +4,21 @@ The "Record Full Visit" button on the Physician Evaluation page lets a doctor
 dictate diagnosis, diagnostic tests, and treatment plan in a single recording.
 This needs two things running locally:
 
-## 1. faster-whisper (transcription)
+## 1. OpenAI transcription API
 
-Already in `requirements.txt` — no extra setup. Configure via `.env` if needed:
+Transcription runs through OpenAI's API rather than a local model, so audio
+leaves the machine for this call and an API key + billing is required.
+Configure via `.env`:
 
 ```
-WHISPER_MODEL_SIZE=base   # tiny/base/small/medium/large-v3
-WHISPER_COMPUTE_TYPE=int8 # int8 for CPU; float16 if you have a CUDA GPU
-WHISPER_DEVICE=cpu        # or "cuda"
+OPENAI_API_KEY=sk-...
+OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
 ```
 
-`small` or `medium` give noticeably cleaner transcripts than `base` at the
-cost of speed — worth trying if accuracy matters more than turnaround time.
+Get a key at https://platform.openai.com/api-keys. The live-caption preview
+(`/transcribe/preview`) fires an API call roughly every 4 seconds while the
+doctor is recording (see `PREVIEW_INTERVAL_MS` in `useDictation.js`), on top
+of the final transcription call — factor that into API cost expectations.
 
 ## 2. Ollama (turns the transcript into structured fields)
 

@@ -47,31 +47,104 @@ TREATMENT_OPTIONS = {
 # is a fixed-vocabulary match problem, not something that needs an LLM, and
 # matching deterministically means the doctor's word always wins instead of an
 # LLM's paraphrase of it.
+# Arabic/French alternatives are written in *normalised* Arabic form (see
+# _normalize_arabic below — alef-hamza forms collapsed to ا, ة->ه, ى->ي)
+# since keyword_match() always searches the normalised haystack. English and
+# French matching is plain re.I; French adds an [ée] class where accents are
+# ASR-optional so it matches whether or not OpenAI transcribes the accent.
+# Arabic terms use an optional `(?:و)?(?:ال)?` definite-article prefix on each noun
+# — the article glues directly onto the word with no space ("الفحوصات" =
+# "the" + "diagnostics" as one token), so a bare `\bفحوصات\b` would never
+# match the (very common) definite form. `(?:و)?(?:ال)?` before the word keeps `\b`
+# anchored at the true start (article present or not) instead.
 DIAGNOSTIC_TEST_SYNONYMS = {
-    "xray": [r"x[\s-]?ray", r"radiograph"],
-    "mri": [r"mri", r"magnetic resonance"],
-    "ct": [r"ct\s*scan", r"cat\s*scan", r"computed tomography"],
-    "lab": [r"laborator\w*", r"lab\s*tests?", r"lab\s*work", r"blood\s*(?:test|work)", r"\bcbc\b", r"\besr\b", r"\bcrp\b"],
-    "us": [r"ultrasound", r"sonograph\w*"],
+    "xray": [
+        r"x[\s-]?ray", r"radiograph",
+        r"\b(?:و)?(?:ال)?اشعه\s*(?:و)?(?:ال)?سينيه\b", r"\b(?:و)?(?:ال)?اشعه\s*(?:و)?(?:ال)?اكس\b", r"\b(?:و)?(?:ال)?رنتجن\b",
+        r"\bradiographie\b", r"\brayons?\s*x\b",
+    ],
+    "mri": [
+        r"mri", r"magnetic resonance",
+        r"\b(?:و)?(?:ال)?رنين\s*(?:و)?(?:ال)?مغناطيسي\b",
+        r"\birm\b", r"\bimagerie\s*par\s*r[ée]sonance\s*magn[ée]tique\b", r"\br[ée]sonance\s*magn[ée]tique\b",
+    ],
+    "ct": [
+        r"ct\s*scan", r"cat\s*scan", r"computed tomography",
+        r"\b(?:و)?(?:ال)?اشعه\s*(?:و)?(?:ال)?مقطعيه\b", r"\b(?:و)?(?:ال)?تصوير\s*(?:و)?(?:ال)?مقطعي\b",
+        r"\bscanner\b", r"\btomodensitom[ée]trie\b",
+    ],
+    "lab": [
+        r"laborator\w*", r"lab\s*tests?", r"lab\s*work", r"blood\s*(?:test|work)", r"\bcbc\b", r"\besr\b", r"\bcrp\b",
+        r"\b(?:و)?(?:ال)?تحاليل\s*(?:و)?(?:ال)?مخبريه\b", r"\b(?:و)?(?:ال)?فحوصات\s*(?:و)?(?:ال)?دم\b", r"\b(?:و)?(?:ال)?تحليل\s*(?:و)?(?:ال)?دم\b",
+        r"\banalyses?\s*de\s*laboratoire\b", r"\banalyses?\s*sanguines?\b", r"\bbilan\s*sanguin\b",
+    ],
+    "us": [
+        r"ultrasound", r"sonograph\w*",
+        r"\b(?:و)?(?:ال)?سونار\b", r"\b(?:و)?(?:ال)?موجات\s*فوق\s*(?:و)?(?:ال)?صوتيه\b", r"\b(?:و)?(?:ال)?ايكو\b",
+        r"\b[ée]chographie\b",
+    ],
 }
 
 TREATMENT_SYNONYMS = {
-    "surgery": [r"surger\w*", r"surgical", r"operat\w*"],
-    "medication": [r"medication\w*", r"\bmeds\b", r"prescri\w*", r"\bmedicine\b"],
-    "physio": [r"physiotherap\w*", r"physical therap\w*", r"\bphysio\b"],
-    "injection": [r"injection\w*", r"corticosteroid\w*", r"\bprp\b", r"steroid shot", r"cortisone"],
-    "rest": [r"rest\s*(?:and|&)?\s*monitor\w*", r"conservative management", r"\bjust rest\b"],
-    "rehab": [r"rehabilitation\w*", r"long[\s-]?term rehab\w*", r"\brehab\b"],
+    "surgery": [
+        r"surger\w*", r"surgical", r"operat\w*",
+        r"\b(?:و)?(?:ال)?جراحه\b", r"\b(?:و)?(?:ال)?عمليه\s*(?:و)?(?:ال)?جراحيه\b",
+        r"\bchirurgie\b", r"\bop[ée]ration\b",
+    ],
+    "medication": [
+        r"medication\w*", r"\bmeds\b", r"prescri\w*", r"\bmedicine\b",
+        r"\b(?:و)?(?:ال)?دواء\b", r"\b(?:و)?(?:ال)?ادويه\b", r"\b(?:و)?(?:ال)?علاج\s*(?:و)?(?:ال)?دوائي\b",
+        r"\bm[ée]dicament\w*\b", r"\btraitement\s*m[ée]dicamenteux\b",
+    ],
+    "physio": [
+        r"physiotherap\w*", r"physical therap\w*", r"\bphysio\b",
+        r"\b(?:و)?(?:ال)?علاج\s*(?:و)?(?:ال)?طبيعي\b", r"\b(?:و)?(?:ال)?فيزيوثيرابي\b",
+        r"\bkin[ée]sith[ée]rapie\b", r"\bphysioth[ée]rapie\b",
+    ],
+    "injection": [
+        r"injection\w*", r"corticosteroid\w*", r"\bprp\b", r"steroid shot", r"cortisone",
+        r"\b(?:و)?(?:ال)?حقن\b", r"\b(?:و)?(?:ال)?حقنه\b", r"\b(?:و)?(?:ال)?ابره\s*كورتيزون\b",
+        r"\binfiltration\b", r"\bcorticoth[ée]rapie\b",
+    ],
+    "rest": [
+        r"rest\s*(?:and|&)?\s*monitor\w*", r"conservative management", r"\bjust rest\b",
+        r"\b(?:و)?(?:ال)?راحه\s*(?:و)?(?:ال)?متابعه\b", r"\b(?:و)?(?:ال)?راحه\s*(?:و)?(?:ال)?مراقبه\b",
+        r"\brepos\s*et\s*surveillance\b", r"\brepos\s*et\s*suivi\b",
+    ],
+    "rehab": [
+        r"rehabilitation\w*", r"long[\s-]?term rehab\w*", r"\brehab\b",
+        r"\b(?:و)?(?:ال)?اعاده\s*(?:و)?(?:ال)?تاهيل\b", r"\b(?:و)?(?:ال)?تاهيل\s*(?:و)?(?:ال)?طويل\s*(?:و)?(?:ال)?امد\b", r"\b(?:و)?(?:ال)?تاهيل\b",
+        r"\br[ée][ée]ducation\b", r"\br[ée]adaptation\b",
+    ],
 }
+
+
+# Length-preserving normalisation of common Arabic letter-form variants
+# (alef-hamza forms, ta-marbuta/ha, alef-maksura/ya) so the Arabic
+# alternatives in the patterns below only need to spell one canonical form
+# instead of enumerating every variant. Only ever used to build the
+# *haystack* passed to .search()/.finditer() — never applied to text that
+# gets sliced or returned, since every substitution is one codepoint for one
+# codepoint, so match offsets stay valid against the original string.
+_ARABIC_NORMALIZE_MAP = str.maketrans({
+    "أ": "ا", "إ": "ا", "آ": "ا",
+    "ى": "ي",
+    "ة": "ه",
+})
+
+
+def _normalize_arabic(text: str) -> str:
+    return text.translate(_ARABIC_NORMALIZE_MAP)
 
 
 def keyword_match(text: str, synonyms: dict) -> list[str]:
     """Scan text for the first occurrence of any synonym for each known id,
     returning matched ids ordered by where they were said (earliest first)."""
+    haystack = _normalize_arabic(text)
     hits = []
     for id_, patterns in synonyms.items():
         for pattern in patterns:
-            m = re.search(pattern, text, re.I)
+            m = re.search(pattern, haystack, re.I)
             if m:
                 hits.append((m.start(), id_))
                 break
@@ -85,24 +158,50 @@ def keyword_match(text: str, synonyms: dict) -> list[str]:
 
 # Spoken section markers a physician uses to delimit one continuous dictation
 # without touching the screen. Word-boundary regexes so "diagnosis" and
-# "diagnostics" don't collide with each other.
+# "diagnostics" don't collide with each other. Arabic/French alternatives
+# merged in via `|` rather than branching by detected language — this also
+# handles a doctor code-switching mid-dictation (e.g. Arabic speech with
+# English medical terms), which is realistic for a bilingual clinic. Arabic
+# alternatives are written in normalised form (see _normalize_arabic above);
+# matched against the normalised haystack in segment_dictation() below.
 _SECTION_PATTERNS = [
-    ("treatment", re.compile(r"\btreatment\s*plan\b|\btreatment\b|\bprescri(?:be|bing|ption)\b", re.I)),
-    ("diagnostics", re.compile(r"\bdiagnostics?\b|\border(?:ing)?\s+(?:tests?|imaging)\b|\brequest(?:ing)?\s+(?:tests?|imaging)\b|\blabs?\b|\bimaging\b", re.I)),
-    ("evaluation", re.compile(r"\bdiagnosis\b|\bevaluation\b|\bassessment\b|\bfindings\b", re.I)),
+    ("treatment", re.compile(
+        r"\btreatment\s*plan\b|\btreatment\b|\bprescri(?:be|bing|ption)\b"
+        r"|\b(?:و)?(?:ال)?خطه\s*(?:و)?(?:ال)?علاج\b|\b(?:و)?(?:ال)?علاج\b|\b(?:و)?(?:ال)?وصفه\s*(?:و)?(?:ال)?طبيه\b|\bصرف\s*(?:و)?(?:ال)?دواء\b"
+        r"|\bplan\s*de\s*traitement\b|\btraitement\b|\bprescription\b|\bordonnance\b",
+        re.I)),
+    ("diagnostics", re.compile(
+        r"\bdiagnostics?\b|\border(?:ing)?\s+(?:tests?|imaging)\b|\brequest(?:ing)?\s+(?:tests?|imaging)\b|\blabs?\b|\bimaging\b"
+        r"|\b(?:و)?(?:ال)?فحوصات\b|\b(?:و)?(?:ال)?تحاليل\b|\b(?:و)?(?:ال)?اشعه\b|\bطلب\s*(?:و)?(?:ال)?فحوصات\b|\b(?:و)?(?:ال)?تصوير\b"
+        r"|\bexamens?\b|\banalyses?\b|\bimagerie\b|\bdemande\s*d.examens?\b",
+        re.I)),
+    ("evaluation", re.compile(
+        r"\bdiagnosis\b|\bevaluation\b|\bassessment\b|\bfindings\b"
+        r"|\b(?:و)?(?:ال)?تشخيص\b|\b(?:و)?(?:ال)?تقييم\b|\b(?:و)?(?:ال)?نتائج\b|\b(?:و)?(?:ال)?فحص\b"
+        # French "diagnostic" (noun) is spelled identically to the English
+        # adjective in "diagnostic tests" — the negative lookahead keeps this
+        # cue for standalone French use without stealing English "diagnostic
+        # tests"/"diagnostic imaging" away from the diagnostics pattern above.
+        r"|\bdiagnostic\b(?!\s+(?:tests?|imaging))|\b[ée]valuation\b|\br[ée]sultats\b|\bconstatations\b",
+        re.I)),
 ]
 
 # Within the treatment section, "instructions"/"details" is itself a spoken
 # cue (same idea as the section markers above) — the LLM doesn't reliably
 # pick it up as free text every time, so capture everything said after it
 # directly. Only used as a fallback when the AI left details empty.
-_DETAILS_CUE_PATTERN = re.compile(r"\b(?:instructions?\s*(?:and|&)?\s*details?|details?|instructions?)\b\s*[:,]?\s*", re.I)
+_DETAILS_CUE_PATTERN = re.compile(
+    r"\b(?:instructions?\s*(?:and|&)?\s*details?|details?|instructions?)\b\s*[:,]?\s*"
+    r"|\bتعليمات\s*(?:و)?\s*تفاصيل\b\s*[:,]?\s*|\bتفاصيل\b\s*[:,]?\s*|\bتعليمات\b\s*[:,]?\s*|\bملاحظات\b\s*[:,]?\s*"
+    r"|\binstructions?\s*(?:et)?\s*d[ée]tails?\b\s*[:,]?\s*|\bd[ée]tails?\b\s*[:,]?\s*",
+    re.I)
 
 
 def extract_details_cue(treatment_text: str) -> str:
     """Return whatever was said after the last "instructions"/"details" cue
     in the treatment section, or "" if the cue wasn't used."""
-    matches = list(_DETAILS_CUE_PATTERN.finditer(treatment_text))
+    haystack = _normalize_arabic(treatment_text)
+    matches = list(_DETAILS_CUE_PATTERN.finditer(haystack))
     if not matches:
         return ""
     return treatment_text[matches[-1].end():].strip().rstrip(".").strip()
@@ -124,11 +223,15 @@ def _apply_details_fallback(treatments: list, fallback_details: str) -> None:
 # "follow-up date"/"follow up on" is itself a spoken cue, same idea as the
 # details cue above — but unlike free-text details, a date said as a raw
 # number sequence ("13, 12, 20, 26") is a fixed-shape value a regex can parse
-# far more reliably than a small local LLM reading garbled ASR text (Whisper
+# far more reliably than a small local LLM reading garbled ASR text (ASR
 # commonly splits a spoken year like "twenty twenty-six" into two separate
 # two-digit numbers). Deterministic parsing wins over the AI guess here, the
 # same as keyword_match already does for diagnostic tests/treatment types.
-_FOLLOWUP_DATE_CUE_PATTERN = re.compile(r"\bfollow[\s-]?up\s*(?:date|visit)?\b\s*[:,]?\s*", re.I)
+_FOLLOWUP_DATE_CUE_PATTERN = re.compile(
+    r"\bfollow[\s-]?up\s*(?:date|visit)?\b\s*[:,]?\s*"
+    r"|\bموعد\s*المتابعه\b\s*[:,]?\s*|\bتاريخ\s*المتابعه\b\s*[:,]?\s*|\bموعد\s*المراجعه\b\s*[:,]?\s*"
+    r"|\bdate\s*de\s*suivi\b\s*[:,]?\s*|\brendez[\s-]?vous\s*de\s*suivi\b\s*[:,]?\s*|\bdate\s*de\s*contr[oô]le\b\s*[:,]?\s*",
+    re.I)
 
 
 def _numbers_to_iso_date(numbers: list[int], today: datetime) -> str | None:
@@ -175,12 +278,12 @@ def extract_followup_date_cue(treatment_text: str, today: datetime) -> str | Non
     """Return an ISO date parsed from whatever was said after a "follow-up
     date" cue in the treatment section, or None if the cue wasn't used or
     couldn't be parsed as a date."""
-    m = _FOLLOWUP_DATE_CUE_PATTERN.search(treatment_text)
+    m = _FOLLOWUP_DATE_CUE_PATTERN.search(_normalize_arabic(treatment_text))
     if not m:
         return None
     tail = treatment_text[m.end():]
     cutoff = len(tail)
-    details_m = _DETAILS_CUE_PATTERN.search(tail)
+    details_m = _DETAILS_CUE_PATTERN.search(_normalize_arabic(tail))
     if details_m:
         cutoff = min(cutoff, details_m.start())
     period = tail.find(".")
@@ -206,9 +309,10 @@ def segment_dictation(text: str) -> dict:
     chunks. Anything spoken before the first marker is treated as evaluation,
     since physicians naturally lead with findings before ordering tests or
     prescribing treatment."""
+    haystack = _normalize_arabic(text)
     matches = []
     for label, pattern in _SECTION_PATTERNS:
-        for m in pattern.finditer(text):
+        for m in pattern.finditer(haystack):
             matches.append((m.start(), label))
     matches.sort(key=lambda x: x[0])
 

@@ -1,18 +1,8 @@
 import sys
 import bcrypt
-import psycopg2
-from dotenv import load_dotenv
-import os
+from sqlalchemy import text
 
-load_dotenv()
-
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "orthopedic_opd",
-    "user": os.getenv("postgres_user"),
-    "password": os.getenv("postgres_password"),
-}
+from database import engine
 
 
 def main():
@@ -30,41 +20,31 @@ def main():
         bcrypt.gensalt()
     ).decode("utf-8")
 
-    conn = psycopg2.connect(**DB_CONFIG)
-    cur = conn.cursor()
+    with engine.begin() as conn:
+        conn.execute(text(
+            """CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT,
+                email TEXT UNIQUE,
+                password_hash TEXT,
+                role TEXT
+            );"""
+        ))
 
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name TEXT,
-            email TEXT,
-            password_hash TEXT,
-            role TEXT
-        );"""
-    )
-
-    cur.execute(
-        """
-        INSERT INTO users (
-            email,
-            password_hash,
-            role,
-            name
+        conn.execute(
+            text(
+                """
+                INSERT INTO users (email, password_hash, role, name)
+                VALUES (:email, :password_hash, :role, :name)
+                """
+            ),
+            {
+                "email": email,
+                "password_hash": password_hash,
+                "role": role,
+                "name": email.split("@")[0],
+            },
         )
-        VALUES (%s, %s, %s, %s)
-        """,
-        (
-            email,
-            password_hash,
-            role,
-            email.split("@")[0]
-        )
-    )
-
-    conn.commit()
-
-    cur.close()
-    conn.close()
 
     print(f"User {email} created successfully")
 

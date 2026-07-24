@@ -1,5 +1,5 @@
 import { Check, AlertCircle, Send, ArrowLeft, BarChart2 } from 'lucide-react';
-import { calculateQuickDASH, calculateSectionScore } from '../../data/mockData';
+import { calculateQuickDASH, calculateSectionScore } from '../../utils/scoring';
 
 function formatAnswer(question, value) {
   if (value === undefined || value === null || value === '') return null;
@@ -26,7 +26,7 @@ function SectionSummary({ section, answers }) {
       const score = calculateQuickDASH(answers, section.questions);
       if (score !== null) {
         const severity = score < 25 ? 'Low' : score < 50 ? 'Moderate' : score < 75 ? 'High' : 'Severe';
-        const color = score < 25 ? '#10b981' : score < 50 ? '#f59e0b' : score < 75 ? '#ef4444' : '#7f1d1d';
+        const color = score < 25 ? 'var(--success)' : score < 50 ? 'var(--warning)' : score < 75 ? 'var(--danger)' : 'color-mix(in srgb, var(--danger) 70%, black)';
         scoreDisplay = (
           <div className="smp-score" style={{ borderColor: color }}>
             <BarChart2 size={14} style={{ color }} />

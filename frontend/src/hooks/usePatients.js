@@ -61,13 +61,12 @@ export function usePatients(token) {
           : p
       )
     );
-    api.post(`/api/patients/${patientId}/evaluations`, evaluation)
+    return api.post(`/api/patients/${patientId}/evaluations`, evaluation)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const addDiagnostic = useCallback((patientId, diagnostic) => {
@@ -117,13 +116,12 @@ export function usePatients(token) {
           : p
       )
     );
-    api.post(`/api/patients/${patientId}/treatments`, treatment)
+    return api.post(`/api/patients/${patientId}/treatments`, treatment)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const markEvaluationSent = useCallback((patientId, evaluationId) => {

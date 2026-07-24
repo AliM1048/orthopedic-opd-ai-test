@@ -29,7 +29,7 @@ export default function AllPatients({ patients }) {
           <div className="card-header">
             <div className="card-title">Patient Records</div>
             <div className="search-bar">
-              <Search size={16} color="#94a3b8" />
+              <Search size={16} color="var(--text-muted)" />
               <input placeholder="Search by name, MRN, or body area…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>

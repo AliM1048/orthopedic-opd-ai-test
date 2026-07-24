@@ -156,13 +156,3 @@ class TreatmentCreate(BaseModel):
     details: Optional[str] = None
     followUpDate: Optional[str] = None
     status: str = "active"
-
-
-class Question(BaseModel):
-    id: str
-    text: str
-    options: list[str]
-
-
-class AssessmentQuestions(BaseModel):
-    questions: list[Question]

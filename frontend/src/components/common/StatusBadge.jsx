@@ -1,7 +1,8 @@
-import { STATUS_CONFIG } from '../../data/mockData';
+import { useLookup } from '../../hooks/useLookupData';
 
 export default function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, class: 'badge-pending' };
+  const { statusConfig } = useLookup();
+  const cfg = statusConfig[status] || { label: status, class: 'badge-pending' };
   return (
     <span className={`badge ${cfg.class}`}>
       <span className="badge-dot" />

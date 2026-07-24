@@ -82,9 +82,10 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
               <div className="card-subtitle">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" onClick={() => navigate('/patients')}>View All Records</button>
               <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Patient</button>
               <div className="search-bar">
-              <Search size={16} color="#94a3b8" />
+              <Search size={16} color="var(--text-muted)" />
               <input
                 placeholder="Search patients…"
                 value={search}
@@ -221,7 +222,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                     <td className="text-sm">{p.mrn}</td>
                     <td>
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar size={14} color="#94a3b8" />
+                        <Calendar size={14} color="var(--text-muted)" />
                         {p.appointmentTime}
                       </div>
                     </td>

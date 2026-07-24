@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 
-import { ASSESSMENT_CONFIG, calculateQuickDASH } from '../data/mockData';
+import { calculateQuickDASH } from '../utils/scoring';
+import { useAssessmentConfig } from '../hooks/useLookupData';
 import PatientSummaryCard from '../components/assessment/PatientSummaryCard';
 import VisitSummaryCard from '../components/assessment/VisitSummaryCard';
 import AssessmentHeader from '../components/assessment/AssessmentHeader';
@@ -36,10 +37,7 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
   const isFollowUp = searchParams.get('type') === 'followup';
 
   const patient = patients.find(p => p.id === patientId);
-  const config = useMemo(() =>
-    ASSESSMENT_CONFIG[patient?.bodyArea] || ASSESSMENT_CONFIG['Other'],
-    [patient]
-  );
+  const config = useAssessmentConfig(patient?.bodyArea);
 
   const sections = useMemo(() => config?.sections || [], [config]);
   const allQuestions = useMemo(() => sections.flatMap(s => s.questions), [sections]);
@@ -205,6 +203,28 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>
               Go to Dashboard
             </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Loading guard (assessment config fetched from the API) ─────────────────────
+  if (!config) {
+    return (
+      <>
+        <div className="topbar">
+          <div className="topbar-left">
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={18} />
+            </button>
+            <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
+          </div>
+        </div>
+        <div className="page-body">
+          <div className="empty-state">
+            <div className="empty-state-icon">📋</div>
+            <p>Loading assessment questions…</p>
           </div>
         </div>
       </>

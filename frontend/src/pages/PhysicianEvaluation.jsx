@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mic, Brain, FlaskConical, Pill, CalendarCheck, Stethoscope,
-         FilePlus, ClipboardList, Printer, Send, UserCheck, Play, Pause, Check, X,
-         Zap, TrendingUp, Activity } from 'lucide-react';
+import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
+         FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
+         Zap, TrendingUp, Activity, FileText } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { useDictation } from '../hooks/useDictation';
-import { DIAGNOSTIC_TESTS, TREATMENT_OPTIONS, ASSESSMENT_CONFIG, calculateQuickDASH, calculateSectionScore } from '../data/mockData';
+import { calculateQuickDASH, calculateSectionScore } from '../utils/scoring';
+import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import DictationRecordingModal from '../components/DictationRecordingModal';
+import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -17,6 +20,26 @@ function todayIso() {
   return new Date().toISOString().split('T')[0];
 }
 
+const successToast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 1800,
+  timerProgressBar: true,
+  didOpen: (el) => {
+    el.addEventListener('mouseenter', Swal.stopTimer);
+    el.addEventListener('mouseleave', Swal.resumeTimer);
+  },
+});
+
+function notifySuccess(title) {
+  successToast.fire({ icon: 'success', title });
+}
+
+function notifyError(title) {
+  successToast.fire({ icon: 'error', title, timer: 3000 });
+}
+
 function latestByDate(items) {
   if (!items || items.length === 0) return null;
   return [...items].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -24,22 +47,19 @@ function latestByDate(items) {
 
 /* ── Workflow Steps ──────────────────────────────────────────────────────── */
 const WORKFLOW_STEPS = [
-  { id: 'check-in',    label: 'Check In',         icon: '🏥' },
-  { id: 'pre-visit',   label: 'Pre-Visit Call',    icon: '📞' },
-  { id: 'assessment',  label: 'Nurse Assessment',  icon: '📋' },
-  { id: 'evaluation',  label: 'Doctor Evaluation', icon: '🩺' },
-  { id: 'diagnostics', label: 'Diagnostics',       icon: '🔬' },
-  { id: 'treatment',   label: 'Treatment Plan',    icon: '💊' },
-  { id: 'discharge',   label: 'Discharge',         icon: '✅' },
+  { id: 'check-in',   label: 'Check In',         icon: '🏥' },
+  { id: 'pre-visit',  label: 'Pre-Visit Call',    icon: '📞' },
+  { id: 'assessment', label: 'Nurse Assessment',  icon: '📋' },
+  { id: 'evaluation', label: 'Doctor Evaluation', icon: '🩺' },
+  { id: 'discharge',  label: 'Discharge',         icon: '✅' },
 ];
 
 function getActiveStepIndex(patient) {
   if (!patient) return 0;
-  const s = patient.status;
-  if (s === 'completed')            return 6;
-  if (s === 'follow-up')            return 5;
-  if (s === 'assessment-completed') return 3;
-  return 2;
+  if (patient.status === 'completed') return 4;
+  if ((patient.evaluations?.length || 0) > 0) return 3;
+  if ((patient.assessments?.length || 0) > 0) return 2;
+  return 0;
 }
 
 /* ── PROM subscale scoring (KOOS/HOOS format: Pain, Symptoms, ADL, Sport/Rec, QoL) ── */
@@ -60,9 +80,8 @@ function sectionSeverity(section, answers) {
   return (total / answered.length) * 100;
 }
 
-function computePromScores(bodyArea, answers) {
-  if (!answers) return {};
-  const config = ASSESSMENT_CONFIG[bodyArea] || ASSESSMENT_CONFIG.Other;
+function computePromScores(config, answers) {
+  if (!answers || !config) return {};
   const sections = config.sections || [];
 
   const painSection = sections.find((s) => s.id === 'pain');
@@ -139,13 +158,14 @@ function TagPill({ label, color }) {
 
 /* ── PROM Score Ring (SVG) ──────────────────────────────────────────────── */
 function ScoreRing({ score, max = 100, size = 88, stroke = 8 }) {
-  const pct    = Math.min(score / max, 1);
+  const hasScore = score !== null && score !== undefined;
+  const pct    = hasScore ? Math.min(score / max, 1) : 0;
   const r      = (size - stroke) / 2;
   const circ   = 2 * Math.PI * r;
   const offset = circ * (1 - pct);
 
-  /* colour: green > 70, amber 40-70, red < 40 */
-  const color = pct > 0.7 ? '#10b981' : pct > 0.4 ? '#f59e0b' : '#ef4444';
+  /* colour: green > 70, amber 40-70, red < 40; grey when there's no score */
+  const color = !hasScore ? 'var(--text-muted)' : pct > 0.7 ? 'var(--success)' : pct > 0.4 ? 'var(--warning)' : 'var(--danger)';
 
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
@@ -169,7 +189,7 @@ function ScoreRing({ score, max = 100, size = 88, stroke = 8 }) {
         alignItems: 'center', justifyContent: 'center',
         lineHeight: 1.1,
       }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color }}>{score}</span>
+        <span style={{ fontSize: 20, fontWeight: 800, color }}>{hasScore ? score : '—'}</span>
         <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>/ {max}</span>
       </div>
     </div>
@@ -226,100 +246,62 @@ function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children })
 }
 
 /* ── Review & Print View ─────────────────────────────────────────────────── */
-const DEMO_ORDERS = [
-  {
-    id: 'rx',
-    type: 'prescription',
-    icon: '💊',
-    title: 'Prescription',
-    status: 'Issued',
-    statusColor: '#6366f1',
-    summary: 'Tab. Celecoxib 200mg',
-    details: '1 tablet twice daily (morning & evening) with food · Duration: 4 weeks',
-    note: '⚠ Avoid if GI ulcers or renal impairment',
-    printTitle: 'Prescription Order',
-    printBody: [
-      ['Medication', 'Tab. Celecoxib 200mg'],
-      ['Dosage', '1 tablet twice daily'],
-      ['Route', 'Oral — with food & full glass of water'],
-      ['Duration', '4 weeks'],
-      ['Caution', 'Contraindicated in peptic ulcer disease / renal impairment'],
-    ],
-  },
-  {
-    id: 'xray',
-    type: 'imaging',
-    icon: '🦴',
-    title: 'X-Ray Request',
-    status: 'Pending',
-    statusColor: '#f59e0b',
-    summary: 'Weight-bearing X-Ray — Both Knees AP/Lateral',
-    details: 'Rule out joint space narrowing & alignment assessment',
+const ORDER_STATUS_COLORS = {
+  pending: '#f59e0b',
+  active: '#10b981',
+  completed: '#10b981',
+  scheduled: '#3b82f6',
+};
+
+function iconForName(name, options) {
+  return options.find((o) => o.name.toLowerCase() === (name || '').toLowerCase())?.icon || '📄';
+}
+
+/** Derives the printable orders list from the patient's real diagnostics/
+ * treatments records instead of fabricated demo content — necessarily less
+ * detailed than a hand-written demo order (no invented MRI sequence
+ * protocols etc.), since only fields that actually exist in the DB are used. */
+function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
+  const treatmentOrders = (patient.treatments || []).map((t) => ({
+    id: t.id,
+    icon: iconForName(t.type, treatmentOptions),
+    title: `${t.type} Order`,
+    status: t.status,
+    statusColor: ORDER_STATUS_COLORS[t.status] || '#94a3b8',
+    summary: t.details || t.type,
+    details: `Duration: ${t.duration}`,
     note: null,
-    printTitle: 'Radiology Request — X-Ray',
+    printTitle: `${t.type} Order`,
     printBody: [
-      ['Examination', 'X-Ray — Both Knees AP/Lateral'],
-      ['Weight-bearing', 'Yes'],
-      ['Views', 'Anteroposterior (AP) + Lateral'],
-      ['Clinical indication', 'Knee pain, suspected osteoarthritis Grade 3'],
-      ['Urgency', 'Routine (within 1 week)'],
+      ['Treatment', t.type],
+      ['Details', t.details || '—'],
+      ['Duration', t.duration],
+      ['Physician', t.physician],
+      ['Date', t.date],
+      ...(t.followUpDate ? [['Follow-Up Date', t.followUpDate]] : []),
     ],
-  },
-  {
-    id: 'mri',
-    type: 'imaging',
-    icon: '🧲',
-    title: 'MRI Request',
-    status: 'Pending',
-    statusColor: '#f59e0b',
-    summary: 'MRI Knee (Right) — Without Contrast',
-    details: 'Assess meniscal tears, cartilage integrity, ACL status',
+  }));
+
+  const diagnosticOrders = (patient.diagnostics || []).map((d) => ({
+    id: d.id,
+    icon: iconForName(d.type, diagnosticTests),
+    title: `${d.type} Request`,
+    status: d.status,
+    statusColor: ORDER_STATUS_COLORS[d.status] || '#94a3b8',
+    summary: d.type,
+    details: d.result || 'Pending results',
     note: null,
-    printTitle: 'Radiology Request — MRI',
+    printTitle: `Diagnostic Request — ${d.type}`,
     printBody: [
-      ['Examination', 'MRI Right Knee — Without IV Contrast'],
-      ['Sequences', 'PD-weighted, T2, STIR, Sagittal/Coronal/Axial'],
-      ['Clinical indication', 'Suspected meniscal tear + ACL evaluation'],
-      ['Urgency', 'Routine (within 2 weeks)'],
+      ['Examination', d.type],
+      ['Date', d.date],
+      ['Status', d.status],
+      ['Result', d.result || 'Pending'],
     ],
-  },
-  {
-    id: 'physio',
-    type: 'physio',
-    icon: '🏃',
-    title: 'Physiotherapy Request',
-    status: 'Approved',
-    statusColor: '#10b981',
-    summary: 'Supervised Physiotherapy — 10 Sessions',
-    details: 'Quadriceps strengthening · ROM exercises · Gait training · TENS therapy',
-    note: null,
-    printTitle: 'Physiotherapy Referral',
-    printBody: [
-      ['Programme', 'Supervised Knee Rehabilitation'],
-      ['Sessions', '10 sessions (3× per week)'],
-      ['Focus areas', 'Quadriceps strengthening, ROM, gait training'],
-      ['Modalities', 'TENS + Ice/Heat therapy post-exercise'],
-      ['Duration', '4 weeks'],
-    ],
-  },
-  {
-    id: 'followup',
-    type: 'followup',
-    icon: '📅',
-    title: 'Follow-Up Appointment',
-    status: 'Scheduled',
-    statusColor: '#3b82f6',
-    summary: 'Follow-Up: 2026-07-01',
-    details: 'After imaging results + 4 weeks of medication',
-    note: null,
-    printTitle: 'Follow-Up Appointment Letter',
-    printBody: [
-      ['Date', '2026-07-01'],
-      ['Purpose', 'Review imaging results & medication response'],
-      ['Instructions', 'Bring imaging CD/reports. Fasting not required.'],
-    ],
-  },
-];
+  }));
+
+  return [...treatmentOrders, ...diagnosticOrders];
+}
 
 function PrintDocModal({ order, patient, physicianName, onClose }) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -402,13 +384,14 @@ function PrintDocModal({ order, patient, physicianName, onClose }) {
   );
 }
 
-function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleSeek, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, promEntries, finalScore, painNRS, painColor, onBack }) {
+function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, promEntries, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
   const [printOrder, setPrintOrder] = React.useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const evaluation = (patient?.evaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div className="pe-review-root" style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       {/* Top bar */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -427,14 +410,14 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 360px', gap: 16, padding: '16px 24px', flex: 1, alignItems: 'start' }}>
+      <div className="pe-review-grid" style={{ display: 'grid', gridTemplateColumns: '260px 1fr 360px', gap: 16, padding: '16px 24px', flex: 1, alignItems: 'start' }}>
 
         {/* ── LEFT: Patient Stats ───────────────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="pe-review-aside" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Patient card */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ background: patient?.avatar || '#1a6fdb', height: 6 }} />
+            <div style={{ background: patient?.avatar || 'var(--primary)', height: 6 }} />
             <div style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{patient?.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{patient?.mrn} · {patient?.age} yrs · {patient?.bodyArea}</div>
@@ -450,7 +433,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>Pain Score (NRS)</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: 40, fontWeight: 900, color: painColor, lineHeight: 1 }}>{painNRS}</span>
+              <span style={{ fontSize: 40, fontWeight: 900, color: painColor, lineHeight: 1 }}>{painNRS === null ? '—' : painNRS}</span>
               <span style={{ fontSize: 18, color: 'var(--text-muted)', fontWeight: 600 }}>/10</span>
             </div>
             <div style={{ marginTop: 10, height: 8, borderRadius: 4, background: 'linear-gradient(to right,#10b981,#f59e0b,#ef4444)' }} />
@@ -475,40 +458,29 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
             ))}
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
               <span style={{ color: 'var(--text-muted)' }}>Overall</span>
-              <span style={{ color: finalScore > 70 ? '#10b981' : finalScore > 40 ? '#f59e0b' : '#ef4444' }}>{finalScore}/100</span>
+              <span style={{ color: finalScore === null ? 'var(--text-muted)' : finalScore > 70 ? 'var(--success)' : finalScore > 40 ? 'var(--warning)' : 'var(--danger)' }}>{finalScore === null ? '—' : finalScore}/100</span>
             </div>
           </div>
         </div>
 
         {/* ── MIDDLE: Voice Player + Extracted Orders ───────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="pe-review-aside" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Voice Player */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Mic size={13} /> Doctor Voice Note
-            </div>
-            <div className="pe-audio-player" style={{ margin: '12px 18px 14px' }}>
-              {audioUrl && (
-                <audio ref={audioRef} src={audioUrl}
-                  onTimeUpdate={handleTimeUpdate}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onEnded={handleAudioEnd}
-                />
-              )}
-              <button className="pe-audio-play-btn" onClick={togglePlay} disabled={!audioUrl}>
-                {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-              </button>
-              <div className="pe-audio-waveform">
-                <div className="pe-audio-track" onClick={handleSeek}>
-                  <div className="pe-audio-progress" style={{ width: `${audioProgress || 0}%` }} />
-                  <div className="pe-audio-knob" style={{ left: `${audioProgress || 0}%` }} />
-                </div>
-              </div>
-              <div className="pe-audio-time">
-                {audioUrl ? `${formatAudioTime(audioCurrentTime)} / ${formatAudioTime(audioDuration)}` : 'No recording'}
-              </div>
-            </div>
+            <AudioWaveformPlayer
+              audioUrl={audioUrl}
+              audioRef={audioRef}
+              isPlaying={isPlaying}
+              togglePlay={togglePlay}
+              audioProgress={audioProgress}
+              audioCurrentTime={audioCurrentTime}
+              audioDuration={audioDuration}
+              formatAudioTime={formatAudioTime}
+              handleTimeUpdate={handleTimeUpdate}
+              handleLoadedMetadata={handleLoadedMetadata}
+              handleAudioEnd={handleAudioEnd}
+            />
             {/* Clinical notes */}
             {evaluation?.notes && (
               <div style={{ padding: '0 18px 14px', fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.6 }}>
@@ -523,7 +495,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
               <ClipboardList size={13} /> Extracted Orders
             </div>
             <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {DEMO_ORDERS.map((order) => (
+              {orders.map((order) => (
                 <div key={order.id} style={{
                   display: 'flex', alignItems: 'flex-start', gap: 12,
                   padding: '11px 14px', background: 'var(--surface-2)',
@@ -550,7 +522,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
         </div>
 
         {/* ── RIGHT: Formal Document Paper ─────────────────────────── */}
-        <div style={{
+        <div className="pe-review-paper" style={{
           background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.08)', overflow: 'hidden',
           position: 'sticky', top: 80,
@@ -584,7 +556,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                 </tr>
               </thead>
               <tbody>
-                {DEMO_ORDERS.map((order, i) => (
+                {orders.map((order, i) => (
                   <tr key={order.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '9px 10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -656,6 +628,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const patientId = searchParams.get('patient');
   const patient   = patients.find((p) => p.id === patientId);
   const physicianName = user?.name || 'Physician';
+  const latestAssessment = patient ? latestByDate(patient.assessments) : null;
 
   const [diagnosis, setDiagnosis]             = useState('');
   const [notes, setNotes]                     = useState('');
@@ -663,6 +636,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [treatments, setTreatments]           = useState([]);
   const [dictation, setDictation]             = useState(null);
   const [showDictationModal, setShowDictationModal] = useState(false);
+  const [dictationLanguage, setDictationLanguage] = useState('en');
   const [error, setError]                     = useState(null);
   const [saved, setSaved]                     = useState(false);
 
@@ -673,6 +647,34 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [noteText, setNoteText] = useState('');
   const [sendingToPatient, setSendingToPatient] = useState(false);
   const [showReview, setShowReview] = useState(false);
+
+  // Seed diagnosis/notes from the most recent saved evaluation once per
+  // patient, so reopening an existing evaluation is editable too — not just
+  // a fresh dictation. Only fills in what's actually blank so it never
+  // clobbers an in-progress dictation or edit.
+  useEffect(() => {
+    if (!patient) return;
+    const latestEval = latestByDate(patient.evaluations);
+    setDiagnosis((d) => d || latestEval?.diagnosis || '');
+    setNotes((n) => n || latestEval?.notes || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.id]);
+
+  const toggleDiagnosticTest = (testId) => {
+    setSelectedTests((prev) => prev.includes(testId) ? prev.filter((t) => t !== testId) : [...prev, testId]);
+  };
+
+  const addTreatmentEntry = () => {
+    setTreatments((prev) => [...prev, { uid: uid(), type: '', duration: '', details: '', followUpDate: '' }]);
+  };
+
+  const updateTreatmentEntry = (entryUid, field, value) => {
+    setTreatments((prev) => prev.map((t) => (t.uid === entryUid ? { ...t, [field]: value } : t)));
+  };
+
+  const removeTreatmentEntry = (entryUid) => {
+    setTreatments((prev) => prev.filter((t) => t.uid !== entryUid));
+  };
 
   /* ── Audio Player State ── */
   const audioRef = useRef(null);
@@ -708,14 +710,6 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     setAudioCurrentTime(0);
   };
 
-  const handleSeek = (e) => {
-    if (audioRef.current && audioDuration > 0) {
-      const bounds = e.currentTarget.getBoundingClientRect();
-      const percent = (e.clientX - bounds.left) / bounds.width;
-      audioRef.current.currentTime = percent * audioDuration;
-      setAudioProgress(percent * 100);
-    }
-  };
 
   const formatAudioTime = (time) => {
     if (isNaN(time) || !isFinite(time)) return '00:00';
@@ -726,6 +720,9 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
   const handleDictationResult = (data) => {
     setError(null); setDictation(data); setShowDictationModal(false);
+    // Reset the audio player so it doesn't show stale progress/duration from
+    // a previous recording once the <audio> element's src switches over.
+    setIsPlaying(false); setAudioProgress(0); setAudioCurrentTime(0); setAudioDuration(0);
     const s = data?.structured;
     if (!s) return;
     if (s.diagnosis)             setDiagnosis(s.diagnosis);
@@ -738,10 +735,16 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       })));
   };
 
-  const { isRecording, isProcessing, elapsedSeconds, liveCaption, startRecording, stopRecording } =
-    useDictation({ patientId, onResult: handleDictationResult, onError: setError });
+  const { isRecording, isProcessing, elapsedSeconds, liveCaption, analyserRef, startRecording, stopRecording } =
+    useDictation({ patientId, language: dictationLanguage, onResult: handleDictationResult, onError: setError });
 
-  const handleStartDictation = () => { setDictation(null); setError(null); setShowDictationModal(true); startRecording(); };
+  const { diagnosticTests, treatmentOptions } = useLookup();
+  const assessmentConfig = useAssessmentConfig(latestAssessment?.bodyArea || patient?.bodyArea);
+
+  // Opens the modal in its idle state (language picker visible) — recording
+  // itself starts when the doctor clicks the mic inside the modal, once
+  // they've picked a language, not the instant the modal opens.
+  const handleStartDictation = () => { setDictation(null); setError(null); setShowDictationModal(true); };
   const handleRetryDictation  = () => { setError(null); startRecording(); };
   const handleCloseDictationModal = () => { setShowDictationModal(false); setError(null); };
 
@@ -753,14 +756,14 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       physician: physicianName, notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl,
     });
     selectedTests.forEach((testId) => {
-      const test = DIAGNOSTIC_TESTS.find((t) => t.id === testId);
+      const test = diagnosticTests.find((t) => t.id === testId);
       if (test && onAddDiagnostic) onAddDiagnostic(patientId, {
         id: `d${Date.now()}-${testId}`, type: test.name,
         date: todayIso(), status: 'pending', result: null,
       });
     });
     treatments.filter((t) => t.type).forEach((t) => {
-      const opt = TREATMENT_OPTIONS.find((o) => o.id === t.type);
+      const opt = treatmentOptions.find((o) => o.id === t.type);
       if (opt && onAddTreatment) onAddTreatment(patientId, {
         id: `tr${Date.now()}-${t.type}`, type: opt.name,
         date: todayIso(), physician: physicianName,
@@ -775,20 +778,24 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const handleSaveMedication = () => {
     if (!medForm.name.trim() || !onAddTreatment) return;
     const details = medForm.dose.trim() ? `${medForm.name.trim()} — ${medForm.dose.trim()}` : medForm.name.trim();
-    onAddTreatment(patientId, {
+    Promise.resolve(onAddTreatment(patientId, {
       id: uid(), type: 'Medication', date: todayIso(), physician: physicianName,
       duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
-    });
+    }))
+      .then(() => notifySuccess('Prescription saved'))
+      .catch(() => notifyError('Failed to save prescription'));
     setMedForm({ name: '', dose: '', duration: '' });
     setShowMedModal(false);
   };
 
   const handleSaveNote = () => {
     if (!noteText.trim() || !onAddEvaluation) return;
-    onAddEvaluation(patientId, {
+    Promise.resolve(onAddEvaluation(patientId, {
       id: `ev${Date.now()}`, date: todayIso(),
       physician: physicianName, notes: noteText.trim(), diagnosis: null, audioUrl: null,
-    });
+    }))
+      .then(() => notifySuccess('Note saved'))
+      .catch(() => notifyError('Failed to save note'));
     setNoteText('');
     setShowNoteModal(false);
   };
@@ -796,7 +803,10 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const handleSendToPatient = (evaluationId) => {
     if (!onMarkEvaluationSent || sendingToPatient) return;
     setSendingToPatient(true);
-    Promise.resolve(onMarkEvaluationSent(patientId, evaluationId)).finally(() => setSendingToPatient(false));
+    Promise.resolve(onMarkEvaluationSent(patientId, evaluationId))
+      .then(() => notifySuccess('Sent to patient'))
+      .catch(() => notifyError('Failed to send to patient'))
+      .finally(() => setSendingToPatient(false));
   };
 
   /* ── Empty / saved states ── */
@@ -830,12 +840,23 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     </>
   );
 
+  if (!assessmentConfig) return (
+    <>
+      <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
+      <div className="page-body">
+        <div className="empty-state">
+          <div className="empty-state-icon">🩺</div>
+          <p>Loading assessment data…</p>
+        </div>
+      </div>
+    </>
+  );
+
   /* ── Derived values ── */
   const initials    = patient.name.split(' ').map((w) => w[0]).join('').slice(0, 2);
   const isNew       = !patient.evaluations?.length;
   const activeStep  = getActiveStepIndex(patient);
 
-  const latestAssessment = latestByDate(patient.assessments);
   const latestEvaluation = latestByDate(patient.evaluations);
   const latestTreatment   = latestByDate(patient.treatments);
   const sortedDiagnostics = [...(patient.diagnostics || [])].sort((a, b) => b.date.localeCompare(a.date));
@@ -844,16 +865,17 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const chiefComplaint = latestAssessment?.chiefComplaint || 'Not recorded yet.';
 
   const answers = latestAssessment?.answers || {};
-  const promRaw = computePromScores(latestAssessment?.bodyArea || patient.bodyArea, answers);
+  const promRaw = computePromScores(assessmentConfig, answers);
   const promEntries = Object.keys(PROM_META)
     .filter((key) => promRaw[key] !== undefined && promRaw[key] !== null)
     .map((key) => ({ key, ...PROM_META[key], score: promRaw[key] }));
   const finalScore = promEntries.length
     ? Math.round(promEntries.reduce((acc, s) => acc + s.score, 0) / promEntries.length)
-    : 45;
+    : null;
 
-  // Pain NRS score (0-10) — ensure it reflects real pain severity (never stays 0 when pain exists)
-  let painNRS = 0;
+  // Pain NRS score (0-10) — real only; null when there's genuinely no pain
+  // data recorded (no fabricated fallback number).
+  let painNRS = null;
   if (answers['pain_scale'] !== undefined && answers['pain_scale'] !== null && answers['pain_scale'] !== '' && Number(answers['pain_scale']) > 0) {
     painNRS = Number(answers['pain_scale']);
   } else if (latestAssessment?.answers?.pain_scale !== undefined && Number(latestAssessment.answers.pain_scale) > 0) {
@@ -861,57 +883,45 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   } else if (promRaw.pain !== undefined && promRaw.pain < 100) {
     // promRaw.pain is wellness score (0-100). Convert inverted wellness to pain NRS severity (0-10)
     painNRS = Math.min(10, Math.max(1, Math.round((100 - promRaw.pain) / 10)));
-  } else {
-    painNRS = 7; // Default clear demo pain score (7/10)
   }
 
-  const painColor = painNRS > 6 ? '#ef4444' : painNRS > 3 ? '#f59e0b' : '#10b981';
-  const painLabel = painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
+  const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#ef4444' : painNRS > 3 ? '#f59e0b' : '#10b981';
+  const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
 
-  // KOOS Overall Trend calculation (Decreasing trend over time)
+  // KOOS Overall Trend — only plotted from real assessment history (2+ visits
+  // with a real score/maxScore). With fewer than 2, there's nothing real to
+  // trend, so no points are fabricated — the chart shows an empty-history
+  // message instead.
   const assessmentHistory = (patient.assessments || []).slice().sort((a, b) => a.date.localeCompare(b.date));
-  let trendPoints = [];
-  if (assessmentHistory.length >= 2) {
-    trendPoints = assessmentHistory.map((a, idx) => {
-      const s = a.score && a.maxScore ? Math.round((a.score / a.maxScore) * 100) : 50;
-      const x = (idx / (assessmentHistory.length - 1)) * 170 + 15;
-      const y = 55 - (s / 100) * 45;
-      return { score: s, label: a.date, x, y };
-    });
-  } else {
-    const current = finalScore && finalScore > 0 ? finalScore : 45;
-    const p1 = Math.min(95, current + 38); // 3 months ago (higher wellness)
-    const p2 = Math.min(88, current + 20); // 1 month ago (medium wellness)
-    const p3 = Math.max(15, current);      // Today (lower wellness - deteriorating)
-    trendPoints = [
-      { score: p1, label: '3 Months Ago', x: 15,  y: 55 - (p1 / 100) * 45 },
-      { score: p2, label: '1 Month Ago',  x: 100, y: 55 - (p2 / 100) * 45 },
-      { score: p3, label: 'Today (Call)', x: 185, y: 55 - (p3 / 100) * 45 },
-    ];
-  }
+  const trendPoints = assessmentHistory.length >= 2
+    ? assessmentHistory.map((a, idx) => {
+        const s = a.score && a.maxScore ? Math.round((a.score / a.maxScore) * 100) : 50;
+        const x = (idx / (assessmentHistory.length - 1)) * 170 + 15;
+        const y = 55 - (s / 100) * 45;
+        return { score: s, label: a.date, x, y };
+      })
+    : [];
 
-  const firstPt = trendPoints[0];
-  const lastPt = trendPoints[trendPoints.length - 1];
+  const firstPt = trendPoints[0] || null;
+  const lastPt = trendPoints[trendPoints.length - 1] || null;
   const trendDiff = lastPt && firstPt ? lastPt.score - firstPt.score : null;
 
   const trendLinePath = trendPoints.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '');
-  const trendAreaPath = `${trendLinePath} L ${lastPt.x} 60 L ${firstPt.x} 60 Z`;
+  const trendAreaPath = (firstPt && lastPt) ? `${trendLinePath} L ${lastPt.x} 60 L ${firstPt.x} 60 Z` : '';
 
-  const audioUrl = latestEvaluation?.audioUrl || null;
-
-  const planText = treatments.length
-    ? treatments.map((t) => {
-        const opt = TREATMENT_OPTIONS.find((o) => o.id === t.type);
-        return `${opt?.name || t.type}${t.duration ? ` (${t.duration})` : ''}`;
-      }).join(', ')
-    : latestTreatment
-      ? `${latestTreatment.type} — ${latestTreatment.duration}`
-      : 'No treatment plan recorded yet.';
+  // Prefer the just-recorded dictation (playable immediately, before the
+  // doctor hits "Confirm & Save All") over the last persisted evaluation's
+  // audio, which only exists once a recording has actually been saved.
+  const audioUrl = (dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null)
+    || latestEvaluation?.audioUrl
+    || null;
 
   const visitDateStr = patient.appointmentDate
     ? new Date(patient.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
   const visitTime = patient.appointmentTime || '—';
+
+  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
 
   if (showReview) {
     return (
@@ -925,7 +935,6 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         audioCurrentTime={audioCurrentTime}
         audioDuration={audioDuration}
         formatAudioTime={formatAudioTime}
-        handleSeek={handleSeek}
         handleTimeUpdate={handleTimeUpdate}
         handleLoadedMetadata={handleLoadedMetadata}
         handleAudioEnd={handleAudioEnd}
@@ -935,6 +944,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         painNRS={painNRS}
         painColor={painColor}
         onBack={() => setShowReview(false)}
+        diagnosticTests={diagnosticTests}
+        treatmentOptions={treatmentOptions}
       />
     );
   }
@@ -1037,8 +1048,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                     ))}
                     <div className="pe-prom-total">
                       <span>Final Score</span>
-                      <span style={{ fontWeight: 800, color: finalScore > 70 ? '#10b981' : finalScore > 40 ? '#f59e0b' : '#ef4444' }}>
-                        {finalScore} / 100
+                      <span style={{ fontWeight: 800, color: finalScore === null ? 'var(--text-muted)' : finalScore > 70 ? 'var(--success)' : finalScore > 40 ? 'var(--warning)' : 'var(--danger)' }}>
+                        {finalScore === null ? '—' : finalScore} / 100
                       </span>
                     </div>
                   </div>
@@ -1051,7 +1062,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1, color: painColor }}>
-                    {painNRS} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>/ 10</span>
+                    {painNRS === null ? '—' : painNRS} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>/ 10</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>
                     Numeric Rating Scale
@@ -1071,18 +1082,20 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                   background: 'linear-gradient(to right, #10b981 0%, #f59e0b 50%, #ef4444 100%)',
                   width: '100%'
                 }} />
-                <div style={{
-                  position: 'absolute',
-                  top: -3,
-                  left: `calc(${Math.min(100, Math.max(0, (painNRS / 10) * 100))}% - 8px)`,
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  background: '#fff',
-                  border: `3px solid ${painColor}`,
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                  transition: 'left 0.4s ease'
-                }} />
+                {painNRS !== null && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -3,
+                    left: `calc(${Math.min(100, Math.max(0, (painNRS / 10) * 100))}% - 8px)`,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    border: `3px solid ${painColor}`,
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                    transition: 'left 0.4s ease'
+                  }} />
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -1095,53 +1108,59 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
             {/* Card 4 — PROM Trend (KOOS Overall) */}
             <SCard title="PROM Trend (KOOS Overall)" icon={TrendingUp}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)' }}>
-                    {finalScore} <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>/ 100</span>
+              {trendPoints.length === 0 ? (
+                <p className="pe-empty-note">Not enough visit history yet — needs 2+ completed assessments to plot a trend.</p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)' }}>
+                        {finalScore === null ? '—' : finalScore} <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>/ 100</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Overall KOOS Score
+                      </div>
+                    </div>
+                    {trendDiff !== null && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                        background: trendDiff >= 0 ? '#10b98118' : '#ef444418',
+                        color: trendDiff >= 0 ? '#10b981' : '#ef4444',
+                        border: `1px solid ${trendDiff >= 0 ? '#10b98130' : '#ef444430'}`
+                      }}>
+                        {trendDiff >= 0 ? `▲ +${trendDiff}%` : `▼ ${trendDiff}%`}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Overall KOOS Score
+
+                  <div style={{ width: '100%', height: 75, position: 'relative', marginTop: 8 }}>
+                    <svg width="100%" height="75" viewBox="0 0 200 65" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="koosGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <path d={trendAreaPath} fill="url(#koosGrad)" />
+                      <path d={trendLinePath} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" />
+                      {trendPoints.map((pt, i) => (
+                        <g key={i}>
+                          <circle cx={pt.x} cy={pt.y} r="4" fill="#fff" stroke="var(--primary)" strokeWidth="2.5" />
+                          <text x={pt.x} y={pt.y - 8} fontSize="9" fontWeight="700" fill="var(--text-primary)" textAnchor="middle">
+                            {pt.score}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
                   </div>
-                </div>
-                {trendDiff !== null && (
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                    background: trendDiff >= 0 ? '#10b98118' : '#ef444418',
-                    color: trendDiff >= 0 ? '#10b981' : '#ef4444',
-                    border: `1px solid ${trendDiff >= 0 ? '#10b98130' : '#ef444430'}`
-                  }}>
-                    {trendDiff >= 0 ? `▲ +${trendDiff}%` : `▼ ${trendDiff}%`}
-                  </span>
-                )}
-              </div>
 
-              <div style={{ width: '100%', height: 75, position: 'relative', marginTop: 8 }}>
-                <svg width="100%" height="75" viewBox="0 0 200 65" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                  <defs>
-                    <linearGradient id="koosGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  <path d={trendAreaPath} fill="url(#koosGrad)" />
-                  <path d={trendLinePath} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" />
-                  {trendPoints.map((pt, i) => (
-                    <g key={i}>
-                      <circle cx={pt.x} cy={pt.y} r="4" fill="#fff" stroke="var(--primary)" strokeWidth="2.5" />
-                      <text x={pt.x} y={pt.y - 8} fontSize="9" fontWeight="700" fill="var(--text-primary)" textAnchor="middle">
-                        {pt.score}
-                      </text>
-                    </g>
-                  ))}
-                </svg>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
-                {trendPoints.map((pt, i) => (
-                  <span key={i}>{pt.label}</span>
-                ))}
-              </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
+                    {trendPoints.map((pt, i) => (
+                      <span key={i}>{pt.label}</span>
+                    ))}
+                  </div>
+                </>
+              )}
             </SCard>
 
           </div>{/* end left col */}
@@ -1150,44 +1169,145 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
           <div className="pe-col pe-col-mid">
             <SCard style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
 
-              {/* 1. WhatsApp-Style Audio Player */}
-              <div className="pe-audio-player">
-                {audioUrl && (
-                  <audio
-                    ref={audioRef}
-                    src={audioUrl}
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onEnded={handleAudioEnd}
-                  />
-                )}
-                <button className="pe-audio-play-btn" onClick={togglePlay} disabled={!audioUrl}>
-                  {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-                </button>
-                <div className="pe-audio-waveform">
-                  <div className="pe-audio-track" onClick={handleSeek}>
-                    <div className="pe-audio-progress" style={{ width: `${audioProgress || 0}%` }}></div>
-                    <div className="pe-audio-knob" style={{ left: `${audioProgress || 0}%` }}></div>
-                  </div>
-                </div>
-                <div className="pe-audio-time">
-                  {audioUrl ? `${formatAudioTime(audioCurrentTime)} / ${formatAudioTime(audioDuration)}` : 'No recording yet'}
-                </div>
-              </div>
+              {/* 1. Doctor Voice Note — decoded waveform player */}
+              <AudioWaveformPlayer
+                audioUrl={audioUrl}
+                audioRef={audioRef}
+                isPlaying={isPlaying}
+                togglePlay={togglePlay}
+                audioProgress={audioProgress}
+                audioCurrentTime={audioCurrentTime}
+                audioDuration={audioDuration}
+                formatAudioTime={formatAudioTime}
+                handleTimeUpdate={handleTimeUpdate}
+                handleLoadedMetadata={handleLoadedMetadata}
+                handleAudioEnd={handleAudioEnd}
+              />
 
               {/* 2. Note Paper (Clean Style) */}
               <div className="pe-note-paper">
+                {dictation?.text && (
+                  <div className="pe-note-section" style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 4 }}>
+                    <h4>Raw Transcript</h4>
+                    <p style={{ fontStyle: 'italic' }}>{dictation.text}</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Check this against what was actually said — the fields below are the AI's structured read of it, and can be edited before you click Complete Visit.
+                    </p>
+                  </div>
+                )}
                 <div className="pe-note-section">
-                  <h4>Clinical Notes</h4>
-                  <p>{liveCaption || dictation?.structured?.notes || notes || latestEvaluation?.notes || 'No notes recorded yet.'}</p>
+                  <h4 className="pe-note-h4"><FileText size={13} /> Clinical Notes</h4>
+                  {isRecording ? (
+                    <p style={{ opacity: 0.6 }}>{liveCaption || 'Listening…'}</p>
+                  ) : (
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      placeholder="No notes recorded yet."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  )}
                 </div>
                 <div className="pe-note-section">
-                  <h4>Diagnosis / Assessment</h4>
-                  <p>{diagnosis || dictation?.structured?.diagnosis || latestEvaluation?.diagnosis || 'No diagnosis recorded yet.'}</p>
+                  <h4 className="pe-note-h4"><Stethoscope size={13} /> Diagnosis / Assessment</h4>
+                  <input
+                    className="form-control"
+                    placeholder="No diagnosis recorded yet."
+                    value={diagnosis}
+                    onChange={(e) => setDiagnosis(e.target.value)}
+                  />
                 </div>
                 <div className="pe-note-section">
-                  <h4>Plan</h4>
-                  <p>{planText}</p>
+                  <h4 className="pe-note-h4"><FlaskConical size={13} /> Diagnostic Tests</h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {diagnosticTests.map((t) => (
+                      <label
+                        key={t.id}
+                        className={`pe-test-pill ${selectedTests.includes(t.id) ? 'selected' : ''}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                          fontSize: 12, padding: '5px 10px', borderRadius: 999,
+                          border: `1px solid ${selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--border)'}`,
+                          background: selectedTests.includes(t.id) ? 'var(--primary-light)' : 'var(--surface-2)',
+                          color: selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--text-secondary)',
+                          fontWeight: selectedTests.includes(t.id) ? 700 : 500,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTests.includes(t.id)}
+                          onChange={() => toggleDiagnosticTest(t.id)}
+                          style={{ margin: 0 }}
+                        />
+                        {t.icon} {t.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="pe-note-section">
+                  <h4 className="pe-note-h4"><Pill size={13} /> Treatment Plan</h4>
+                  {treatments.length === 0 && (
+                    <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>No treatments added yet.</p>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {treatments.map((t) => (
+                      <div key={t.uid} className="pe-treatment-card">
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select
+                            className="form-control"
+                            style={{ flex: 1 }}
+                            value={t.type}
+                            onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
+                          >
+                            <option value="">Select treatment type…</option>
+                            {treatmentOptions.map((opt) => (
+                              <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="pe-treatment-remove"
+                            onClick={() => removeTreatmentEntry(t.uid)}
+                            title="Remove"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            className="form-control"
+                            style={{ flex: 1 }}
+                            placeholder="Duration (e.g. 6 weeks)"
+                            value={t.duration}
+                            onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
+                          />
+                          <input
+                            className="form-control"
+                            style={{ flex: 1 }}
+                            type="date"
+                            value={t.followUpDate || ''}
+                            onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
+                          />
+                        </div>
+                        <textarea
+                          className="form-control"
+                          rows={2}
+                          placeholder="Details / instructions"
+                          value={t.details}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ marginTop: 8 }}
+                    onClick={addTreatmentEntry}
+                  >
+                    + Add Treatment
+                  </button>
                 </div>
               </div>
 
@@ -1210,109 +1330,44 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
             {/* ─── Card: Orders & Documents ─────────────────────────── */}
             <SCard title="Orders & Documents" icon={ClipboardList} style={{ flex: 1 }}>
-
-              {/* ── 1. Prescription ── */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                  <span style={{ fontSize: 16 }}>💊</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Prescription</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#6366f118', color: '#6366f1', border: '1px solid #6366f130' }}>Issued</span>
-                </div>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px' }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>Tab. Celecoxib 200mg</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    <span style={{ fontWeight: 600 }}>Dosage:</span> 1 tablet twice daily (morning & evening)<br />
-                    <span style={{ fontWeight: 600 }}>With food</span> — take with a full glass of water<br />
-                    <span style={{ fontWeight: 600 }}>Duration:</span> 4 weeks<br />
-                    <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>⚠ Avoid if history of GI ulcers or renal impairment</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
-
-              {/* ── 2. Imaging Request ── */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                  <span style={{ fontSize: 16 }}>🩻</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Imaging Request</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#f59e0b18', color: '#f59e0b', border: '1px solid #f59e0b30' }}>Pending</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {[
-                    { icon: '🦴', label: 'Weight-bearing X-Ray — Both Knees AP/Lateral', note: 'Rule out joint space narrowing & alignment' },
-                    { icon: '🧲', label: 'MRI Knee (Right) — Without Contrast',           note: 'Assess meniscal tears, cartilage, ACL integrity' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '9px 12px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{item.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{item.note}</div>
+              {mainOrders.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {mainOrders.map((order) => (
+                    <div key={order.id} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                        <span style={{ fontSize: 16 }}>{order.icon}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
                       </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{order.summary} — {order.details}</div>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
 
               <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
 
-              {/* ── 3. Physiotherapy Request ── */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                  <span style={{ fontSize: 16 }}>🏃</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Physiotherapy Request</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#10b98118', color: '#10b981', border: '1px solid #10b98130' }}>Approved</span>
-                </div>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px' }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>Supervised Physiotherapy Programme</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    <span style={{ fontWeight: 600 }}>Sessions:</span> 10 sessions (3× per week)<br />
-                    <span style={{ fontWeight: 600 }}>Focus:</span> Quadriceps strengthening, ROM exercises, gait training<br />
-                    <span style={{ fontWeight: 600 }}>Modalities:</span> TENS + Ice/Heat therapy post-exercise
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
-
-              {/* ── 4. Follow-Up ── */}
+              {/* ── Follow-Up ── */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
                   <span style={{ fontSize: 16 }}>📅</span>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Follow-Up</span>
                 </div>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
-                      {latestTreatment?.followUpDate || '2026-07-01'}
+                {latestTreatment?.followUpDate ? (
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>{latestTreatment.followUpDate}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{latestTreatment.type}{latestTreatment.details ? ` — ${latestTreatment.details}` : ''}</div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      After imaging results + 4 weeks of medication
-                    </div>
+                    <CalendarCheck size={22} style={{ color: 'var(--primary)', opacity: 0.7 }} />
                   </div>
-                  <CalendarCheck size={22} style={{ color: 'var(--primary)', opacity: 0.7 }} />
-                </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No follow-up scheduled yet.</p>
+                )}
               </div>
 
-            </SCard>
-
-            {/* ─── Card: AI Suggestions ─────────────────────────────── */}
-            <SCard title="AI Suggestions" icon={Brain}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { icon: '🤖', text: 'Consider Hyaluronic Acid injection if conservative management fails after 4 weeks.', color: '#6366f1' },
-                  { icon: '📊', text: 'KOOS score declining — re-assess for surgical candidacy at follow-up.', color: '#f59e0b' },
-                  { icon: '⚕️', text: 'Recommend weight management consultation (BMI > 28 increases knee load).', color: '#10b981' },
-                ].map((s, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', background: `${s.color}0d`, borderRadius: 'var(--radius)', border: `1px solid ${s.color}25` }}>
-                    <span style={{ fontSize: 16, flexShrink: 0 }}>{s.icon}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{s.text}</span>
-                  </div>
-                ))}
-                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
-                  AI suggestions are advisory only and not a substitute for clinical judgment.
-                </p>
-              </div>
             </SCard>
 
           </div>{/* end right col */}
@@ -1362,6 +1417,10 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         elapsedSeconds={elapsedSeconds}
         liveCaption={liveCaption}
         error={error}
+        language={dictationLanguage}
+        onLanguageChange={setDictationLanguage}
+        analyserRef={analyserRef}
+        onStartRecording={startRecording}
         onStopRecording={stopRecording}
         onRetry={handleRetryDictation}
         onClose={handleCloseDictationModal}

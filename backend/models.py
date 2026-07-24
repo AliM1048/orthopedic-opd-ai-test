@@ -84,3 +84,43 @@ class User(Base):
     email = Column(String, nullable=False, unique=True, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False)
+
+
+class AssessmentConfig(Base):
+    __tablename__ = "assessment_configs"
+
+    bodyArea = Column(String, primary_key=True)
+    configId = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    sections = Column(JSON, nullable=False)
+
+
+class StatusConfig(Base):
+    __tablename__ = "status_configs"
+
+    statusId = Column(String, primary_key=True)
+    label = Column(String, nullable=False)
+    badgeClass = Column(String, nullable=False)
+    color = Column(String, nullable=False)
+    sortOrder = Column(Integer, nullable=False, default=0)
+
+
+class DiagnosticTestOption(Base):
+    __tablename__ = "diagnostic_test_options"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    icon = Column(String, nullable=False)
+    desc = Column(String, nullable=False)
+    sortOrder = Column(Integer, nullable=False, default=0)
+
+
+class TreatmentOption(Base):
+    __tablename__ = "treatment_options"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    icon = Column(String, nullable=False)
+    desc = Column(String, nullable=False)
+    sortOrder = Column(Integer, nullable=False, default=0)
