@@ -12,6 +12,8 @@ class AssessmentOut(BaseModel):
     completedBy: str
     chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
+    finalScore: Optional[int] = None
+    promCode: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -109,6 +111,10 @@ class UpdateStatusRequest(BaseModel):
     status: str
 
 
+class UpdateBodyAreaRequest(BaseModel):
+    bodyArea: str
+
+
 class AssessmentCreate(BaseModel):
     id: str
     date: str
@@ -119,6 +125,8 @@ class AssessmentCreate(BaseModel):
     completedBy: str
     chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
+    finalScore: Optional[int] = None
+    promCode: Optional[str] = None
 
 
 class EvaluationCreate(BaseModel):
@@ -131,6 +139,9 @@ class EvaluationCreate(BaseModel):
 
 
 class EvaluationUpdate(BaseModel):
+    notes: Optional[str] = None
+    diagnosis: Optional[str] = None
+    audioUrl: Optional[str] = None
     sentToPatient: Optional[bool] = None
 
 

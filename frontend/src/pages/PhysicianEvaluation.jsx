@@ -5,7 +5,6 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          Zap, TrendingUp, Activity, FileText } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useDictation } from '../hooks/useDictation';
-import { calculateQuickDASH, calculateSectionScore } from '../utils/scoring';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
@@ -62,83 +61,14 @@ function getActiveStepIndex(patient) {
   return 0;
 }
 
-/* ── PROM subscale scoring (KOOS/HOOS format: Pain, Symptoms, ADL, Sport/Rec, QoL) ── */
-const PROM_META = {
-  pain:     { label: 'Pain (الألم)',             color: '#ef4444' },
-  symptoms: { label: 'Symptoms (الأعراض)',         color: '#f59e0b' },
-  adl:      { label: 'ADL (الوظائف اليومية)',      color: '#6366f1' },
-  sportRec: { label: 'Sport/Rec (الرياضة والترفيه)', color: '#3b82f6' },
-  qol:      { label: 'QoL (جودة الحياة)',          color: '#10b981' },
-};
-
-function sectionSeverity(section, answers) {
-  if (!section) return null;
-  const radioQs = section.questions.filter((q) => q.type === 'radio' && Array.isArray(q.options) && q.options.length > 1);
-  const answered = radioQs.filter((q) => answers[q.id] !== undefined && answers[q.id] !== null && answers[q.id] !== '');
-  if (!answered.length) return null;
-  const total = answered.reduce((acc, q) => acc + (answers[q.id] || 0) / (q.options.length - 1), 0);
-  return (total / answered.length) * 100;
-}
-
-function computePromScores(config, answers) {
-  if (!answers || !config) return {};
-  const sections = config.sections || [];
-
-  const painSection = sections.find((s) => s.id === 'pain');
-  const symptomsSection = sections.find((s) => s.id === 'symptoms');
-  const qdashSection = sections.find((s) => s.scoreCalculation === 'quickdash');
-  const qolSection = sections.find((s) => s.id === 'qol');
-
-  const result = {};
-
-  // 1. Pain subscale (wellness 0-100)
-  if (painSection) {
-    const painResult = calculateSectionScore(answers, painSection.questions);
-    if (painResult && painResult.max > 0) {
-      result.pain = Math.round(100 - (painResult.score / painResult.max) * 100);
-    } else if (answers['pain_scale'] !== undefined && answers['pain_scale'] !== null) {
-      result.pain = Math.round((1 - answers['pain_scale'] / 10) * 100);
-    }
-  }
-
-  // 2. Symptoms subscale (wellness 0-100)
-  if (symptomsSection) {
-    const symptomsSev = sectionSeverity(symptomsSection, answers);
-    if (symptomsSev !== null) result.symptoms = Math.round(100 - symptomsSev);
-  }
-
-  // 3. ADL (Activities of Daily Living) subscale (wellness 0-100)
-  if (qdashSection) {
-    const qdashScore = calculateQuickDASH(answers, qdashSection.questions);
-    if (qdashScore !== null) result.adl = Math.round(Math.max(0, 100 - qdashScore));
-  }
-
-  // 4. Sport & Recreation subscale (wellness 0-100)
-  const allQs = sections.flatMap(s => s.questions);
-  const sportQ = allQs.find(q => q.id === 'qol_sport' || q.id === 'dem_activity');
-  if (sportQ && answers[sportQ.id] !== undefined && answers[sportQ.id] !== null) {
-    const idx = answers[sportQ.id];
-    const maxIdx = Math.max(1, sportQ.options.length - 1);
-    result.sportRec = sportQ.id === 'dem_activity'
-      ? Math.round((idx / maxIdx) * 100)
-      : Math.round(100 - (idx / maxIdx) * 100);
-  }
-
-  // 5. QoL (Quality of Life) subscale (wellness 0-100)
-  if (qolSection) {
-    const qolSev = sectionSeverity(qolSection, answers);
-    if (qolSev !== null) result.qol = Math.round(100 - qolSev);
-  }
-
-  // Fallbacks to ensure all 5 subscales render reliably
-  const baseVal = result.pain ?? result.symptoms ?? 65;
-  if (result.pain === undefined)     result.pain = baseVal;
-  if (result.symptoms === undefined) result.symptoms = Math.min(100, Math.max(0, baseVal + 4));
-  if (result.adl === undefined)      result.adl = Math.min(100, Math.max(0, baseVal - 5));
-  if (result.sportRec === undefined) result.sportRec = Math.min(100, Math.max(0, baseVal - 12));
-  if (result.qol === undefined)      result.qol = Math.min(100, Math.max(0, baseVal - 3));
-
-  return result;
+// A pre-migration assessment (taken before the real per-instrument scoring
+// engine existed) has no finalScore stored — fall back to the raw/max ratio
+// it does have rather than showing nothing.
+function resolveFinalScore(assessment) {
+  if (!assessment) return null;
+  if (assessment.finalScore !== null && assessment.finalScore !== undefined) return assessment.finalScore;
+  if (assessment.maxScore) return Math.round((assessment.score / assessment.maxScore) * 100);
+  return null;
 }
 
 /* ── Tag Pill ────────────────────────────────────────────────────────────── */
@@ -157,15 +87,17 @@ function TagPill({ label, color }) {
 }
 
 /* ── PROM Score Ring (SVG) ──────────────────────────────────────────────── */
-function ScoreRing({ score, max = 100, size = 88, stroke = 8 }) {
+function ScoreRing({ score, max = 100, size = 88, stroke = 8, direction = 'higher_better' }) {
   const hasScore = score !== null && score !== undefined;
   const pct    = hasScore ? Math.min(score / max, 1) : 0;
   const r      = (size - stroke) / 2;
   const circ   = 2 * Math.PI * r;
   const offset = circ * (1 - pct);
 
-  /* colour: green > 70, amber 40-70, red < 40; grey when there's no score */
-  const color = !hasScore ? 'var(--text-muted)' : pct > 0.7 ? 'var(--success)' : pct > 0.4 ? 'var(--warning)' : 'var(--danger)';
+  // Direction-aware: for a lower_better instrument (e.g. QuickDASH/ODI/NDI,
+  // where 0=best/100=worst) a low score is good, so the colour bands invert.
+  const wellnessPct = direction === 'lower_better' ? 1 - pct : pct;
+  const color = !hasScore ? 'var(--text-muted)' : wellnessPct > 0.7 ? 'var(--success)' : wellnessPct > 0.4 ? 'var(--warning)' : 'var(--danger)';
 
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
@@ -384,7 +316,7 @@ function PrintDocModal({ order, patient, physicianName, onClose }) {
   );
 }
 
-function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, promEntries, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
+function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, latestAssessment, promName, scoreDirection, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
   const [printOrder, setPrintOrder] = React.useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const evaluation = (patient?.evaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -442,24 +374,27 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
             </div>
           </div>
 
-          {/* PROM Subscales */}
+          {/* Pre-Visit PROM */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>Pre-Visit PROM</div>
-            {promEntries.map((s) => (
-              <div key={s.key} style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
-                  <span style={{ fontWeight: 700, color: s.color }}>{s.score}</span>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 2 }}>Pre-Visit PROM</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginBottom: 10 }}>{promName}</div>
+            {!latestAssessment ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>No pre-visit assessment completed yet.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Raw Score</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
                 </div>
-                <div style={{ height: 6, borderRadius: 3, background: 'var(--border)' }}>
-                  <div style={{ height: '100%', borderRadius: 3, width: `${s.score}%`, background: s.color, transition: 'width 0.6s ease' }} />
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Final Score</span>
+                  <span style={{ color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>{finalScore === null ? '—' : finalScore}/100</span>
                 </div>
-              </div>
-            ))}
-            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Overall</span>
-              <span style={{ color: finalScore === null ? 'var(--text-muted)' : finalScore > 70 ? 'var(--success)' : finalScore > 40 ? 'var(--warning)' : 'var(--danger)' }}>{finalScore === null ? '—' : finalScore}/100</span>
-            </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function'}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -621,7 +556,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */
-export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onAddDiagnostic, onAddTreatment, onMarkEvaluationSent }) {
+export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onAddTreatment, onMarkEvaluationSent }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -639,6 +574,11 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [dictationLanguage, setDictationLanguage] = useState('en');
   const [error, setError]                     = useState(null);
   const [saved, setSaved]                     = useState(false);
+  // The evaluation row (if any) already saved today for this patient — once
+  // set, "Complete Visit" and "New Note" amend it in place instead of each
+  // inserting their own row, so one encounter doesn't fragment into several
+  // partial evaluations (one with no diagnosis, one with no notes, etc.).
+  const [currentEvaluationId, setCurrentEvaluationId] = useState(null);
 
   /* ── Quick-action modal state ── */
   const [showMedModal, setShowMedModal] = useState(false);
@@ -657,6 +597,9 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     const latestEval = latestByDate(patient.evaluations);
     setDiagnosis((d) => d || latestEval?.diagnosis || '');
     setNotes((n) => n || latestEval?.notes || '');
+    // Only today's evaluation counts as "the current encounter" to amend —
+    // an older saved evaluation is a past visit and must stay untouched.
+    setCurrentEvaluationId(latestEval?.date === todayIso() ? latestEval.id : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient?.id]);
 
@@ -751,10 +694,16 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const handleSaveAll = () => {
     if (!diagnosis.trim() && !notes.trim()) return;
     const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
-    if (onAddEvaluation) onAddEvaluation(patientId, {
-      id: `ev${Date.now()}`, date: todayIso(),
-      physician: physicianName, notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl,
-    });
+    if (currentEvaluationId && onUpdateEvaluation) {
+      onUpdateEvaluation(patientId, currentEvaluationId, { notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl });
+    } else if (onAddEvaluation) {
+      const newId = `ev${Date.now()}`;
+      onAddEvaluation(patientId, {
+        id: newId, date: todayIso(),
+        physician: physicianName, notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl,
+      });
+      setCurrentEvaluationId(newId);
+    }
     selectedTests.forEach((testId) => {
       const test = diagnosticTests.find((t) => t.id === testId);
       if (test && onAddDiagnostic) onAddDiagnostic(patientId, {
@@ -789,11 +738,27 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   };
 
   const handleSaveNote = () => {
-    if (!noteText.trim() || !onAddEvaluation) return;
-    Promise.resolve(onAddEvaluation(patientId, {
-      id: `ev${Date.now()}`, date: todayIso(),
-      physician: physicianName, notes: noteText.trim(), diagnosis: null, audioUrl: null,
-    }))
+    if (!noteText.trim()) return;
+    // Appends to today's evaluation (if one is already open) instead of
+    // inserting a separate row, so a quick note doesn't fork the encounter
+    // into a second, diagnosis-less evaluation — see currentEvaluationId.
+    const merged = notes.trim() ? `${notes.trim()}\n\n${noteText.trim()}` : noteText.trim();
+    setNotes(merged);
+    let promise;
+    if (currentEvaluationId && onUpdateEvaluation) {
+      promise = onUpdateEvaluation(patientId, currentEvaluationId, { notes: merged });
+    } else if (onAddEvaluation) {
+      const newId = `ev${Date.now()}`;
+      const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
+      promise = onAddEvaluation(patientId, {
+        id: newId, date: todayIso(),
+        physician: physicianName, notes: merged, diagnosis: diagnosis.trim(), audioUrl,
+      });
+      setCurrentEvaluationId(newId);
+    } else {
+      return;
+    }
+    Promise.resolve(promise)
       .then(() => notifySuccess('Note saved'))
       .catch(() => notifyError('Failed to save note'));
     setNoteText('');
@@ -865,41 +830,36 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const chiefComplaint = latestAssessment?.chiefComplaint || 'Not recorded yet.';
 
   const answers = latestAssessment?.answers || {};
-  const promRaw = computePromScores(assessmentConfig, answers);
-  const promEntries = Object.keys(PROM_META)
-    .filter((key) => promRaw[key] !== undefined && promRaw[key] !== null)
-    .map((key) => ({ key, ...PROM_META[key], score: promRaw[key] }));
-  const finalScore = promEntries.length
-    ? Math.round(promEntries.reduce((acc, s) => acc + s.score, 0) / promEntries.length)
-    : null;
+  const promName = assessmentConfig?.promName || assessmentConfig?.title || 'PROM';
+  const scoreDirection = assessmentConfig?.scoreDirection || 'higher_better';
+  const finalScore = resolveFinalScore(latestAssessment);
+  const directionCaption = scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function';
 
-  // Pain NRS score (0-10) — real only; null when there's genuinely no pain
-  // data recorded (no fabricated fallback number).
+  // Pain NRS score (0-10) — real only, straight from the shared pain_scale
+  // intake item; null when there's genuinely no pain data recorded (no
+  // fabricated fallback number).
   let painNRS = null;
-  if (answers['pain_scale'] !== undefined && answers['pain_scale'] !== null && answers['pain_scale'] !== '' && Number(answers['pain_scale']) > 0) {
+  if (answers['pain_scale'] !== undefined && answers['pain_scale'] !== null && answers['pain_scale'] !== '') {
     painNRS = Number(answers['pain_scale']);
-  } else if (latestAssessment?.answers?.pain_scale !== undefined && Number(latestAssessment.answers.pain_scale) > 0) {
-    painNRS = Number(latestAssessment.answers.pain_scale);
-  } else if (promRaw.pain !== undefined && promRaw.pain < 100) {
-    // promRaw.pain is wellness score (0-100). Convert inverted wellness to pain NRS severity (0-10)
-    painNRS = Math.min(10, Math.max(1, Math.round((100 - promRaw.pain) / 10)));
   }
 
   const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#ef4444' : painNRS > 3 ? '#f59e0b' : '#10b981';
   const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
 
-  // KOOS Overall Trend — only plotted from real assessment history (2+ visits
-  // with a real score/maxScore). With fewer than 2, there's nothing real to
-  // trend, so no points are fabricated — the chart shows an empty-history
-  // message instead.
+  // PROM Trend — only plotted from real assessment history (2+ visits with a
+  // resolvable score). With fewer than 2, there's nothing real to trend, so
+  // no points are fabricated — the chart shows an empty-history message.
   const assessmentHistory = (patient.assessments || []).slice().sort((a, b) => a.date.localeCompare(b.date));
   const trendPoints = assessmentHistory.length >= 2
-    ? assessmentHistory.map((a, idx) => {
-        const s = a.score && a.maxScore ? Math.round((a.score / a.maxScore) * 100) : 50;
-        const x = (idx / (assessmentHistory.length - 1)) * 170 + 15;
-        const y = 55 - (s / 100) * 45;
-        return { score: s, label: a.date, x, y };
-      })
+    ? assessmentHistory
+        .map((a, idx) => {
+          const s = resolveFinalScore(a);
+          if (s === null) return null;
+          const x = (idx / (assessmentHistory.length - 1)) * 170 + 15;
+          const y = 55 - (s / 100) * 45;
+          return { score: s, label: a.date, x, y };
+        })
+        .filter(Boolean)
     : [];
 
   const firstPt = trendPoints[0] || null;
@@ -939,7 +899,9 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         handleLoadedMetadata={handleLoadedMetadata}
         handleAudioEnd={handleAudioEnd}
         audioRef={audioRef}
-        promEntries={promEntries}
+        latestAssessment={latestAssessment}
+        promName={promName}
+        scoreDirection={scoreDirection}
         finalScore={finalScore}
         painNRS={painNRS}
         painColor={painColor}
@@ -1029,29 +991,25 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               <p className="pe-complaint-text">{chiefComplaint}</p>
             </SCard>
 
-            {/* Card 2 — Pre-Visit PROM (5 Subscales) */}
-            <SCard title="Pre-Visit PROM" icon={FlaskConical}>
-              {promEntries.length === 0 ? (
+            {/* Card 2 — Pre-Visit PROM */}
+            <SCard title={`Pre-Visit PROM — ${promName}`} icon={FlaskConical}>
+              {!latestAssessment ? (
                 <p className="pe-empty-note">No pre-visit assessment completed yet.</p>
               ) : (
                 <div className="pe-prom-body">
-                  <ScoreRing score={finalScore} size={96} stroke={9} />
+                  <ScoreRing score={finalScore} size={96} stroke={9} direction={scoreDirection} />
                   <div className="pe-prom-list">
-                    {promEntries.map((s) => (
-                      <div key={s.key} className="pe-prom-row">
-                        <span className="pe-prom-label">{s.label}</span>
-                        <div className="pe-prom-bar-wrap">
-                          <div className="pe-prom-bar" style={{ width: `${s.score}%`, background: s.color }} />
-                        </div>
-                        <span className="pe-prom-val" style={{ color: s.color }}>{s.score}</span>
-                      </div>
-                    ))}
+                    <div className="pe-prom-row">
+                      <span className="pe-prom-label">Raw Score</span>
+                      <span className="pe-prom-val" style={{ color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
+                    </div>
                     <div className="pe-prom-total">
                       <span>Final Score</span>
-                      <span style={{ fontWeight: 800, color: finalScore === null ? 'var(--text-muted)' : finalScore > 70 ? 'var(--success)' : finalScore > 40 ? 'var(--warning)' : 'var(--danger)' }}>
+                      <span style={{ fontWeight: 800, color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>
                         {finalScore === null ? '—' : finalScore} / 100
                       </span>
                     </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{directionCaption}</div>
                   </div>
                 </div>
               )}
@@ -1106,8 +1064,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               </div>
             </SCard>
 
-            {/* Card 4 — PROM Trend (KOOS Overall) */}
-            <SCard title="PROM Trend (KOOS Overall)" icon={TrendingUp}>
+            {/* Card 4 — PROM Trend */}
+            <SCard title={`PROM Trend — ${promName}`} icon={TrendingUp}>
               {trendPoints.length === 0 ? (
                 <p className="pe-empty-note">Not enough visit history yet — needs 2+ completed assessments to plot a trend.</p>
               ) : (
@@ -1118,19 +1076,25 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         {finalScore === null ? '—' : finalScore} <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>/ 100</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Overall KOOS Score
+                        Overall {promName} Score
                       </div>
                     </div>
-                    {trendDiff !== null && (
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                        background: trendDiff >= 0 ? '#10b98118' : '#ef444418',
-                        color: trendDiff >= 0 ? '#10b981' : '#ef4444',
-                        border: `1px solid ${trendDiff >= 0 ? '#10b98130' : '#ef444430'}`
-                      }}>
-                        {trendDiff >= 0 ? `▲ +${trendDiff}%` : `▼ ${trendDiff}%`}
-                      </span>
-                    )}
+                    {trendDiff !== null && (() => {
+                      // For a lower_better instrument a falling score is the
+                      // improvement, so the up/down arrow's good/bad colour
+                      // (not its direction) flips relative to higher_better.
+                      const improving = scoreDirection === 'lower_better' ? trendDiff <= 0 : trendDiff >= 0;
+                      return (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                          background: improving ? '#10b98118' : '#ef444418',
+                          color: improving ? '#10b981' : '#ef4444',
+                          border: `1px solid ${improving ? '#10b98130' : '#ef444430'}`
+                        }}>
+                          {trendDiff >= 0 ? `▲ +${trendDiff}` : `▼ ${trendDiff}`}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div style={{ width: '100%', height: 75, position: 'relative', marginTop: 8 }}>

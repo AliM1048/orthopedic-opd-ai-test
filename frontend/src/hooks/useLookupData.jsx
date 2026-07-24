@@ -7,6 +7,7 @@ const LookupContext = createContext({
   statusConfig: {},
   diagnosticTests: [],
   treatmentOptions: [],
+  bodyAreas: [],
   loaded: false,
 });
 
@@ -15,6 +16,7 @@ export function LookupProvider({ children }) {
     statusConfig: {},
     diagnosticTests: [],
     treatmentOptions: [],
+    bodyAreas: [],
     loaded: false,
   });
 
@@ -23,12 +25,14 @@ export function LookupProvider({ children }) {
       api.get('/api/status-config'),
       api.get('/api/diagnostic-tests'),
       api.get('/api/treatment-options'),
+      api.get('/api/body-areas'),
     ])
-      .then(([statusRes, testsRes, treatmentsRes]) => {
+      .then(([statusRes, testsRes, treatmentsRes, bodyAreasRes]) => {
         setState({
           statusConfig: statusRes.data.statusConfig,
           diagnosticTests: testsRes.data.diagnosticTests,
           treatmentOptions: treatmentsRes.data.treatmentOptions,
+          bodyAreas: bodyAreasRes.data.bodyAreas,
           loaded: true,
         });
       })

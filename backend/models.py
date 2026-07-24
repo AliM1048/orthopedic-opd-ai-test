@@ -36,6 +36,8 @@ class Assessment(Base):
     completedBy = Column(String, nullable=False)
     chiefComplaint = Column(String, nullable=True)
     answers = Column(JSON, nullable=True)
+    finalScore = Column(Integer, nullable=True)
+    promCode = Column(String, nullable=True)
 
 
 class Evaluation(Base):
@@ -94,6 +96,12 @@ class AssessmentConfig(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     sections = Column(JSON, nullable=False)
+    promName = Column(String, nullable=True)
+    scoreCalculation = Column(String, nullable=False, default="generic")
+    scoreDirection = Column(String, nullable=False, default="higher_better")
+    rawMax = Column(Integer, nullable=True)
+    conversionTable = Column(JSON, nullable=True)
+    icon = Column(String, nullable=True)
 
 
 class StatusConfig(Base):

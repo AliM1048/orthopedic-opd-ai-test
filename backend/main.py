@@ -65,6 +65,14 @@ def on_startup():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"chiefComplaint\" VARCHAR"))
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"sentToPatient\" BOOLEAN NOT NULL DEFAULT FALSE"))
+            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" INTEGER"))
+            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"promCode\" VARCHAR"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"promName\" VARCHAR"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"scoreCalculation\" VARCHAR NOT NULL DEFAULT 'generic'"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"scoreDirection\" VARCHAR NOT NULL DEFAULT 'higher_better'"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"rawMax\" INTEGER"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"conversionTable\" JSON"))
+            conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"icon\" VARCHAR"))
     except Exception as e:
         print(f"⚠️  Column migration skipped/failed (safe to ignore on a fresh DB): {e}")
 

@@ -14,6 +14,10 @@ const CATEGORICAL = {
 const OTHER_COLOR = { light: '#94a3b8', dark: '#6b7894' };
 const MAX_CATEGORICAL_SLOTS = 6;
 
+// Assessment.promCode values whose native scoring direction is 0=best/100=worst
+// (see backend/seed_proms.py scoreDirection: 'lower_better').
+const LOWER_BETTER_PROM_CODES = new Set(['quickdash', 'odi_ndi']);
+
 function colorForIndex(idx, theme, isOther) {
   if (isOther) return OTHER_COLOR[theme];
   return CATEGORICAL[theme][idx % CATEGORICAL[theme].length];
@@ -160,11 +164,18 @@ export default function Analytics({ patients }) {
   }, [patients]);
 
   const avgPromByAreaCols = useMemo(() => {
+    // Normalizes every region to a "wellness" score (100 = best) for
+    // cross-region comparability here, even though several instruments are
+    // natively lower_better (0=best/100=worst — QuickDASH/ODI/NDI), so those
+    // get inverted for this chart only — a deliberate exception to
+    // per-assessment clinical fidelity, which the Physician Evaluation page
+    // preserves exactly (native direction + a "higher = ..." caption).
     const byArea = new Map();
     patients.forEach((p) => {
       (p.assessments || []).forEach((a) => {
         if (!a.maxScore) return;
-        const pct = (a.score / a.maxScore) * 100;
+        const raw = a.finalScore ?? Math.round((a.score / a.maxScore) * 100);
+        const pct = LOWER_BETTER_PROM_CODES.has(a.promCode) ? 100 - raw : raw;
         const area = a.bodyArea || p.bodyArea;
         if (!byArea.has(area)) byArea.set(area, []);
         byArea.get(area).push(pct);

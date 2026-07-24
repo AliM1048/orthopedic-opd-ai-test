@@ -36,6 +36,18 @@ export function usePatients(token) {
       .catch(() => {});
   }, []);
 
+  const updateBodyArea = useCallback((id, bodyArea) => {
+    setPatients((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, bodyArea } : p))
+    );
+    return api.patch(`/api/patients/${id}/body-area`, { bodyArea })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === id ? res.data : p))
+        );
+      });
+  }, []);
+
   const addAssessment = useCallback((patientId, assessment) => {
     setPatients((prev) =>
       prev.map((p) =>
@@ -62,6 +74,27 @@ export function usePatients(token) {
       )
     );
     return api.post(`/api/patients/${patientId}/evaluations`, evaluation)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const updateEvaluation = useCallback((patientId, evaluationId, updates) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              evaluations: p.evaluations.map((e) =>
+                e.id === evaluationId ? { ...e, ...updates } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/evaluations/${evaluationId}`, updates)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
@@ -162,8 +195,10 @@ export function usePatients(token) {
     loading,
     getPatient,
     updateStatus,
+    updateBodyArea,
     addAssessment,
     addEvaluation,
+    updateEvaluation,
     addDiagnostic,
     updateDiagnostic,
     addTreatment,

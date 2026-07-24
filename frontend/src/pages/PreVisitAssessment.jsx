@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 
-import { calculateQuickDASH } from '../utils/scoring';
+import { computeFinalScore } from '../utils/scoring';
 import { useAssessmentConfig } from '../hooks/useLookupData';
 import PatientSummaryCard from '../components/assessment/PatientSummaryCard';
 import VisitSummaryCard from '../components/assessment/VisitSummaryCard';
@@ -11,6 +11,7 @@ import AssessmentSidebar from '../components/assessment/AssessmentSidebar';
 import QuestionRenderer from '../components/assessment/QuestionRenderer';
 import AssessmentNavigation from '../components/assessment/AssessmentNavigation';
 import SummaryPage from '../components/assessment/SummaryPage';
+import RegionPicker from '../components/assessment/RegionPicker';
 
 const DRAFT_KEY = (patientId) => `assessment_draft_${patientId}`;
 
@@ -30,7 +31,7 @@ function countAnswered(section, answers) {
   }).length;
 }
 
-export default function PreVisitAssessment({ patients, onAddAssessment, onUpdateStatus }) {
+export default function PreVisitAssessment({ patients, onAddAssessment, onUpdateStatus, onUpdateBodyArea }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
@@ -44,13 +45,30 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
 
   const [answers, setAnswers] = useState(() => getInitialAnswers(patientId));
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [chiefComplaint, setChiefComplaint] = useState(patient?.bodyArea ? `${patient.bodyArea} pain` : 'Pain');
+  const [chiefComplaint, setChiefComplaint] = useState('');
   const [errors, setErrors] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
+
+  // The nurse confirms/picks the region at the start of every call — this
+  // gates the rest of the intake UI until a region is chosen, so the right
+  // instrument (and its scoring rules) always loads deliberately rather than
+  // silently inheriting whatever bodyArea the patient happened to have.
+  const [regionConfirmed, setRegionConfirmed] = useState(false);
+  useEffect(() => { setRegionConfirmed(false); }, [patientId]);
+
+  const handleRegionConfirmed = (region) => {
+    const persist = (region !== patient?.bodyArea && onUpdateBodyArea)
+      ? onUpdateBodyArea(patientId, region)
+      : Promise.resolve();
+    return Promise.resolve(persist).then(() => {
+      setChiefComplaint((c) => c || `${region} pain`);
+      setRegionConfirmed(true);
+    });
+  };
 
   // Auto-persist to localStorage
   useEffect(() => {
@@ -138,40 +156,22 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
     setIsSubmitting(true);
     await new Promise(r => setTimeout(r, 800));
 
-    // Build structured result
-    const quickdashSection = sections.find(s => s.scoreCalculation === 'quickdash');
-    const quickdashScore = quickdashSection
-      ? calculateQuickDASH(answers, quickdashSection.questions)
-      : null;
-
-    const totalScore = sections.reduce((acc, s) => {
-      return acc + s.questions.reduce((qacc, q) => {
-        if (q.scoreValues && answers[q.id] !== undefined && answers[q.id] !== null) {
-          return qacc + (q.scoreValues[answers[q.id]] || 0);
-        }
-        return qacc;
-      }, 0);
-    }, 0);
-
-    const maxScore = sections.reduce((acc, s) => {
-      return acc + s.questions.reduce((qacc, q) => {
-        if (q.scoreValues) return qacc + Math.max(...q.scoreValues);
-        return qacc;
-      }, 0);
-    }, 0);
+    // Score using the instrument this region's config specifies (KOOS-JR,
+    // QuickDASH, ODI/NDI, SEFAS, ...) — see utils/scoring.js computeFinalScore.
+    const result = computeFinalScore(config, answers);
 
     const assessment = {
       id: `a${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       type: isFollowUp ? 'Follow-Up' : 'Pre-Visit',
-      score: totalScore,
-      maxScore,
-      quickdashScore,
+      score: result?.raw ?? 0,
+      maxScore: result?.rawMax ?? 0,
+      finalScore: result?.final ?? null,
+      promCode: result?.promCode ?? null,
       bodyArea: patient?.bodyArea,
       completedBy: 'Nurse Sara',
       chiefComplaint,
       answers,
-      sections: config.title
     };
 
     if (onAddAssessment) onAddAssessment(patientId, assessment);
@@ -205,6 +205,26 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
             </button>
           </div>
         </div>
+      </>
+    );
+  }
+
+  // ── Region confirmation (start-of-call gate) ────────────────────────────────
+  if (!regionConfirmed) {
+    return (
+      <>
+        <div className="topbar">
+          <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
+              <p>{patient.name} · {patient.mrn}</p>
+            </div>
+          </div>
+        </div>
+        <RegionPicker patient={patient} onConfirm={handleRegionConfirmed} />
       </>
     );
   }

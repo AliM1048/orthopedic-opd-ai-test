@@ -24,8 +24,10 @@ export default function App() {
   const {
     patients,
     updateStatus,
+    updateBodyArea,
     addAssessment,
     addEvaluation,
+    updateEvaluation,
     addDiagnostic,
     addTreatment,
     markEvaluationSent,
@@ -68,6 +70,7 @@ export default function App() {
                     patients={patients}
                     onAddAssessment={addAssessment}
                     onUpdateStatus={updateStatus}
+                    onUpdateBodyArea={updateBodyArea}
                   />
                 }
               />
@@ -78,6 +81,7 @@ export default function App() {
                     patients={patients}
                     user={user}
                     onAddEvaluation={addEvaluation}
+                    onUpdateEvaluation={updateEvaluation}
                     onAddDiagnostic={addDiagnostic}
                     onAddTreatment={addTreatment}
                     onMarkEvaluationSent={markEvaluationSent}

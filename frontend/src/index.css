@@ -3042,6 +3042,47 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   .anav-bar { flex-wrap: wrap; gap: 10px; }
 }
 
+/* ── Region Picker (start-of-call category select) ── */
+.rp-wrapper {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 8px 0 32px;
+}
+.rp-header { text-align: center; margin-bottom: 28px; }
+.rp-header h2 { font-size: 22px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
+.rp-header p { font-size: 13.5px; color: var(--text-muted); }
+
+.rp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.rp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 12px 16px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.rp-card:hover { border-color: var(--border-dark); box-shadow: var(--shadow); transform: translateY(-2px); }
+.rp-card-selected { border-color: var(--primary); background: var(--primary-light); }
+.rp-card-icon { font-size: 32px; line-height: 1; margin-bottom: 4px; }
+.rp-card-label { font-size: 13.5px; font-weight: 700; color: var(--text-primary); text-align: center; }
+.rp-card-prom { font-size: 11px; font-weight: 600; color: var(--primary); text-align: center; }
+.rp-card-check {
+  position: absolute;
+  top: 8px; right: 8px;
+  color: var(--primary);
+}
+.rp-footer { display: flex; justify-content: center; }
+
 /* ── Print — Review & Print page only prints the formal document,
    not the working screen (sidebar, nav, voice player, extracted-orders
    aid all live in .pe-review-aside and are screen-only). ── */

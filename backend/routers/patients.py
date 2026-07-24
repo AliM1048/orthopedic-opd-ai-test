@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from database import get_db
 from models import Patient, Assessment, Evaluation, Diagnostic, Treatment
 from schemas import (
-    PatientOut, PatientListResponse, UpdateStatusRequest,
+    PatientOut, PatientListResponse, UpdateStatusRequest, UpdateBodyAreaRequest,
     AssessmentOut, EvaluationOut, DiagnosticOut, TreatmentOut,
     PatientCreate,
 )
@@ -87,6 +87,17 @@ def update_patient_status(patient_id: str, body: UpdateStatusRequest, db: Sessio
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     patient.status = body.status
+    db.commit()
+    db.refresh(patient)
+    return _build_patient(patient, db)
+
+
+@router.patch("/{patient_id}/body-area", response_model=PatientOut)
+def update_patient_body_area(patient_id: str, body: UpdateBodyAreaRequest, db: Session = Depends(get_db)):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    patient.bodyArea = body.bodyArea
     db.commit()
     db.refresh(patient)
     return _build_patient(patient, db)

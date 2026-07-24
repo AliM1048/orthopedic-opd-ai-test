@@ -19,13 +19,32 @@ def get_questions(body_area: str = "Knee", db: Session = Depends(get_db)):
         "title": cfg.title,
         "description": cfg.description,
         "sections": cfg.sections,
+        "promName": cfg.promName,
+        "scoreCalculation": cfg.scoreCalculation,
+        "scoreDirection": cfg.scoreDirection,
+        "rawMax": cfg.rawMax,
+        "conversionTable": cfg.conversionTable,
+        "icon": cfg.icon,
     }
 
 
 @router.get("/body-areas")
 def get_body_areas(db: Session = Depends(get_db)):
-    areas = [row[0] for row in db.query(AssessmentConfig.bodyArea).all()]
-    return {"bodyAreas": areas}
+    # "Other" is a generic manual-entry fallback and "Spine" is the retired
+    # legacy config (superseded by the real Low Back / Neck & Cervical
+    # instruments) — neither belongs in the region-picker's selectable list.
+    rows = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.bodyArea.notin_(["Other", "Spine"]))
+        .order_by(AssessmentConfig.bodyArea)
+        .all()
+    )
+    return {
+        "bodyAreas": [
+            {"bodyArea": r.bodyArea, "promName": r.promName, "icon": r.icon, "title": r.title}
+            for r in rows
+        ]
+    }
 
 
 @router.get("/status-config")
