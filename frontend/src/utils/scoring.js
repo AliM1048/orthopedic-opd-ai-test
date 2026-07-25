@@ -4,14 +4,16 @@ export function calculateQuickDASH(answers, questions) {
   if (scoredQuestions.length === 0) return null;
 
   const answered = scoredQuestions.filter(q => answers[q.id] !== undefined && answers[q.id] !== null);
-  if (answered.length < scoredQuestions.length) return null;
+  // DASH requires at least 27 of 30 items (or 10 of 11 for QuickDASH)
+  const minRequired = Math.max(1, scoredQuestions.length - 3);
+  if (answered.length < minRequired) return null;
 
   const sum = answered.reduce((acc, q) => {
     const idx = Array.isArray(answers[q.id]) ? answers[q.id][0] : answers[q.id];
     return acc + (q.scoreValues[idx] || 0);
   }, 0);
 
-  // QuickDASH formula: (sum/n - 1) * 25, giving 0–100
+  // DASH / QuickDASH formula: ((sum/n) - 1) * 25, giving 0–100
   const score = ((sum / answered.length) - 1) * 25;
   return Math.round(score * 10) / 10;
 }
@@ -70,14 +72,28 @@ export function calculateRawPercent(raw, rawMax) {
 // scoreValues are oriented so higher raw = more problems; final score inverts
 // that to 0=worst/100=best) until the real table is supplied via `conversionTable`.
 export function calculateKoosHoosJr(raw, rawMax, conversionTable) {
-  if (!rawMax) return null;
-  if (Array.isArray(conversionTable) && conversionTable.length) {
-    let closest = conversionTable[0];
-    for (const row of conversionTable) {
-      if (Math.abs(row.raw - raw) < Math.abs(closest.raw - raw)) closest = row;
+  if (raw === undefined || raw === null) return null;
+  if (conversionTable) {
+    if (typeof conversionTable === 'object' && !Array.isArray(conversionTable)) {
+      const val = conversionTable[raw] ?? conversionTable[String(raw)];
+      if (val !== undefined && val !== null) {
+        return Math.round(val);
+      }
     }
-    return Math.round(closest.interval);
+    if (Array.isArray(conversionTable) && conversionTable.length) {
+      let closest = conversionTable[0];
+      for (const row of conversionTable) {
+        const rowRaw = typeof row === 'object' ? row.raw : conversionTable.indexOf(row);
+        const closestRaw = typeof closest === 'object' ? closest.raw : conversionTable.indexOf(closest);
+        if (Math.abs(rowRaw - raw) < Math.abs(closestRaw - raw)) {
+          closest = row;
+        }
+      }
+      const intervalVal = typeof closest === 'object' ? closest.interval : closest;
+      return Math.round(intervalVal);
+    }
   }
+  if (!rawMax) return null;
   return Math.round(100 - (raw / rawMax) * 100);
 }
 
