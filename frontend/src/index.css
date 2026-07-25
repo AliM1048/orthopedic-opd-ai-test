@@ -970,29 +970,18 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   box-shadow: 0 0 0 4px rgba(94,179,255,.15);
 }
 
-.dictation-lang-picker {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 16px;
-}
-.dictation-lang-pill {
-  padding: 6px 14px;
+.dictation-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.65);
-  font-size: 12.5px;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.85);
+  font-size: 11px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.dictation-lang-pill:hover { background: rgba(255,255,255,.12); color: #fff; }
-.dictation-lang-pill.active {
-  background: linear-gradient(135deg, #5eb3ff, #1a6fdb);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(26,111,219,.4);
 }
 
 .live-waveform-wrap {
@@ -3082,6 +3071,98 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   color: var(--primary);
 }
 .rp-footer { display: flex; justify-content: center; }
+
+/* ── Document Generator ── */
+.dg-selected-patient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.dg-suggestions {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 6px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.dg-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.dg-suggestion:hover { background: var(--surface-2); }
+.dg-suggestion + .dg-suggestion { border-top: 1px solid var(--border); }
+
+.dg-type-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin: 14px 0 8px;
+}
+.dg-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.dg-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.dg-type-card:hover { border-color: var(--border-dark); box-shadow: var(--shadow-sm); }
+.dg-type-card.selected { border-color: var(--primary); background: var(--primary-light); }
+.dg-type-icon { font-size: 22px; line-height: 1; }
+.dg-type-name { font-size: 12px; font-weight: 700; color: var(--text-primary); text-align: center; }
+
+/* ── Patient Status (master-detail record lookup) ── */
+.ps-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.ps-list-col { position: sticky; top: 84px; max-height: calc(100vh - 104px); overflow-y: auto; }
+.ps-detail-col { min-width: 0; }
+.ps-patient-list { display: flex; flex-direction: column; gap: 6px; }
+.ps-patient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1.5px solid transparent;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition);
+  width: 100%;
+}
+.ps-patient-row:hover { background: var(--surface-2); }
+.ps-patient-row.active { border-color: var(--primary); background: var(--primary-light); }
+.ps-patient-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+
+@media (max-width: 1024px) {
+  .ps-layout { grid-template-columns: 1fr; }
+  .ps-list-col { position: static; max-height: none; }
+}
 
 /* ── Print — Review & Print page only prints the formal document,
    not the working screen (sidebar, nav, voice player, extracted-orders

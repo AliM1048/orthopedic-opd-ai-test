@@ -17,3 +17,18 @@ def add_treatment(patient_id: str, body: TreatmentCreate, db: Session = Depends(
     db.add(treatment)
     db.commit()
     return _build_patient(patient, db)
+
+
+@router.delete("/{patient_id}/treatments/{treatment_id}", response_model=PatientOut)
+def delete_treatment(patient_id: str, treatment_id: str, db: Session = Depends(get_db)):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    treatment = db.query(Treatment).filter(
+        Treatment.id == treatment_id, Treatment.patient_id == patient_id
+    ).first()
+    if not treatment:
+        raise HTTPException(status_code=404, detail="Treatment not found")
+    db.delete(treatment)
+    db.commit()
+    return _build_patient(patient, db)

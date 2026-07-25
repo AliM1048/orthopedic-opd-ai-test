@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
-         Zap, TrendingUp, Activity, FileText } from 'lucide-react';
+         Zap, TrendingUp, Activity, FileText, Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
+import PrintDocModal from '../components/PrintDocModal';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -196,6 +197,7 @@ function iconForName(name, options) {
 function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
   const treatmentOrders = (patient.treatments || []).map((t) => ({
     id: t.id,
+    kind: 'treatment',
     icon: iconForName(t.type, treatmentOptions),
     title: `${t.type} Order`,
     status: t.status,
@@ -216,6 +218,7 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
 
   const diagnosticOrders = (patient.diagnostics || []).map((d) => ({
     id: d.id,
+    kind: 'diagnostic',
     icon: iconForName(d.type, diagnosticTests),
     title: `${d.type} Request`,
     status: d.status,
@@ -233,87 +236,6 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
   }));
 
   return [...treatmentOrders, ...diagnosticOrders];
-}
-
-function PrintDocModal({ order, patient, physicianName, onClose }) {
-  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  const handlePrint = () => window.print();
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-      backdropFilter: 'blur(4px)',
-    }} onClick={onClose}>
-      <div
-        style={{
-          background: '#fff', borderRadius: 16, width: 640, maxHeight: '90vh',
-          overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.35)', padding: 0,
-        }}
-        onClick={(e) => e.stopPropagation()}
-        id="print-doc-root"
-      >
-        {/* Header bar */}
-        <div style={{ background: 'linear-gradient(135deg, #1a6fdb 0%, #6366f1 100%)', padding: '22px 32px', borderRadius: '16px 16px 0 0', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD</div>
-            <div style={{ fontSize: 20, fontWeight: 800 }}>{order.printTitle}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1 }}>×</button>
-        </div>
-
-        {/* Patient info strip */}
-        <div style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '12px 32px', display: 'flex', gap: 32 }}>
-          {[['Patient', patient?.name || '—'], ['MRN', patient?.mrn || '—'], ['Date', today], ['Age', patient?.age ? `${patient.age} yrs` : '—']].map(([l, v]) => (
-            <div key={l}>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{l}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Order table */}
-        <div style={{ padding: '24px 32px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <tbody>
-              {order.printBody.map(([label, value], i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                  <td style={{ padding: '10px 14px', fontWeight: 700, color: '#475569', width: '38%', borderBottom: '1px solid #e2e8f0' }}>{label}</td>
-                  <td style={{ padding: '10px 14px', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {order.note && (
-            <div style={{ marginTop: 14, background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', fontWeight: 600 }}>
-              {order.note}
-            </div>
-          )}
-        </div>
-
-        {/* Signature block */}
-        <div style={{ margin: '0 32px 28px', borderTop: '1px solid #e2e8f0', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>
-            <div>Generated: {today}</div>
-            <div>Orthopedic OPD — Clinical Document</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ width: 160, borderBottom: '2px solid #334155', marginBottom: 4 }} />
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{physicianName}</div>
-            <div style={{ fontSize: 10, color: '#64748b' }}>Attending Physician</div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '14px 32px', display: 'flex', gap: 10, justifyContent: 'flex-end', borderRadius: '0 0 16px 16px' }}>
-          <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#475569' }}>Close</button>
-          <button onClick={handlePrint} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1a6fdb,#6366f1)', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-            🖨 Print Document
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, latestAssessment, promName, scoreDirection, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
@@ -556,7 +478,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */
-export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onAddTreatment, onMarkEvaluationSent }) {
+export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -571,7 +493,6 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [treatments, setTreatments]           = useState([]);
   const [dictation, setDictation]             = useState(null);
   const [showDictationModal, setShowDictationModal] = useState(false);
-  const [dictationLanguage, setDictationLanguage] = useState('en');
   const [error, setError]                     = useState(null);
   const [saved, setSaved]                     = useState(false);
   // The evaluation row (if any) already saved today for this patient — once
@@ -587,6 +508,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [noteText, setNoteText] = useState('');
   const [sendingToPatient, setSendingToPatient] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState(null);
 
   // Seed diagnosis/notes from the most recent saved evaluation once per
   // patient, so reopening an existing evaluation is editable too — not just
@@ -625,6 +547,11 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [audioProgress, setAudioProgress] = useState(0);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  // Set while handleLoadedMetadata is forcing a seek purely to read the real
+  // duration (see below) — handleTimeUpdate skips updating playback-position
+  // state during that window so the seek-and-back doesn't visibly flash the
+  // waveform to "fully played" for a frame.
+  const fixingDurationRef = useRef(false);
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -635,16 +562,33 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
+    if (audioRef.current && !fixingDurationRef.current) {
       setAudioCurrentTime(audioRef.current.currentTime);
       setAudioProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
     }
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setAudioDuration(audioRef.current.duration);
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isFinite(audio.duration)) {
+      setAudioDuration(audio.duration);
+      return;
     }
+    // MediaRecorder-produced WebM/Opus commonly reports duration=Infinity on
+    // loadedmetadata (the container has no duration header) — Chrome only
+    // computes the real value once playback seeks near the end. Force that,
+    // capture the now-finite duration, then seek back to the start so this
+    // doesn't disturb normal playback.
+    fixingDurationRef.current = true;
+    const onTimeUpdate = () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      setAudioDuration(audio.duration);
+      audio.currentTime = 0;
+      fixingDurationRef.current = false;
+    };
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.currentTime = 1e101;
   };
 
   const handleAudioEnd = () => {
@@ -678,8 +622,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       })));
   };
 
-  const { isRecording, isProcessing, elapsedSeconds, liveCaption, analyserRef, startRecording, stopRecording } =
-    useDictation({ patientId, language: dictationLanguage, onResult: handleDictationResult, onError: setError });
+  const { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording } =
+    useDictation({ patientId, onResult: handleDictationResult, onError: setError });
 
   const { diagnosticTests, treatmentOptions } = useLookup();
   const assessmentConfig = useAssessmentConfig(latestAssessment?.bodyArea || patient?.bodyArea);
@@ -772,6 +716,28 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       .then(() => notifySuccess('Sent to patient'))
       .catch(() => notifyError('Failed to send to patient'))
       .finally(() => setSendingToPatient(false));
+  };
+
+  const handleDeleteOrder = async (order) => {
+    if (deletingOrderId) return;
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: `Remove ${order.title}?`,
+      text: 'This order will be permanently removed from the patient record.',
+      showCancelButton: true,
+      confirmButtonText: 'Remove',
+      confirmButtonColor: 'var(--danger)',
+      cancelButtonText: 'Cancel',
+    }).then((r) => r.isConfirmed);
+    if (!confirmed) return;
+
+    const handler = order.kind === 'treatment' ? onDeleteTreatment : onDeleteDiagnostic;
+    if (!handler) return;
+    setDeletingOrderId(order.id);
+    Promise.resolve(handler(patientId, order.id))
+      .then(() => notifySuccess('Order removed'))
+      .catch(() => notifyError('Failed to remove order'))
+      .finally(() => setDeletingOrderId(null));
   };
 
   /* ── Empty / saved states ── */
@@ -1304,6 +1270,22 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         <span style={{ fontSize: 16 }}>{order.icon}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
                         <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrder(order)}
+                          disabled={deletingOrderId === order.id}
+                          title="Remove order"
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22, borderRadius: 6, border: 'none',
+                            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                            opacity: deletingOrderId === order.id ? 0.5 : 1, flexShrink: 0,
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 12%, transparent)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{order.summary} — {order.details}</div>
                     </div>
@@ -1381,8 +1363,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         elapsedSeconds={elapsedSeconds}
         liveCaption={liveCaption}
         error={error}
-        language={dictationLanguage}
-        onLanguageChange={setDictationLanguage}
+        detectedLanguage={detectedLanguage}
         analyserRef={analyserRef}
         onStartRecording={startRecording}
         onStopRecording={stopRecording}

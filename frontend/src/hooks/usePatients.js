@@ -141,6 +141,22 @@ export function usePatients(token) {
       .catch(() => {});
   }, []);
 
+  const deleteDiagnostic = useCallback((patientId, diagnosticId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, diagnostics: p.diagnostics.filter((d) => d.id !== diagnosticId) }
+          : p
+      )
+    );
+    return api.delete(`/api/patients/${patientId}/diagnostics/${diagnosticId}`)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
   const addTreatment = useCallback((patientId, treatment) => {
     setPatients((prev) =>
       prev.map((p) =>
@@ -150,6 +166,22 @@ export function usePatients(token) {
       )
     );
     return api.post(`/api/patients/${patientId}/treatments`, treatment)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const deleteTreatment = useCallback((patientId, treatmentId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, treatments: p.treatments.filter((t) => t.id !== treatmentId) }
+          : p
+      )
+    );
+    return api.delete(`/api/patients/${patientId}/treatments/${treatmentId}`)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
@@ -201,7 +233,9 @@ export function usePatients(token) {
     updateEvaluation,
     addDiagnostic,
     updateDiagnostic,
+    deleteDiagnostic,
     addTreatment,
+    deleteTreatment,
     markEvaluationSent,
     createPatient
   };

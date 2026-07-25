@@ -1,11 +1,22 @@
 import os
-import time  # TEMP DEBUG TIMING - remove after testing
+import sys
 import uuid
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, Form, Depends, BackgroundTasks
+# Windows defaults stdout/stderr to the cp1252 codepage when the process
+# isn't attached to a real console (e.g. output piped/redirected to a file,
+# or run under certain process managers) — any print() with an emoji or
+# other non-cp1252 character then raises UnicodeEncodeError and crashes the
+# in-flight request instead of just failing to log. Reconfigure to UTF-8
+# (falling back to '?' for anything truly unencodable) so a log line can
+# never take down a request.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
+from fastapi import FastAPI, File, UploadFile, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from openai import OpenAI
@@ -15,7 +26,7 @@ from pydub import AudioSegment
 from sqlalchemy import text
 from database import engine, Base
 from auth import get_current_user
-from llm_extract import extract_structured, warm_up_ollama
+from llm_extract import extract_structured, detect_language
 from routers.patients import router as patients_router
 from routers.assessments import router as assessments_router
 from routers.evaluations import router as evaluations_router
@@ -211,30 +222,10 @@ def root():
     }
 
 
-@app.post("/llm/warmup")
-def llm_warmup(background_tasks: BackgroundTasks):
-    """
-    Call this the moment the doctor clicks the mic. Ollama unloads idle models
-    after ~5 minutes; a cold reload can take long enough to blow past the
-    extraction timeout in /dictate. Kicking off the load now means the model
-    is usually warm by the time the doctor finishes a 10-60s dictation.
-    """
-    # TEMP DEBUG TIMING - remove after testing
-    print(f"⏱️  [warmup] requested at t={time.time():.2f}")
-
-    def _timed_warmup():
-        t0 = time.time()
-        warm_up_ollama()
-        print(f"⏱️  [warmup] finished in {time.time() - t0:.2f}s")
-
-    background_tasks.add_task(_timed_warmup)
-    return JSONResponse(content={"status": "warming"})
-
-
 @app.post("/transcribe/preview")
 async def transcribe_preview(
     audio: UploadFile = File(...),
-    language: str = Form(default="en"),
+    language: str = Form(default=""),
 ):
     """
     Throwaway transcription of the recording-so-far, used purely to show the
@@ -242,12 +233,17 @@ async def transcribe_preview(
     talking. No speaker ID, no LLM structuring, nothing persisted —
     just transcribe and return text as fast as possible.
 
-    `language` is forced (not auto-detected) even though it's now selectable:
-    skipping language auto-detection is both faster and avoids the model
-    occasionally mis-detecting language on short/ambiguous preview clips.
+    The doctor no longer picks a language up front — `language` arrives
+    empty on the first preview of a new recording. That first call is
+    transcribed unforced (best-effort, auto/multilingual) and the resulting
+    text is run through detect_language() to identify en/ar/fr from
+    whatever's been said so far, so it's effectively "detected from the
+    first words spoken." The frontend then remembers that result and sends
+    it back on every later preview in the same recording, at which point it
+    IS forced — same reasoning as before: forcing is faster and more
+    accurate than re-detecting on every short, possibly-ambiguous chunk.
     """
-    if language not in LANGUAGE_MAP:
-        language = "en"
+    had_language = language in LANGUAGE_MAP
 
     suffix = os.path.splitext(audio.filename)[-1] if audio.filename else ".webm"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -255,8 +251,9 @@ async def transcribe_preview(
         tmp_path = tmp.name
 
     try:
-        result = run_transcription(tmp_path, language=language)
-        return JSONResponse(content={"text": result["text"], "language": result.get("language")})
+        result = run_transcription(tmp_path, language=language if had_language else None)
+        detected = language if had_language else detect_language(result["text"])
+        return JSONResponse(content={"text": result["text"], "language": detected})
     except Exception as e:
         # A handful of these can legitimately fail to decode (the recorder may
         # hand us a momentarily truncated container mid-recording) - that's
@@ -270,32 +267,33 @@ async def transcribe_preview(
 async def dictate(
     audio: UploadFile = File(...),
     patient_id: str = Form(default=None),
-    language: str = Form(default="en"),
+    language: str = Form(default=""),
 ):
     """
     One-take physician dictation: the doctor speaks diagnosis, diagnostics to
     order, and the treatment plan in a single recording instead of filling out
     three separate screens.
 
-    1. Transcribe via the OpenAI API in the doctor's chosen language (en/ar/fr
-       — forced, not auto-detected, since forcing avoids the model ever
-       mis-detecting language on accented or noisy audio). Extraction
-       (llm_extract.py) supports all three plus code-switching between them,
-       so the dictation language and the app's UI language are independent.
+    1. Transcribe via the OpenAI API. `language` normally arrives already
+       detected from the live-preview phase (see /transcribe/preview — the
+       doctor doesn't pick a language up front, it's identified from the
+       first words spoken and forced from then on for accuracy). If this
+       recording was too short for any preview to have fired, `language`
+       arrives empty here and this call transcribes unforced, then
+       detect_language() tags the result from the full transcript instead.
+       Extraction (llm_extract.py) supports en/ar/fr plus code-switching
+       between them, so the dictation language and the app's UI language are
+       independent either way.
     2. Hand the transcript to llm_extract.extract_structured(), which splits it by
-       spoken section markers and uses a local LLM to map free speech onto the
-       app's diagnosis/diagnostic-test/treatment fields.
+       spoken section markers and uses OpenAI (chat completions) to map free
+       speech onto the app's diagnosis/diagnostic-test/treatment fields.
     3. Persist the recording + structured result and return it so the physician
        only has to review and confirm, instead of typing/clicking through every field.
 
     (Speaker recognition/matching isn't implemented — speaker_id/similarity_score
     below are just hardcoded neutral values.)
     """
-    if language not in LANGUAGE_MAP:
-        language = "en"
-    # TEMP DEBUG TIMING - remove after testing
-    t_request_start = time.time()
-    print(f"⏱️  [dictate] request received at t={t_request_start:.2f}")
+    had_language = language in LANGUAGE_MAP
 
     suffix = os.path.splitext(audio.filename)[-1] if audio.filename else ".webm"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -309,30 +307,18 @@ async def dictate(
     with open(audio_path, "wb") as f:
         f.write(content)
 
-    # TEMP DEBUG TIMING - remove after testing
-    print(f"⏱️  [dictate] audio saved (upload+write took {time.time() - t_request_start:.2f}s), size={len(content)} bytes")
-
     try:
-        t0 = time.time()  # TEMP DEBUG TIMING - remove after testing
         try:
-            result = transcribe_with_fallback(tmp_path, language=language)
+            result = transcribe_with_fallback(tmp_path, language=language if had_language else None)
         except Exception as e:
             return JSONResponse(status_code=422, content={"detail": f"Could not process the recording audio: {e}"})
         text = result["text"]
-        detected_code = result.get("language", language)
+        detected_code = language if had_language else detect_language(text)
         detected_language = LANGUAGE_MAP.get(detected_code, detected_code)
-
-        # TEMP DEBUG TIMING - remove after testing
-        t_whisper_done = time.time()
-        print(f"⏱️  [dictate] Transcription took {t_whisper_done - t0:.2f}s (audio duration ~{audio_duration_seconds(tmp_path):.1f}s)")
 
         speaker_id, similarity_score = None, 0.0
 
         structured = extract_structured(text)
-
-        # TEMP DEBUG TIMING - remove after testing
-        t_llm_done = time.time()
-        print(f"⏱️  [dictate] LLM extraction (Ollama) took {t_llm_done - t_whisper_done:.2f}s")
 
         doc = {
             "id": str(uuid.uuid4()),
@@ -348,9 +334,6 @@ async def dictate(
             "duration_seconds": audio_duration_seconds(tmp_path),
             "audio_filename": audio_filename,
         }
-
-        # TEMP DEBUG TIMING - remove after testing
-        print(f"⏱️  [dictate] TOTAL request time: {time.time() - t_request_start:.2f}s\n")
 
         return JSONResponse(content=doc)
 

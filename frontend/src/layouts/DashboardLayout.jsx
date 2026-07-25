@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Stethoscope,
+  LayoutDashboard, Stethoscope, Users, FileSignature,
   LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
@@ -14,7 +14,9 @@ const NAV_ITEMS = [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
   ]},
   { label: 'RECORDS', items: [
-    { to: '/analytics',   icon: Activity, text: 'Analytics' },
+    { to: '/analytics',      icon: Activity,        text: 'Analytics' },
+    { to: '/records',        icon: Users,           text: 'Patient Status' },
+    { to: '/documents/new',  icon: FileSignature,   text: 'Generate Document' },
   ]},
 ];
 

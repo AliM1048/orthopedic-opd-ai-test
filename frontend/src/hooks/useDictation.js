@@ -9,17 +9,26 @@ const API_BASE = 'http://localhost:8000';
 const PREVIEW_INTERVAL_MS = 4000;
 const PREVIEW_MIN_CHUNKS = 5; // ~0.5s at the 100ms timeslice below — skip near-empty previews
 
-export function useDictation({ patientId, language = 'en', onResult, onError }) {
+export function useDictation({ patientId, onResult, onError }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveCaption, setLiveCaption] = useState('');
+  // No more up-front language picker — this is identified from the first
+  // words spoken (see sendPreview) and then reused/forced for the rest of
+  // the recording, both for later live-preview chunks and the final /dictate
+  // call. Reset to null at the start of every new recording.
+  const [detectedLanguage, setDetectedLanguage] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const previewTimerRef = useRef(null);
   const previewBusyRef = useRef(false);
+  // Mirrors detectedLanguage for synchronous reads inside sendPreview/sendAudio
+  // callbacks, which close over state from whenever they were created —
+  // a ref always has the latest value without needing to resubscribe them.
+  const detectedLanguageRef = useRef(null);
 
   // Web Audio graph for the live waveform visualization — runs in parallel
   // with (not instead of) MediaRecorder; createMediaStreamSource taps the
@@ -42,19 +51,26 @@ export function useDictation({ patientId, language = 'en', onResult, onError }) 
       const ext = mimeType.includes('ogg') ? '.ogg' : '.webm';
       const formData = new FormData();
       formData.append('audio', blob, `preview${ext}`);
-      formData.append('language', language);
+      // Empty until detected — the backend then auto-detects from this
+      // chunk's text and hands the result back, which we lock in below so
+      // every later preview (and the final /dictate call) forces it.
+      formData.append('language', detectedLanguageRef.current || '');
 
       const res = await axios.post(`${API_BASE}/transcribe/preview`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (res.data?.text) setLiveCaption(res.data.text);
+      if (!detectedLanguageRef.current && res.data?.language) {
+        detectedLanguageRef.current = res.data.language;
+        setDetectedLanguage(res.data.language);
+      }
     } catch {
       // Best-effort only — a failed preview just means the caption doesn't
       // update this tick, nothing else depends on it.
     } finally {
       previewBusyRef.current = false;
     }
-  }, [language]);
+  }, []);
 
   const teardownAudioGraph = useCallback(() => {
     analyserRef.current = null;
@@ -67,11 +83,6 @@ export function useDictation({ patientId, language = 'en', onResult, onError }) 
 
   const startRecording = useCallback(async () => {
     try {
-      // Fire-and-forget: starts loading the Ollama model now so it's warm by
-      // the time the doctor finishes talking, instead of paying a cold-start
-      // reload (which can exceed the extraction timeout) on the real call.
-      axios.post(`${API_BASE}/llm/warmup`).catch(() => {});
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -84,6 +95,8 @@ export function useDictation({ patientId, language = 'en', onResult, onError }) 
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       setLiveCaption('');
+      detectedLanguageRef.current = null;
+      setDetectedLanguage(null);
 
       // A fresh AudioContext/AnalyserNode per recording — never reused across
       // cycles (a doctor may record multiple takes per visit).
@@ -142,7 +155,10 @@ export function useDictation({ patientId, language = 'en', onResult, onError }) 
       const formData = new FormData();
       formData.append('audio', blob, `dictation${ext}`);
       if (patientId) formData.append('patient_id', patientId);
-      formData.append('language', language);
+      // Whatever was detected from the first preview chunk, if any — see
+      // sendPreview. Left empty on a recording too short for a preview to
+      // have fired; the backend detects it from the full transcript instead.
+      formData.append('language', detectedLanguageRef.current || '');
 
       const res = await axios.post(`${API_BASE}/dictate`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -158,5 +174,5 @@ export function useDictation({ patientId, language = 'en', onResult, onError }) 
     }
   };
 
-  return { isRecording, isProcessing, elapsedSeconds, liveCaption, analyserRef, startRecording, stopRecording };
+  return { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording };
 }

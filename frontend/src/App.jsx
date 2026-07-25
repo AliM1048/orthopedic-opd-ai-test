@@ -14,6 +14,8 @@ import PreVisitAssessment from './pages/PreVisitAssessment';
 import PhysicianEvaluation from './pages/PhysicianEvaluation';
 import AllPatients from './pages/AllPatients';
 import Analytics from './pages/Analytics';
+import DocumentGenerator from './pages/DocumentGenerator';
+import PatientStatus from './pages/PatientStatus';
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
@@ -29,7 +31,9 @@ export default function App() {
     addEvaluation,
     updateEvaluation,
     addDiagnostic,
+    deleteDiagnostic,
     addTreatment,
+    deleteTreatment,
     markEvaluationSent,
     createPatient
   } = usePatients(token);
@@ -83,7 +87,9 @@ export default function App() {
                     onAddEvaluation={addEvaluation}
                     onUpdateEvaluation={updateEvaluation}
                     onAddDiagnostic={addDiagnostic}
+                    onDeleteDiagnostic={deleteDiagnostic}
                     onAddTreatment={addTreatment}
+                    onDeleteTreatment={deleteTreatment}
                     onMarkEvaluationSent={markEvaluationSent}
                   />
                 }
@@ -95,6 +101,14 @@ export default function App() {
               <Route
                 path="/analytics"
                 element={<Analytics patients={patients} />}
+              />
+              <Route
+                path="/records"
+                element={<PatientStatus patients={patients} />}
+              />
+              <Route
+                path="/documents/new"
+                element={<DocumentGenerator patients={patients} user={user} />}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

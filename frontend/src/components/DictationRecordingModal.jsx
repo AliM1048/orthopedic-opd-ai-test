@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Mic, Square, X, RotateCcw, Sparkles } from 'lucide-react';
+import { Mic, Square, X, RotateCcw, Sparkles, Globe2 } from 'lucide-react';
 
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'fr', label: 'Français' },
-];
+const LANGUAGE_LABELS = { en: 'English', ar: 'العربية', fr: 'Français' };
 
 function formatTimer(seconds) {
   const m = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -94,8 +90,7 @@ export default function DictationRecordingModal({
   elapsedSeconds,
   liveCaption,
   error,
-  language,
-  onLanguageChange,
+  detectedLanguage,
   analyserRef,
   onStartRecording,
   onStopRecording,
@@ -123,22 +118,8 @@ export default function DictationRecordingModal({
           </div>
           <p>
             Say &ldquo;Diagnosis&hellip;&rdquo;, then &ldquo;Diagnostics&hellip;&rdquo;, then &ldquo;Treatment plan&hellip;&rdquo; — click stop when done and it fills the chart automatically.
+            {idle && ' Speak in English, Arabic, or French — it’s detected automatically from what you say.'}
           </p>
-
-          {idle && (
-            <div className="dictation-lang-picker">
-              {LANGUAGES.map((l) => (
-                <button
-                  key={l.code}
-                  type="button"
-                  className={`dictation-lang-pill ${language === l.code ? 'active' : ''}`}
-                  onClick={() => onLanguageChange(l.code)}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          )}
 
           {!showError && (
             <>
@@ -165,7 +146,14 @@ export default function DictationRecordingModal({
               {isRecording && (
                 <>
                   <div className="record-timer-medical">{formatTimer(elapsedSeconds)}</div>
-                  <div className="record-status-medical">Recording the full visit… Click to stop</div>
+                  <div className="record-status-medical">
+                    Recording the full visit… Click to stop
+                    {detectedLanguage && (
+                      <span className="dictation-lang-badge">
+                        <Globe2 size={11} /> {LANGUAGE_LABELS[detectedLanguage] || detectedLanguage}
+                      </span>
+                    )}
+                  </div>
                   <div className="live-waveform-wrap">
                     <LiveWaveform analyserRef={analyserRef} active={isRecording} />
                   </div>

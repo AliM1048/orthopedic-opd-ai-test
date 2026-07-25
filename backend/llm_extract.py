@@ -7,22 +7,22 @@ Pipeline:
    treatment chunks using spoken keyword markers (e.g. "diagnosis...",
    "diagnostics...", "treatment plan..."). This is a deterministic, no-AI step
    so the split is predictable and doctors can learn the cues.
-2. extract_structured() sends the transcript + those chunks to a local Ollama
-   LLM, which maps free speech onto the app's fixed diagnostic-test / treatment
-   option lists and resolves relative dates ("in two weeks") to ISO dates.
-   If Ollama is unreachable, it falls back to the plain segmented text so the
-   page still works (just without AI-mapped tests/treatments).
+2. extract_structured() sends the transcript + those chunks to OpenAI
+   (chat completions, JSON mode), which maps free speech onto the app's fixed
+   diagnostic-test / treatment option lists and resolves relative dates
+   ("in two weeks") to ISO dates. If the API call fails, it falls back to the
+   plain segmented text so the page still works (just without AI-mapped
+   tests/treatments).
 """
 import os
 import re
 import json
 from datetime import datetime
 
-import requests
+from openai import OpenAI
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "60"))
+OPENAI_EXTRACT_MODEL = os.getenv("OPENAI_EXTRACT_MODEL", "gpt-4o-mini")
+_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Must stay in sync with frontend/src/data/mockData.js (DIAGNOSTIC_TESTS / TREATMENT_OPTIONS)
 DIAGNOSTIC_TESTS = {
@@ -135,6 +135,35 @@ _ARABIC_NORMALIZE_MAP = str.maketrans({
 
 def _normalize_arabic(text: str) -> str:
     return text.translate(_ARABIC_NORMALIZE_MAP)
+
+
+# Auto-detects which of the app's 3 supported languages a transcript is in,
+# from the transcript text itself — used to identify the dictation's language
+# from the first few words spoken (see main.py /transcribe/preview) so the
+# doctor doesn't have to pick a language up front, and so the rest of the
+# recording can then be transcribed with that language forced (more accurate
+# than leaving every chunk unforced/auto-detected — see run_transcription).
+# Arabic is unambiguous by Unicode script. English vs French (both Latin
+# script) is resolved by accented characters or common French stopwords;
+# English is the default when neither signal is present.
+_ARABIC_SCRIPT_PATTERN = re.compile(r"[؀-ۿ]")
+_FRENCH_SIGNAL_PATTERN = re.compile(
+    r"[àâäéèêëïîôöùûüÿœæç]"
+    r"|\b(le|la|les|des|une|un|est|dans|avec|pour|que|qui|vous|nous|votre|nos|et|au|aux|du|ce|cette|ces|douleur|traitement)\b",
+    re.I,
+)
+
+
+def detect_language(text: str) -> str:
+    """Best-effort en/ar/fr guess from transcribed text. Falls back to "en"
+    when the text is empty or carries no clear signal either way."""
+    if not text or not text.strip():
+        return "en"
+    if _ARABIC_SCRIPT_PATTERN.search(text):
+        return "ar"
+    if _FRENCH_SIGNAL_PATTERN.search(text):
+        return "fr"
+    return "en"
 
 
 def keyword_match(text: str, synonyms: dict) -> list[str]:
@@ -400,49 +429,18 @@ def _clean_date(value):
     return cleaned or None
 
 
-def warm_up_ollama():
-    """Start loading the model into memory/VRAM ahead of time. Ollama unloads
-    idle models after ~5 minutes, and a cold reload can take long enough to
-    blow past OLLAMA_TIMEOUT_SECONDS on the real extraction call. Call this
-    the moment the doctor starts recording so the model is already warm by
-    the time they finish dictating.
-
-    This already runs inside a FastAPI BackgroundTask (i.e. after the HTTP
-    response to the browser has been sent), so there is no reason to cut the
-    request short with a tight client timeout — doing that previously was
-    actively counterproductive: Ollama is a Go server that cancels the
-    in-flight model load when the client disconnects, so a short timeout here
-    aborted the warm-up instead of completing it.
-    """
+def call_openai_extract(prompt: str) -> dict | None:
     try:
-        requests.post(
-            f"{OLLAMA_HOST}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": "", "keep_alive": "30m"},
-            timeout=OLLAMA_TIMEOUT_SECONDS,
+        resp = _openai_client.chat.completions.create(
+            model=OPENAI_EXTRACT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0,
         )
-    except Exception as e:
-        print(f"⚠️ Ollama warm-up failed (will still try at extraction time): {e}")
-
-
-def call_ollama(prompt: str) -> dict | None:
-    try:
-        resp = requests.post(
-            f"{OLLAMA_HOST}/api/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "format": "json",
-                "stream": False,
-                "keep_alive": "30m",
-                "options": {"temperature": 0},
-            },
-            timeout=OLLAMA_TIMEOUT_SECONDS,
-        )
-        resp.raise_for_status()
-        raw = resp.json().get("response", "")
+        raw = resp.choices[0].message.content or ""
         return json.loads(raw)
     except Exception as e:
-        print(f"⚠️ Ollama extraction unavailable, falling back to plain text ({e})")
+        print(f"⚠️ OpenAI extraction unavailable, falling back to plain text ({e})")
         return None
 
 
@@ -469,12 +467,12 @@ def extract_structured(transcript: str) -> dict:
             "sections": sections, "ai_structured": False,
         }
 
-    parsed = call_ollama(_build_prompt(transcript, sections))
+    parsed = call_openai_extract(_build_prompt(transcript, sections))
 
     if parsed is None:
-        # Ollama unreachable: still honor the keyword-matched tests/treatments
-        # so voice selection works even with the LLM down — just without an
-        # AI-written diagnosis/notes/duration/follow-up date.
+        # Extraction call failed: still honor the keyword-matched
+        # tests/treatments so voice selection works even with the API down —
+        # just without an AI-written diagnosis/notes/duration/follow-up date.
         treatments = [
             {"type": t, "duration": "", "details": "", "followUpDate": None}
             for t in keyword_treatment_types
