@@ -94,6 +94,7 @@ export default function DictationRecordingModal({
   analyserRef,
   onStartRecording,
   onStopRecording,
+  onCancel,
   onRetry,
   onClose,
 }) {
@@ -157,16 +158,24 @@ export default function DictationRecordingModal({
                   <div className="live-waveform-wrap">
                     <LiveWaveform analyserRef={analyserRef} active={isRecording} />
                   </div>
+                  <button type="button" className="dictation-cancel-btn" onClick={onCancel}>
+                    <X size={13} /> Cancel
+                  </button>
                 </>
               )}
 
               {isProcessing && (
-                <div className="dictation-processing-status">
-                  <span className="dictation-processing-dot" />
-                  <span className="dictation-processing-dot" />
-                  <span className="dictation-processing-dot" />
-                  <span style={{ marginLeft: 8 }}>Transcribing &amp; filling the chart&hellip;</span>
-                </div>
+                <>
+                  <div className="dictation-processing-status">
+                    <span className="dictation-processing-dot" />
+                    <span className="dictation-processing-dot" />
+                    <span className="dictation-processing-dot" />
+                    <span style={{ marginLeft: 8 }}>Transcribing &amp; filling the chart&hellip;</span>
+                  </div>
+                  <button type="button" className="dictation-cancel-btn" onClick={onCancel}>
+                    <X size={13} /> Cancel
+                  </button>
+                </>
               )}
 
               {isRecording && (

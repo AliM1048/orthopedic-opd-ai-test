@@ -25,6 +25,14 @@ export function useDictation({ patientId, onResult, onError }) {
   const timerRef = useRef(null);
   const previewTimerRef = useRef(null);
   const previewBusyRef = useRef(false);
+  // Set by cancelRecording() so the MediaRecorder's onstop handler (which
+  // fires either way once .stop() is called) discards the take instead of
+  // sending it off for transcription. Cleared at the start of every
+  // recording so cancelling one take never affects the next.
+  const cancelledRef = useRef(false);
+  // Lets cancelRecording() abort an in-flight /dictate call too, not just a
+  // still-recording take — "cancel" should work during processing as well.
+  const abortControllerRef = useRef(null);
   // Mirrors detectedLanguage for synchronous reads inside sendPreview/sendAudio
   // callbacks, which close over state from whenever they were created —
   // a ref always has the latest value without needing to resubscribe them.
@@ -94,6 +102,7 @@ export function useDictation({ patientId, onResult, onError }) {
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
+      cancelledRef.current = false;
       setLiveCaption('');
       detectedLanguageRef.current = null;
       setDetectedLanguage(null);
@@ -119,6 +128,7 @@ export function useDictation({ patientId, onResult, onError }) {
         // analyser goes silent anyway) and tear down the audio graph.
         teardownAudioGraph();
         stream.getTracks().forEach((t) => t.stop());
+        if (cancelledRef.current) return; // discard the take — see cancelRecording
         const blob = new Blob(chunksRef.current, { type: mimeType });
         await sendAudio(blob, mimeType);
       };
@@ -149,7 +159,26 @@ export function useDictation({ patientId, onResult, onError }) {
     }
   }, [isRecording]);
 
+  // Discards the current take instead of transcribing it — works whether
+  // still recording (skips sendAudio entirely, see onstop above) or already
+  // mid-transcription (aborts the in-flight /dictate request instead).
+  const cancelRecording = useCallback(() => {
+    if (isRecording) {
+      cancelledRef.current = true;
+      clearInterval(timerRef.current);
+      clearInterval(previewTimerRef.current);
+      setIsRecording(false);
+      mediaRecorderRef.current?.stop();
+      setElapsedSeconds(0);
+      setLiveCaption('');
+    } else if (isProcessing) {
+      abortControllerRef.current?.abort();
+    }
+  }, [isRecording, isProcessing]);
+
   const sendAudio = async (blob, mimeType) => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
       const ext = mimeType.includes('ogg') ? '.ogg' : '.webm';
       const formData = new FormData();
@@ -162,10 +191,12 @@ export function useDictation({ patientId, onResult, onError }) {
 
       const res = await axios.post(`${API_BASE}/dictate`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        signal: controller.signal,
       });
 
       onResult(res.data);
     } catch (err) {
+      if (axios.isCancel(err) || err.code === 'ERR_CANCELED') return; // user cancelled — no error to show
       const msg = err.response?.data?.detail || err.message || 'Dictation processing failed';
       onError(msg);
     } finally {
@@ -174,5 +205,5 @@ export function useDictation({ patientId, onResult, onError }) {
     }
   };
 
-  return { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording };
+  return { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording, cancelRecording };
 }

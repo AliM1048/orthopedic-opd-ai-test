@@ -622,18 +622,21 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       })));
   };
 
-  const { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording } =
+  const { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording, cancelRecording } =
     useDictation({ patientId, onResult: handleDictationResult, onError: setError });
 
   const { diagnosticTests, treatmentOptions } = useLookup();
   const assessmentConfig = useAssessmentConfig(latestAssessment?.bodyArea || patient?.bodyArea);
 
-  // Opens the modal in its idle state (language picker visible) — recording
-  // itself starts when the doctor clicks the mic inside the modal, once
-  // they've picked a language, not the instant the modal opens.
+  // Opens the modal in its idle state — recording itself starts when the
+  // doctor clicks the mic inside the modal, not the instant the modal opens.
   const handleStartDictation = () => { setDictation(null); setError(null); setShowDictationModal(true); };
   const handleRetryDictation  = () => { setError(null); startRecording(); };
   const handleCloseDictationModal = () => { setShowDictationModal(false); setError(null); };
+  // Discards the current take (recording or in-flight transcription) and
+  // closes the modal — see useDictation's cancelRecording for what this
+  // aborts under the hood.
+  const handleCancelDictation = () => { cancelRecording(); setShowDictationModal(false); setError(null); };
 
   const handleSaveAll = () => {
     if (!diagnosis.trim() && !notes.trim()) return;
@@ -1367,6 +1370,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         analyserRef={analyserRef}
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
+        onCancel={handleCancelDictation}
         onRetry={handleRetryDictation}
         onClose={handleCloseDictationModal}
       />
