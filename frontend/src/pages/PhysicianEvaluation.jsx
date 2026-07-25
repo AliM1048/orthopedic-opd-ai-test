@@ -6,6 +6,7 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
 import Swal from 'sweetalert2';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
+import { getOdiNdiInterpretation } from '../utils/scoring';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
@@ -802,6 +803,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const promName = assessmentConfig?.promName || assessmentConfig?.title || 'PROM';
   const scoreDirection = assessmentConfig?.scoreDirection || 'higher_better';
   const finalScore = resolveFinalScore(latestAssessment);
+  const disabilityInterpretation = latestAssessment?.interpretation || getOdiNdiInterpretation(finalScore);
   const directionCaption = scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function';
 
   // Pain NRS score (0-10) — real only, straight from the shared pain_scale
@@ -979,6 +981,12 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{directionCaption}</div>
+                    {disabilityInterpretation && (
+                      <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Disability Severity</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{disabilityInterpretation.label}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -37,6 +37,7 @@ class Assessment(Base):
     chiefComplaint = Column(String, nullable=True)
     answers = Column(JSON, nullable=True)
     finalScore = Column(Integer, nullable=True)
+    interpretation = Column(JSON, nullable=True)
     promCode = Column(String, nullable=True)
 
 

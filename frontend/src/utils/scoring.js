@@ -30,6 +30,23 @@ export function calculateSectionScore(answers, questions) {
 
 // ─── Standardized PROM scoring (KOOS-JR / HOOS-JR / QuickDASH / ODI / NDI / SEFAS) ──
 
+export function getOdiNdiInterpretation(score) {
+  if (score === null || score === undefined) return null;
+  if (score <= 20) {
+    return { label: 'Minimal disability', severity: 'mild', range: '0–20%' };
+  }
+  if (score <= 40) {
+    return { label: 'Moderate disability', severity: 'moderate', range: '21–40%' };
+  }
+  if (score <= 60) {
+    return { label: 'Severe disability', severity: 'severe', range: '41–60%' };
+  }
+  if (score <= 80) {
+    return { label: 'Crippled', severity: 'very_severe', range: '61–80%' };
+  }
+  return { label: 'Bed-bound or symptom exaggeration', severity: 'critical', range: '81–100%' };
+}
+
 // ODI / NDI: (total / (answered * 5)) * 100 — 0 = best (no disability), 100 = worst.
 export function calculatePercentOfMax(answers, questions) {
   const scoredQs = questions.filter(q => q.scoreValues);
@@ -37,7 +54,7 @@ export function calculatePercentOfMax(answers, questions) {
   const answered = scoredQs.filter(q => answers[q.id] !== undefined && answers[q.id] !== null);
   if (!answered.length) return null;
   const total = answered.reduce((acc, q) => acc + (q.scoreValues[answers[q.id]] || 0), 0);
-  return Math.round((total / (answered.length * 5)) * 100);
+  return Math.round((total / (answered.length * 5)) * 1000) / 10;
 }
 
 // SEFAS: (raw / rawMax) * 100 — item scoreValues are already oriented so
@@ -77,7 +94,9 @@ export function computeFinalScore(config, answers) {
   if (!answered.length) return null;
 
   const raw = answered.reduce((acc, q) => acc + (q.scoreValues[answers[q.id]] || 0), 0);
-  const rawMax = config.rawMax ?? scored.reduce((acc, q) => acc + Math.max(...q.scoreValues), 0);
+  const rawMax = config.scoreCalculation === 'odi_ndi'
+    ? answered.length * 5
+    : (config.rawMax ?? scored.reduce((acc, q) => acc + Math.max(...q.scoreValues), 0));
 
   let final;
   switch (config.scoreCalculation) {
@@ -97,10 +116,15 @@ export function computeFinalScore(config, answers) {
       final = rawMax ? Math.round((raw / rawMax) * 100) : null;
   }
 
+  const interpretation = config.scoreCalculation === 'odi_ndi'
+    ? getOdiNdiInterpretation(final)
+    : null;
+
   return {
     raw, rawMax, final,
     direction: config.scoreDirection || 'higher_better',
     promCode: config.scoreCalculation || 'generic',
     promName: config.promName || config.title,
+    interpretation,
   };
 }

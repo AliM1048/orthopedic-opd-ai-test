@@ -167,6 +167,7 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
       score: result?.raw ?? 0,
       maxScore: result?.rawMax ?? 0,
       finalScore: result?.final ?? null,
+      interpretation: result?.interpretation ?? null,
       promCode: result?.promCode ?? null,
       bodyArea: patient?.bodyArea,
       completedBy: 'Nurse Sara',

@@ -77,6 +77,7 @@ def on_startup():
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"chiefComplaint\" VARCHAR"))
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"sentToPatient\" BOOLEAN NOT NULL DEFAULT FALSE"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" INTEGER"))
+            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"interpretation\" JSON"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"promCode\" VARCHAR"))
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"promName\" VARCHAR"))
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"scoreCalculation\" VARCHAR NOT NULL DEFAULT 'generic'"))

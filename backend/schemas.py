@@ -13,6 +13,7 @@ class AssessmentOut(BaseModel):
     chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
     finalScore: Optional[int] = None
+    interpretation: Optional[dict] = None
     promCode: Optional[str] = None
 
     class Config:
@@ -126,6 +127,7 @@ class AssessmentCreate(BaseModel):
     chiefComplaint: Optional[str] = None
     answers: Optional[dict] = None
     finalScore: Optional[int] = None
+    interpretation: Optional[dict] = None
     promCode: Optional[str] = None
 
 
