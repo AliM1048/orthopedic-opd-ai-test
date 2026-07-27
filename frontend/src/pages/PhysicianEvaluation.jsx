@@ -10,6 +10,7 @@ import { getOdiNdiInterpretation } from '../utils/scoring';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
+import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -385,11 +386,17 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           boxShadow: '0 8px 32px rgba(0,0,0,0.08)', overflow: 'hidden',
           position: 'sticky', top: 80,
         }}>
-          {/* Document header */}
-          <div style={{ background: 'linear-gradient(135deg,#1a6fdb 0%,#6366f1 100%)', padding: '20px 24px', color: '#fff' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD — Clinical Summary</div>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>Doctor's Orders Summary</div>
-            <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>{patient?.name} · {today}</div>
+          {/* Document header — hospital letterhead */}
+          <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #33AEB8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <img src={rasoulLogo} alt="Al-Rasoul Al-Aazam Hospital" style={{ width: 48, height: 48, flexShrink: 0, objectFit: 'contain' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Al-Rasoul Al-Aazam Hospital</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD — Clinical Summary</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>Doctor's Orders Summary</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{patient?.name} · {today}</div>
           </div>
 
           {/* Patient strip */}
