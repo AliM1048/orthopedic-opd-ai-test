@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -12,12 +13,56 @@ import uuid
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
+FOLLOW_UP_LEAD_DAYS = 3
+# Statuses that represent "nothing currently pending" for this patient — safe
+# to roll over into the follow-up call queue. A patient with an active
+# pending call is left alone rather than being bumped out of that queue.
+FOLLOW_UP_ELIGIBLE_STATUSES = {"completed", "assessment-completed"}
+
+
+def _parse_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _is_follow_up_due(treatments, assessments):
+    today = date.today()
+    completed_follow_ups = [
+        d for a in assessments if a.type == "Follow-Up" for d in [_parse_date(a.date)] if d
+    ]
+    for t in treatments:
+        follow_up_date = _parse_date(t.followUpDate)
+        if not follow_up_date:
+            continue
+        due_from = follow_up_date - timedelta(days=FOLLOW_UP_LEAD_DAYS)
+        if today < due_from:
+            continue
+        # A follow-up assessment already completed for this follow-up window
+        # means it's handled — don't re-flag it as due again.
+        if any(d >= due_from for d in completed_follow_ups):
+            continue
+        return True
+    return False
+
 
 def _build_patient(patient: Patient, db: Session) -> PatientOut:
     assessments = db.query(Assessment).filter(Assessment.patient_id == patient.id).all()
     evaluations = db.query(Evaluation).filter(Evaluation.patient_id == patient.id).all()
     diagnostics = db.query(Diagnostic).filter(Diagnostic.patient_id == patient.id).all()
     treatments = db.query(Treatment).filter(Treatment.patient_id == patient.id).all()
+
+    # Roll the patient into the existing 'follow-up' status bucket once their
+    # follow-up date is within FOLLOW_UP_LEAD_DAYS — this reuses the nurse
+    # dashboard's stat card, filter chip, and "Follow-Up" action button as-is,
+    # so nothing downstream needs its own copy of this date check.
+    if patient.status in FOLLOW_UP_ELIGIBLE_STATUSES and _is_follow_up_due(treatments, assessments):
+        patient.status = "follow-up"
+        db.commit()
+
     return PatientOut(
         **{c.name: getattr(patient, c.name) for c in patient.__table__.columns},
         assessments=[AssessmentOut.model_validate(a) for a in assessments],
