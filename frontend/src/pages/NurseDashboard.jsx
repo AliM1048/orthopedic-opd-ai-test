@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, PhoneCall, ArrowRight } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
+import api from '../api';
 
 export default function NurseDashboard({ patients, onUpdateStatus, createPatient }) {
   const [search, setSearch] = useState('');
@@ -11,6 +12,14 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
     name: '', mrn: '', age: 30, gender: 'Male', dob: '', bodyArea: 'Knee', appointmentDate: '', appointmentTime: '', phone: '', email: '', address: '', bloodType: 'O+', allergies: '', avatar: '#7c3aed'
   });
   const navigate = useNavigate();
+
+  // Pre-visit call reminders — 2 days before a patient's scheduled 3/6/9-month
+  // PROM check-in, so it never gets missed. Full management lives on
+  // /followups; this is just the "look here today" prompt.
+  const [dueCalls, setDueCalls] = useState([]);
+  useEffect(() => {
+    api.get('/api/followups/due').then((res) => setDueCalls(res.data)).catch(() => setDueCalls([]));
+  }, []);
 
   const filtered = useMemo(() => {
     let list = patients;
@@ -73,6 +82,40 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
             </div>
           </div>
         </div>
+
+        {/* Pre-Visit Call Reminders — due within 2 days */}
+        {dueCalls.length > 0 && (
+          <div className="card" style={{ marginBottom: 16, borderColor: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 4%, var(--surface))' }}>
+            <div className="card-header">
+              <div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <PhoneCall size={15} style={{ color: 'var(--danger)' }} />
+                  Pre-Visit Calls Due
+                </div>
+                <div className="card-subtitle">{dueCalls.length} patient{dueCalls.length !== 1 ? 's' : ''} need a follow-up PROM call in the next 2 days</div>
+              </div>
+              <button className="btn btn-outline btn-sm" onClick={() => navigate('/followups')}>
+                View All <ArrowRight size={14} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {dueCalls.slice(0, 4).map((call) => (
+                <div key={call.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                  <div className="patient-avatar" style={{ background: call.patientAvatar, width: 32, height: 32, fontSize: 12 }}>
+                    {call.patientName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{call.intervalMonths}-month check-in · scheduled {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}</div>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => navigate(`/assessment?patient=${call.patient_id}`)}>
+                    Start Call
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filters & Search */}
         <div className="card">

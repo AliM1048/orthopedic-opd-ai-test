@@ -2,16 +2,19 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Stethoscope, Users, FileSignature,
-  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon
+  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon, ClipboardList
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { label: 'NURSE', items: [
-    { to: '/',           icon: LayoutDashboard, text: 'Dashboard' },
+    { to: '/',            icon: LayoutDashboard, text: 'Dashboard' },
   ]},
   { label: 'PHYSICIAN', items: [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
+  ]},
+  { label: 'CLERK', items: [
+    { to: '/clerk-tasks', icon: ClipboardList, text: 'PROM Tasks' },
   ]},
   { label: 'RECORDS', items: [
     { to: '/analytics',      icon: Activity,        text: 'Analytics' },
@@ -47,7 +50,7 @@ export default function DashboardLayout({ children, user }) {
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon"><Activity size={20} /></div>
           <div className="sidebar-logo-text">
-            <h2>OrthoOPD</h2>
+            <h2>OPD AI Unit</h2>
             <p>Patient Management</p>
           </div>
           <button
@@ -88,7 +91,7 @@ export default function DashboardLayout({ children, user }) {
             <div className="sidebar-avatar">{user?.name?.split(' ').map((w) => w[0]).join('').slice(0, 2) || 'NS'}</div>
             <div className="sidebar-user-text">
               <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>{user?.name || 'User'}</div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>{user?.role === 'physician' ? 'Physician' : 'Orthopedic Ward'}</div>
+              <div style={{ fontSize: 11, color: 'var(--sidebar-text)' }}>{user?.role === 'physician' ? 'Physician' : 'Orthopedic Ward'}</div>
             </div>
             <button
               type="button"

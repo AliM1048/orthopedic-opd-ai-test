@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid } from 'lucide-react';
+import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall } from 'lucide-react';
+import Swal from 'sweetalert2';
+import api from '../../api';
 import StatusBadge from '../common/StatusBadge';
+import FollowUpScheduleModal from './FollowUpScheduleModal';
 
 function latestByDate(items) {
   if (!items || items.length === 0) return null;
@@ -14,7 +17,28 @@ const TABS = [
   { key: 'evaluations', label: 'Evaluations', icon: Stethoscope },
   { key: 'diagnostics', label: 'Diagnostics', icon: FileText },
   { key: 'treatments', label: 'Treatments', icon: Pill },
+  { key: 'followups', label: 'Follow-Ups', icon: CalendarClock },
 ];
+
+const successToast = Swal.mixin({
+  toast: true, position: 'top-end', showConfirmButton: false, timer: 1800, timerProgressBar: true,
+  didOpen: (el) => { el.addEventListener('mouseenter', Swal.stopTimer); el.addEventListener('mouseleave', Swal.resumeTimer); },
+});
+const notifySuccess = (title) => successToast.fire({ icon: 'success', title });
+const notifyError = (title) => successToast.fire({ icon: 'error', title, timer: 3000 });
+
+const REMINDER_LEAD_DAYS = 2;
+function todayIso() { return new Date().toISOString().split('T')[0]; }
+function addDaysIso(iso, days) { const d = new Date(iso); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0]; }
+function callBucket(call) {
+  if (call.status === 'completed') return 'completed';
+  return call.scheduledDate <= addDaysIso(todayIso(), REMINDER_LEAD_DAYS) ? 'due' : 'upcoming';
+}
+const BUCKET_META = {
+  due:       { label: 'Due Soon',  badgeClass: 'badge-danger' },
+  upcoming:  { label: 'Upcoming',  badgeClass: 'badge-completed' },
+  completed: { label: 'Completed', badgeClass: 'badge-active' },
+};
 
 // The patient-record body shared by the /patient/:id profile page and the
 // Patient Status master-detail page — assumes `patient` is always a real
@@ -23,6 +47,54 @@ const TABS = [
 export default function PatientRecordPanel({ patient }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Recurring PROM follow-up calls (e.g. 3/6/9 months out) for this patient —
+  // see backend/routers/followups.py. Fetched here (not in a page-level
+  // component) so both the /patient/:id profile and the Patient Status
+  // master-detail view get it automatically.
+  const [followUps, setFollowUps] = useState([]);
+  const [followUpsLoaded, setFollowUpsLoaded] = useState(false);
+  const [showAddCall, setShowAddCall] = useState(false);
+  const [newCallDate, setNewCallDate] = useState('');
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  const reloadFollowUps = useCallback(() => {
+    api.get(`/api/patients/${patient.id}/followups`)
+      .then((res) => setFollowUps(res.data))
+      .catch(() => setFollowUps([]))
+      .finally(() => setFollowUpsLoaded(true));
+  }, [patient.id]);
+
+  useEffect(() => { reloadFollowUps(); }, [reloadFollowUps]);
+
+  const handleReschedule = (callId, newDate) => {
+    if (!newDate) return;
+    api.patch(`/api/followups/${callId}`, { scheduledDate: newDate })
+      .then(() => { notifySuccess('Rescheduled'); reloadFollowUps(); })
+      .catch(() => notifyError('Failed to reschedule'));
+  };
+
+  const handleAddCall = () => {
+    if (!newCallDate) return;
+    api.post(`/api/patients/${patient.id}/followups`, { scheduledDate: newCallDate })
+      .then(() => { notifySuccess('Call added'); setShowAddCall(false); setNewCallDate(''); reloadFollowUps(); })
+      .catch(() => notifyError('Failed to add call'));
+  };
+
+  const handleDeleteCall = async (call) => {
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: 'Remove this follow-up call?',
+      text: call.scheduledDate,
+      showCancelButton: true,
+      confirmButtonText: 'Remove',
+      confirmButtonColor: 'var(--danger)',
+    }).then((r) => r.isConfirmed);
+    if (!confirmed) return;
+    api.delete(`/api/followups/${call.id}`)
+      .then(() => { notifySuccess('Call removed'); reloadFollowUps(); })
+      .catch(() => notifyError('Failed to remove'));
+  };
 
   const latestEvaluation = latestByDate(patient.evaluations);
   const latestTreatment = latestByDate(patient.treatments);
@@ -230,6 +302,93 @@ export default function PatientRecordPanel({ patient }) {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'followups' && (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title"><CalendarClock size={16} style={{ display: 'inline', marginRight: 6 }} />PROM Follow-Up Calls</div>
+              <div className="card-subtitle">Recurring check-in calls (e.g. 3/6/9 months out) — reminders surface {REMINDER_LEAD_DAYS} days before each one.</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowScheduleModal(true)}>
+                <Settings2 size={14} /> Schedule Interval
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddCall((s) => !s)}>
+                <Plus size={14} /> Add Call
+              </button>
+            </div>
+          </div>
+
+          {showAddCall && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <input type="date" className="form-control" style={{ maxWidth: 200 }} value={newCallDate} onChange={(e) => setNewCallDate(e.target.value)} />
+              <button className="btn btn-primary btn-sm" onClick={handleAddCall} disabled={!newCallDate}>Save</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddCall(false); setNewCallDate(''); }}>Cancel</button>
+            </div>
+          )}
+
+          {!followUpsLoaded ? (
+            <p className="text-muted">Loading…</p>
+          ) : followUps.length === 0 ? (
+            <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>No follow-up calls scheduled yet.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Check-In</th><th>Scheduled Date</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {followUps.map((call) => {
+                    const bucket = callBucket(call);
+                    const meta = BUCKET_META[bucket];
+                    return (
+                      <tr key={call.id} style={{ cursor: 'default' }}>
+                        <td>{call.intervalMonths ? `${call.intervalMonths}-month` : 'Custom'}</td>
+                        <td>
+                          {call.status === 'pending' ? (
+                            <input type="date" className="form-control" style={{ width: 150, padding: '6px 10px', fontSize: 13 }} value={call.scheduledDate} onChange={(e) => handleReschedule(call.id, e.target.value)} />
+                          ) : (
+                            <span className="text-sm">{call.scheduledDate}</span>
+                          )}
+                        </td>
+                        <td><span className={`badge ${meta.badgeClass}`}><span className="badge-dot" />{meta.label}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {call.status === 'pending' && (
+                              <button className="btn btn-primary btn-sm" onClick={() => navigate(`/assessment?patient=${patient.id}`)}>
+                                <PhoneCall size={13} /> Start Call
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCall(call)}
+                              title="Remove"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 12%, transparent)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showScheduleModal && (
+        <FollowUpScheduleModal
+          patient={patient}
+          onClose={() => setShowScheduleModal(false)}
+          onSaved={() => { setShowScheduleModal(false); reloadFollowUps(); }}
+        />
       )}
     </>
   );

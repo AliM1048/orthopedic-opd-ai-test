@@ -22,7 +22,7 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
         id="print-doc-root"
       >
         {/* Letterhead */}
-        <div style={{ padding: '24px 32px 18px', borderBottom: '3px solid #33AEB8' }}>
+        <div style={{ padding: '24px 32px 18px', borderBottom: '3px solid #0369a1' }}>
           <button onClick={onClose} className="no-print" style={{ float: 'right', background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#64748b', fontSize: 18, lineHeight: 1 }}>×</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src={rasoulLogo} alt="Al-Rasoul Al-Aazam Hospital" style={{ width: 64, height: 64, flexShrink: 0, objectFit: 'contain' }} />
@@ -61,7 +61,7 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
           </table>
 
           {order.note && (
-            <div style={{ marginTop: 14, background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', fontWeight: 600 }}>
+            <div style={{ marginTop: 14, background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#b45309', fontWeight: 600 }}>
               {order.note}
             </div>
           )}
@@ -83,7 +83,7 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
         {/* Action buttons */}
         <div className="no-print" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '14px 32px', display: 'flex', gap: 10, justifyContent: 'flex-end', borderRadius: '0 0 16px 16px' }}>
           <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#475569' }}>Close</button>
-          <button onClick={handlePrint} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1a6fdb,#6366f1)', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={handlePrint} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
             🖨 Print Document
           </button>
         </div>

@@ -2,14 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
-         Zap, TrendingUp, Activity, FileText, Trash2 } from 'lucide-react';
+         Zap, TrendingUp, Activity, FileText, Trash2, History, Search, ListChecks,
+         AlertTriangle, Clock3 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../api';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import { getOdiNdiInterpretation } from '../utils/scoring';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
+import PromAssignmentModal from '../components/PromAssignmentModal';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
 
 const API_BASE = 'http://localhost:8000';
@@ -45,6 +48,39 @@ function notifyError(title) {
 function latestByDate(items) {
   if (!items || items.length === 0) return null;
   return [...items].sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
+/* ── Clinical Note (SOAP-style) ──────────────────────────────────────────── */
+const SOAP_SECTIONS = [
+  { id: 'chiefComplaint', label: 'Chief Complaint', icon: Stethoscope, rows: 2,
+    placeholder: 'e.g. Right knee pain for 3 weeks, worse going up stairs.' },
+  { id: 'historyOfPresentIllness', label: 'History of Present Illness', icon: History, rows: 4,
+    placeholder: 'Onset, duration, character, aggravating/relieving factors…' },
+  { id: 'pastMedicalHistory', label: 'Past Medical History', icon: FileText, rows: 3,
+    placeholder: 'Relevant prior conditions, surgeries, medications — leave blank if none.' },
+  { id: 'examination', label: 'Examination', icon: Search, rows: 4,
+    placeholder: 'Inspection, palpation, range of motion, special tests…' },
+  { id: 'assessment', label: 'Assessment', icon: ClipboardList, rows: 3,
+    placeholder: 'Clinical assessment / diagnosis…' },
+  { id: 'plan', label: 'Plan', icon: ListChecks, rows: 4,
+    placeholder: 'Management plan — tests, treatment, follow-up…' },
+];
+
+const EMPTY_SOAP = SOAP_SECTIONS.reduce((acc, s) => ({ ...acc, [s.id]: '' }), {});
+
+// The evaluation's `diagnosis`/`notes` columns are kept for older pages that
+// still read them directly (patient timeline, analytics diagnosis tally,
+// print views) — this derives both from the structured note so there's one
+// source of truth (`soap`) instead of two things that can drift apart.
+function deriveLegacyFields(soap) {
+  const assessmentText = (soap.assessment || '').trim();
+  const diagnosis = assessmentText.split('\n')[0].trim();
+  const notes = SOAP_SECTIONS
+    .map((s) => [s.label, (soap[s.id] || '').trim()])
+    .filter(([, text]) => text)
+    .map(([label, text]) => `${label}:\n${text}`)
+    .join('\n\n');
+  return { diagnosis, notes };
 }
 
 /* ── Workflow Steps ──────────────────────────────────────────────────────── */
@@ -149,10 +185,10 @@ function SCard({ title, icon: Icon, children, style = {} }) {
 /* ── Imaging status badge ───────────────────────────────────────────────── */
 function StatusBadge({ status }) {
   const cfg = {
-    completed: { label: 'Done',    color: '#10b981' },
-    pending:   { label: 'Pending', color: '#f59e0b' },
+    completed: { label: 'Done',    color: '#059669' },
+    pending:   { label: 'Pending', color: '#d97706' },
     ordered:   { label: 'Ordered', color: '#6366f1' },
-  }[status] || { label: status, color: '#94a3b8' };
+  }[status] || { label: status, color: '#7a9a9e' };
   return (
     <span style={{
       fontSize: 10, fontWeight: 700, padding: '2px 8px',
@@ -182,10 +218,10 @@ function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children })
 
 /* ── Review & Print View ─────────────────────────────────────────────────── */
 const ORDER_STATUS_COLORS = {
-  pending: '#f59e0b',
-  active: '#10b981',
-  completed: '#10b981',
-  scheduled: '#3b82f6',
+  pending: '#d97706',
+  active: '#059669',
+  completed: '#059669',
+  scheduled: '#0369a1',
 };
 
 function iconForName(name, options) {
@@ -203,7 +239,7 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
     icon: iconForName(t.type, treatmentOptions),
     title: `${t.type} Order`,
     status: t.status,
-    statusColor: ORDER_STATUS_COLORS[t.status] || '#94a3b8',
+    statusColor: ORDER_STATUS_COLORS[t.status] || '#7a9a9e',
     summary: t.details || t.type,
     details: `Duration: ${t.duration}`,
     note: null,
@@ -224,7 +260,7 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
     icon: iconForName(d.type, diagnosticTests),
     title: `${d.type} Request`,
     status: d.status,
-    statusColor: ORDER_STATUS_COLORS[d.status] || '#94a3b8',
+    statusColor: ORDER_STATUS_COLORS[d.status] || '#7a9a9e',
     summary: d.type,
     details: d.result || 'Pending results',
     note: null,
@@ -260,7 +296,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           </div>
         </div>
         <div className="topbar-right">
-          <button onClick={() => window.print()} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1a6fdb,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <button onClick={() => window.print()} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             🖨 Print Full Summary
           </button>
         </div>
@@ -387,7 +423,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           position: 'sticky', top: 80,
         }}>
           {/* Document header — hospital letterhead */}
-          <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #33AEB8' }}>
+          <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #0369a1' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <img src={rasoulLogo} alt="Al-Rasoul Al-Aazam Hospital" style={{ width: 48, height: 48, flexShrink: 0, objectFit: 'contain' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -466,7 +502,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 
           {/* Print full doc button */}
           <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', gap: 8 }}>
-            <button onClick={() => window.print()} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1a6fdb,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={() => window.print()} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               🖨 Print Full Document
             </button>
           </div>
@@ -495,8 +531,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const physicianName = user?.name || 'Physician';
   const latestAssessment = patient ? latestByDate(patient.assessments) : null;
 
-  const [diagnosis, setDiagnosis]             = useState('');
-  const [notes, setNotes]                     = useState('');
+  const [soap, setSoap]                       = useState(EMPTY_SOAP);
   const [selectedTests, setSelectedTests]     = useState([]);
   const [treatments, setTreatments]           = useState([]);
   const [dictation, setDictation]             = useState(null);
@@ -518,20 +553,59 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const [showReview, setShowReview] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState(null);
 
-  // Seed diagnosis/notes from the most recent saved evaluation once per
+  // Seed the SOAP note from the most recent saved evaluation once per
   // patient, so reopening an existing evaluation is editable too — not just
-  // a fresh dictation. Only fills in what's actually blank so it never
-  // clobbers an in-progress dictation or edit.
+  // a fresh dictation. Only fills in fields that are actually blank so it
+  // never clobbers an in-progress dictation or edit. Chief Complaint also
+  // carries over from the pre-visit intake when nothing's been dictated for
+  // this evaluation yet — the doctor can still overwrite it either way.
   useEffect(() => {
     if (!patient) return;
     const latestEval = latestByDate(patient.evaluations);
-    setDiagnosis((d) => d || latestEval?.diagnosis || '');
-    setNotes((n) => n || latestEval?.notes || '');
+    const seeded = (latestEval?.soapNote && typeof latestEval.soapNote === 'object') ? latestEval.soapNote : null;
+    setSoap((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const field of Object.keys(EMPTY_SOAP)) {
+        if (!next[field] && seeded?.[field]) { next[field] = seeded[field]; changed = true; }
+      }
+      if (!next.chiefComplaint && latestAssessment?.chiefComplaint) {
+        next.chiefComplaint = latestAssessment.chiefComplaint;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
     // Only today's evaluation counts as "the current encounter" to amend —
     // an older saved evaluation is a past visit and must stay untouched.
     setCurrentEvaluationId(latestEval?.date === todayIso() ? latestEval.id : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient?.id]);
+
+  // Walk-in / ER-referral patients can reach the doctor with no pre-visit
+  // PROM on file — this tracks whether one's already been assigned (and to
+  // whom/how) so the "PROM Not Completed" alert doesn't nag once it's in
+  // motion. See components/PromAssignmentModal.jsx / backend/routers/prom_assignments.py.
+  const [promAssignments, setPromAssignments] = useState([]);
+  const [showPromAssignModal, setShowPromAssignModal] = useState(false);
+  useEffect(() => {
+    if (!patientId) { setPromAssignments([]); return; }
+    api.get(`/api/patients/${patientId}/prom-assignments`)
+      .then((res) => setPromAssignments(res.data))
+      .catch(() => setPromAssignments([]));
+  }, [patientId]);
+
+  const latestPromAssignment = promAssignments[0] || null;
+  const promAssignmentActive = latestPromAssignment && ['sent_pending', 'assigned_to_clerk', 'overdue'].includes(latestPromAssignment.status);
+
+  const handlePromAssigned = (assignment) => {
+    setShowPromAssignModal(false);
+    setPromAssignments((prev) => [assignment, ...prev.filter((a) => a.id !== assignment.id)]);
+    if (assignment.completionMethod === 'physician_assisted') {
+      navigate(`/assessment?patient=${patientId}&promAssignment=${assignment.id}`);
+    }
+  };
+
+  const updateSoap = (field, value) => setSoap((prev) => ({ ...prev, [field]: value }));
 
   const toggleDiagnosticTest = (testId) => {
     setSelectedTests((prev) => prev.includes(testId) ? prev.filter((t) => t !== testId) : [...prev, testId]);
@@ -620,8 +694,15 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     setIsPlaying(false); setAudioProgress(0); setAudioCurrentTime(0); setAudioDuration(0);
     const s = data?.structured;
     if (!s) return;
-    if (s.diagnosis)             setDiagnosis(s.diagnosis);
-    if (s.notes)                 setNotes(s.notes);
+    if (s.soap) {
+      setSoap((prev) => {
+        const next = { ...prev };
+        for (const field of Object.keys(EMPTY_SOAP)) {
+          if (s.soap[field]) next[field] = s.soap[field];
+        }
+        return next;
+      });
+    }
     if (s.diagnostic_tests?.length) setSelectedTests(s.diagnostic_tests);
     if (s.treatments?.length)
       setTreatments(s.treatments.map((t) => ({
@@ -633,7 +714,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording, cancelRecording } =
     useDictation({ patientId, onResult: handleDictationResult, onError: setError });
 
-  const { diagnosticTests, treatmentOptions } = useLookup();
+  const { diagnosticTests, treatmentOptions, bodyAreas } = useLookup();
   const assessmentConfig = useAssessmentConfig(latestAssessment?.bodyArea || patient?.bodyArea);
 
   // Opens the modal in its idle state — recording itself starts when the
@@ -647,15 +728,16 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const handleCancelDictation = () => { cancelRecording(); setShowDictationModal(false); setError(null); };
 
   const handleSaveAll = () => {
-    if (!diagnosis.trim() && !notes.trim()) return;
+    const { diagnosis, notes } = deriveLegacyFields(soap);
+    if (!diagnosis && !notes) return;
     const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
     if (currentEvaluationId && onUpdateEvaluation) {
-      onUpdateEvaluation(patientId, currentEvaluationId, { notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl });
+      onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap });
     } else if (onAddEvaluation) {
       const newId = `ev${Date.now()}`;
       onAddEvaluation(patientId, {
         id: newId, date: todayIso(),
-        physician: physicianName, notes: notes.trim(), diagnosis: diagnosis.trim(), audioUrl,
+        physician: physicianName, notes, diagnosis, audioUrl, soapNote: soap,
       });
       setCurrentEvaluationId(newId);
     }
@@ -694,20 +776,24 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
   const handleSaveNote = () => {
     if (!noteText.trim()) return;
-    // Appends to today's evaluation (if one is already open) instead of
-    // inserting a separate row, so a quick note doesn't fork the encounter
-    // into a second, diagnosis-less evaluation — see currentEvaluationId.
-    const merged = notes.trim() ? `${notes.trim()}\n\n${noteText.trim()}` : noteText.trim();
-    setNotes(merged);
+    // Appends to today's evaluation's Plan section (if one is already open)
+    // instead of inserting a separate row, so a quick note doesn't fork the
+    // encounter into a second, diagnosis-less evaluation — see
+    // currentEvaluationId. Plan is the catch-all section for anything said
+    // outside the structured dictation flow.
+    const mergedPlan = soap.plan.trim() ? `${soap.plan.trim()}\n\n${noteText.trim()}` : noteText.trim();
+    const nextSoap = { ...soap, plan: mergedPlan };
+    setSoap(nextSoap);
+    const { diagnosis, notes } = deriveLegacyFields(nextSoap);
     let promise;
     if (currentEvaluationId && onUpdateEvaluation) {
-      promise = onUpdateEvaluation(patientId, currentEvaluationId, { notes: merged });
+      promise = onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, soapNote: nextSoap });
     } else if (onAddEvaluation) {
       const newId = `ev${Date.now()}`;
       const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
       promise = onAddEvaluation(patientId, {
         id: newId, date: todayIso(),
-        physician: physicianName, notes: merged, diagnosis: diagnosis.trim(), audioUrl,
+        physician: physicianName, notes, diagnosis, audioUrl, soapNote: nextSoap,
       });
       setCurrentEvaluationId(newId);
     } else {
@@ -821,7 +907,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     painNRS = Number(answers['pain_scale']);
   }
 
-  const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#ef4444' : painNRS > 3 ? '#f59e0b' : '#10b981';
+  const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#dc2626' : painNRS > 3 ? '#d97706' : '#059669';
   const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
 
   // PROM Trend — only plotted from real assessment history (2+ visits with a
@@ -929,8 +1015,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                 <span className="pe-info-value">{visitDateStr} at {visitTime}</span>
               </div>
               <div className="pe-info-row pe-tags-row">
-                <TagPill label={isNew ? '🆕 New Patient' : '🔄 Returning'} color={isNew ? '#1a6fdb' : '#10b981'} />
-                {patient.bodyArea && <TagPill label={`📍 ${patient.bodyArea}`} color="#f59e0b" />}
+                <TagPill label={isNew ? '🆕 New Patient' : '🔄 Returning'} color={isNew ? '#0369a1' : '#059669'} />
+                {patient.bodyArea && <TagPill label={`📍 ${patient.bodyArea}`} color="#d97706" />}
               </div>
             </div>
           </div>
@@ -972,7 +1058,21 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
             {/* Card 2 — Pre-Visit PROM */}
             <SCard title={`Pre-Visit PROM — ${promName}`} icon={FlaskConical}>
               {!latestAssessment ? (
-                <p className="pe-empty-note">No pre-visit assessment completed yet.</p>
+                promAssignmentActive ? (
+                  <div className="prom-alert-banner" style={{ background: 'var(--info-light)', color: 'var(--info-dark)', borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                    <Clock3 size={16} />
+                    <span>
+                      PROM assigned — {latestPromAssignment.status === 'assigned_to_clerk' ? 'Assigned to Clerk' : latestPromAssignment.status === 'overdue' ? 'Overdue' : 'Sent to Patient (Pending)'}
+                    </span>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowPromAssignModal(true)}>Reassign</button>
+                  </div>
+                ) : (
+                  <div className="prom-alert-banner">
+                    <AlertTriangle size={16} />
+                    <span>PROM Not Completed</span>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowPromAssignModal(true)}>Select &amp; Assign PROM</button>
+                  </div>
+                )
               ) : (
                 <div className="pe-prom-body">
                   <ScoreRing score={finalScore} size={96} stroke={9} direction={scoreDirection} />
@@ -1021,7 +1121,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               <div style={{ position: 'relative', marginTop: 14, marginBottom: 8 }}>
                 <div style={{
                   height: 10, borderRadius: 5,
-                  background: 'linear-gradient(to right, #10b981 0%, #f59e0b 50%, #ef4444 100%)',
+                  background: 'linear-gradient(to right, #059669 0%, #d97706 50%, #dc2626 100%)',
                   width: '100%'
                 }} />
                 {painNRS !== null && (
@@ -1071,9 +1171,9 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                       return (
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                          background: improving ? '#10b98118' : '#ef444418',
-                          color: improving ? '#10b981' : '#ef4444',
-                          border: `1px solid ${improving ? '#10b98130' : '#ef444430'}`
+                          background: improving ? '#05966918' : '#dc262618',
+                          color: improving ? '#059669' : '#dc2626',
+                          border: `1px solid ${improving ? '#05966930' : '#dc262630'}`
                         }}>
                           {trendDiff >= 0 ? `▲ +${trendDiff}` : `▼ ${trendDiff}`}
                         </span>
@@ -1132,133 +1232,39 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                 handleAudioEnd={handleAudioEnd}
               />
 
-              {/* 2. Note Paper (Clean Style) */}
-              <div className="pe-note-paper">
+              {/* 2. Clinical Note — 6-section SOAP-style notepad. Scrolls
+                  internally (pe-note-paper already has overflow-y:auto and
+                  sits in a flex:1 card) so a long dictation never grows the
+                  page layout; each field is dictation-filled, then editable. */}
+              <div className="pe-note-paper pe-soap-notepad">
+                {isRecording && (
+                  <div className="pe-soap-live-caption">
+                    <Mic size={12} />
+                    <span>{liveCaption || 'Listening…'}</span>
+                  </div>
+                )}
                 {dictation?.text && (
-                  <div className="pe-note-section" style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 4 }}>
-                    <h4>Raw Transcript</h4>
+                  <div className="pe-note-section pe-soap-transcript">
+                    <h4 className="pe-note-h4"><FileText size={13} /> Raw Transcript</h4>
                     <p style={{ fontStyle: 'italic' }}>{dictation.text}</p>
                     <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Check this against what was actually said — the fields below are the AI's structured read of it, and can be edited before you click Complete Visit.
+                      Check this against what was actually said — the sections below are the AI's structured, grammar-corrected read of it, and can be edited before you click Complete Visit.
                     </p>
                   </div>
                 )}
-                <div className="pe-note-section">
-                  <h4 className="pe-note-h4"><FileText size={13} /> Clinical Notes</h4>
-                  {isRecording ? (
-                    <p style={{ opacity: 0.6 }}>{liveCaption || 'Listening…'}</p>
-                  ) : (
+                {SOAP_SECTIONS.map(({ id, label, icon: Icon, rows, placeholder }) => (
+                  <div className="pe-note-section pe-soap-section" key={id}>
+                    <h4 className="pe-note-h4"><Icon size={13} /> {label}</h4>
                     <textarea
-                      className="form-control"
-                      rows={4}
-                      placeholder="No notes recorded yet."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      className="form-control pe-soap-textarea"
+                      rows={rows}
+                      placeholder={placeholder}
+                      value={soap[id]}
+                      onChange={(e) => updateSoap(id, e.target.value)}
                     />
-                  )}
-                </div>
-                <div className="pe-note-section">
-                  <h4 className="pe-note-h4"><Stethoscope size={13} /> Diagnosis / Assessment</h4>
-                  <input
-                    className="form-control"
-                    placeholder="No diagnosis recorded yet."
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                  />
-                </div>
-                <div className="pe-note-section">
-                  <h4 className="pe-note-h4"><FlaskConical size={13} /> Diagnostic Tests</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {diagnosticTests.map((t) => (
-                      <label
-                        key={t.id}
-                        className={`pe-test-pill ${selectedTests.includes(t.id) ? 'selected' : ''}`}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-                          fontSize: 12, padding: '5px 10px', borderRadius: 999,
-                          border: `1px solid ${selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--border)'}`,
-                          background: selectedTests.includes(t.id) ? 'var(--primary-light)' : 'var(--surface-2)',
-                          color: selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--text-secondary)',
-                          fontWeight: selectedTests.includes(t.id) ? 700 : 500,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedTests.includes(t.id)}
-                          onChange={() => toggleDiagnosticTest(t.id)}
-                          style={{ margin: 0 }}
-                        />
-                        {t.icon} {t.name}
-                      </label>
-                    ))}
                   </div>
-                </div>
-                <div className="pe-note-section">
-                  <h4 className="pe-note-h4"><Pill size={13} /> Treatment Plan</h4>
-                  {treatments.length === 0 && (
-                    <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>No treatments added yet.</p>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {treatments.map((t) => (
-                      <div key={t.uid} className="pe-treatment-card">
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <select
-                            className="form-control"
-                            style={{ flex: 1 }}
-                            value={t.type}
-                            onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
-                          >
-                            <option value="">Select treatment type…</option>
-                            {treatmentOptions.map((opt) => (
-                              <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            className="pe-treatment-remove"
-                            onClick={() => removeTreatmentEntry(t.uid)}
-                            title="Remove"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            className="form-control"
-                            style={{ flex: 1 }}
-                            placeholder="Duration (e.g. 6 weeks)"
-                            value={t.duration}
-                            onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
-                          />
-                          <input
-                            className="form-control"
-                            style={{ flex: 1 }}
-                            type="date"
-                            value={t.followUpDate || ''}
-                            onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
-                          />
-                        </div>
-                        <textarea
-                          className="form-control"
-                          rows={2}
-                          placeholder="Details / instructions"
-                          value={t.details}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    style={{ marginTop: 8 }}
-                    onClick={addTreatmentEntry}
-                  >
-                    + Add Treatment
-                  </button>
-                </div>
+                ))}
               </div>
-
               {/* 3. Record Button Area */}
               <div className="pe-record-controls">
                 <button
@@ -1278,6 +1284,110 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
             {/* ─── Card: Orders & Documents ─────────────────────────── */}
             <SCard title="Orders & Documents" icon={ClipboardList} style={{ flex: 1 }}>
+
+              {/* ── Draft orders for this visit — dictation-filled or added
+                  manually, editable right up until Complete Visit persists
+                  them below as Diagnostic/Treatment records. ── */}
+              <div className="pe-orders-draft">
+                <div className="pe-orders-draft-label">
+                  <FlaskConical size={13} /> Diagnostic Tests
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                  {diagnosticTests.map((t) => (
+                    <label
+                      key={t.id}
+                      className={`pe-test-pill ${selectedTests.includes(t.id) ? 'selected' : ''}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                        fontSize: 12, padding: '5px 10px', borderRadius: 999,
+                        border: `1px solid ${selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--border)'}`,
+                        background: selectedTests.includes(t.id) ? 'var(--primary-light)' : 'var(--surface-2)',
+                        color: selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--text-secondary)',
+                        fontWeight: selectedTests.includes(t.id) ? 700 : 500,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTests.includes(t.id)}
+                        onChange={() => toggleDiagnosticTest(t.id)}
+                        style={{ margin: 0 }}
+                      />
+                      {t.icon} {t.name}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="pe-orders-draft-label">
+                  <Pill size={13} /> Treatment Plan
+                </div>
+                {treatments.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>No treatments added yet.</p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {treatments.map((t) => (
+                    <div key={t.uid} className="pe-treatment-card">
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          value={t.type}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
+                        >
+                          <option value="">Select treatment type…</option>
+                          {treatmentOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="pe-treatment-remove"
+                          onClick={() => removeTreatmentEntry(t.uid)}
+                          title="Remove"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          placeholder="Duration (e.g. 6 weeks)"
+                          value={t.duration}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
+                        />
+                        <input
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          type="date"
+                          value={t.followUpDate || ''}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
+                        />
+                      </div>
+                      <textarea
+                        className="form-control"
+                        rows={2}
+                        placeholder="Details / instructions"
+                        value={t.details}
+                        onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{ marginTop: 8 }}
+                  onClick={addTreatmentEntry}
+                >
+                  + Add Treatment
+                </button>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
+
+              <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
+                <ClipboardList size={13} /> Recorded Orders
+              </div>
               {mainOrders.length === 0 ? (
                 <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded yet.</p>
               ) : (
@@ -1390,6 +1500,15 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         onClose={handleCloseDictationModal}
       />
 
+      {showPromAssignModal && (
+        <PromAssignmentModal
+          patient={patient}
+          bodyAreas={bodyAreas}
+          onClose={() => setShowPromAssignModal(false)}
+          onAssigned={handlePromAssigned}
+        />
+      )}
+
       {/* ── Add Medication / Order Prescription modal ── */}
       {showMedModal && (
         <MiniModal title="Order Prescription" onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
@@ -1413,7 +1532,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         <MiniModal title="New Note" onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
           <div className="form-group">
             <label className="form-label">Note</label>
-            <textarea className="form-control" rows={5} placeholder="Add a quick clinical note…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+            <textarea className="form-control" rows={5} placeholder="Add a quick note — appended to the Plan section…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
           </div>
         </MiniModal>
       )}

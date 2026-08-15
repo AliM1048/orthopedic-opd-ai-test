@@ -16,6 +16,83 @@ import AllPatients from './pages/AllPatients';
 import Analytics from './pages/Analytics';
 import DocumentGenerator from './pages/DocumentGenerator';
 import PatientStatus from './pages/PatientStatus';
+import ClerkTasks from './pages/ClerkTasks';
+import PromPublicFill from './pages/PromPublicFill';
+
+// Everything a logged-in user can reach — split out so the public,
+// no-login PROM link route (below) never gets caught behind the auth gate.
+function AuthedApp({ user, patients, actions }) {
+  const {
+    updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
+    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent,
+  } = actions;
+
+  return (
+    <LookupProvider>
+      <DashboardLayout user={user}>
+        <Routes>
+          <Route
+            path="/"
+            element={<NurseDashboard patients={patients} onUpdateStatus={updateStatus} createPatient={actions.createPatient} />}
+          />
+          <Route
+            path="/patient/:id"
+            element={<PatientProfile patients={patients} />}
+          />
+          <Route
+            path="/assessment"
+            element={
+              <PreVisitAssessment
+                patients={patients}
+                user={user}
+                onAddAssessment={addAssessment}
+                onUpdateStatus={updateStatus}
+                onUpdateBodyArea={updateBodyArea}
+              />
+            }
+          />
+          <Route
+            path="/evaluation"
+            element={
+              <PhysicianEvaluation
+                patients={patients}
+                user={user}
+                onAddEvaluation={addEvaluation}
+                onUpdateEvaluation={updateEvaluation}
+                onAddDiagnostic={addDiagnostic}
+                onDeleteDiagnostic={deleteDiagnostic}
+                onAddTreatment={addTreatment}
+                onDeleteTreatment={deleteTreatment}
+                onMarkEvaluationSent={markEvaluationSent}
+              />
+            }
+          />
+          <Route
+            path="/patients"
+            element={<AllPatients patients={patients} />}
+          />
+          <Route
+            path="/analytics"
+            element={<Analytics patients={patients} />}
+          />
+          <Route
+            path="/records"
+            element={<PatientStatus patients={patients} />}
+          />
+          <Route
+            path="/clerk-tasks"
+            element={<ClerkTasks />}
+          />
+          <Route
+            path="/documents/new"
+            element={<DocumentGenerator patients={patients} user={user} />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </DashboardLayout>
+    </LookupProvider>
+  );
+}
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
@@ -43,77 +120,31 @@ export default function App() {
     setUser(userData);
   };
 
-  if (!token) {
-    return (
-      <ThemeProvider>
-        <BrowserRouter>
-          <Login onLogin={handleLogin} />
-        </BrowserRouter>
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <LookupProvider>
-          <DashboardLayout user={user}>
-            <Routes>
-              <Route
-                path="/"
-                element={<NurseDashboard patients={patients} onUpdateStatus={updateStatus} createPatient={createPatient} />}
-              />
-              <Route
-                path="/patient/:id"
-                element={<PatientProfile patients={patients} />}
-              />
-              <Route
-                path="/assessment"
-                element={
-                  <PreVisitAssessment
-                    patients={patients}
-                    onAddAssessment={addAssessment}
-                    onUpdateStatus={updateStatus}
-                    onUpdateBodyArea={updateBodyArea}
-                  />
-                }
-              />
-              <Route
-                path="/evaluation"
-                element={
-                  <PhysicianEvaluation
-                    patients={patients}
-                    user={user}
-                    onAddEvaluation={addEvaluation}
-                    onUpdateEvaluation={updateEvaluation}
-                    onAddDiagnostic={addDiagnostic}
-                    onDeleteDiagnostic={deleteDiagnostic}
-                    onAddTreatment={addTreatment}
-                    onDeleteTreatment={deleteTreatment}
-                    onMarkEvaluationSent={markEvaluationSent}
-                  />
-                }
-              />
-              <Route
-                path="/patients"
-                element={<AllPatients patients={patients} />}
-              />
-              <Route
-                path="/analytics"
-                element={<Analytics patients={patients} />}
-              />
-              <Route
-                path="/records"
-                element={<PatientStatus patients={patients} />}
-              />
-              <Route
-                path="/documents/new"
-                element={<DocumentGenerator patients={patients} user={user} />}
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </DashboardLayout>
-        </LookupProvider>
+        <Routes>
+          {/* Public — no login required, opened from a doctor-generated link/QR */}
+          <Route path="/prom/:token" element={<PromPublicFill />} />
+          <Route
+            path="*"
+            element={
+              !token ? (
+                <Login onLogin={handleLogin} />
+              ) : (
+                <AuthedApp
+                  user={user}
+                  patients={patients}
+                  actions={{
+                    updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
+                    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent,
+                    createPatient,
+                  }}
+                />
+              )
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </ThemeProvider>
   );

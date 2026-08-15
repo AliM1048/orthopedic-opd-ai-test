@@ -64,8 +64,8 @@ function LiveWaveform({ analyserRef, active }) {
         const x = i * barWidth + gap / 2;
         const y = (height - barHeight) / 2;
         const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-        gradient.addColorStop(0, '#5eb3ff');
-        gradient.addColorStop(1, '#1a6fdb');
+        gradient.addColorStop(0, '#0ea5e9');
+        gradient.addColorStop(1, '#0369a1');
         ctx.fillStyle = gradient;
         roundRect(ctx, x, y, barWidth - gap, barHeight, 3);
         ctx.fill();

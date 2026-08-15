@@ -4,7 +4,7 @@ export function calculateQuickDASH(answers, questions) {
   if (scoredQuestions.length === 0) return null;
 
   const answered = scoredQuestions.filter(q => answers[q.id] !== undefined && answers[q.id] !== null);
-  // DASH requires at least 27 of 30 items (or 10 of 11 for QuickDASH)
+  // DASH requires at least 26 of 29 mandatory items (or 10 of 11 for QuickDASH)
   const minRequired = Math.max(1, scoredQuestions.length - 3);
   if (answered.length < minRequired) return null;
 

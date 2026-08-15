@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 
+import api from '../api';
 import { computeFinalScore } from '../utils/scoring';
 import { useAssessmentConfig } from '../hooks/useLookupData';
 import PatientSummaryCard from '../components/assessment/PatientSummaryCard';
@@ -31,14 +32,24 @@ function countAnswered(section, answers) {
   }).length;
 }
 
-export default function PreVisitAssessment({ patients, onAddAssessment, onUpdateStatus, onUpdateBodyArea }) {
+export default function PreVisitAssessment({ patients, user, onAddAssessment, onUpdateStatus, onUpdateBodyArea }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
   const isFollowUp = searchParams.get('type') === 'followup';
 
+  // Arriving from a doctor's "Select & Assign PROM" (physician-assisted) or
+  // a clerk task ("clerk-assisted") — see PromAssignmentModal / ClerkTasks.
+  // The instrument and respondent are already decided, so this skips the
+  // region-picker gate below and uses the assigned body area directly
+  // instead of the patient's stored default (a one-off PROM for a new
+  // complaint shouldn't silently overwrite their usual body area).
+  const promAssignmentId = searchParams.get('promAssignment');
+  const promBodyArea = searchParams.get('bodyArea');
+  const promRespondent = searchParams.get('respondent'); // 'patient' | 'parent_caregiver'
+
   const patient = patients.find(p => p.id === patientId);
-  const config = useAssessmentConfig(patient?.bodyArea);
+  const config = useAssessmentConfig(promBodyArea || patient?.bodyArea);
 
   const sections = useMemo(() => config?.sections || [], [config]);
   const allQuestions = useMemo(() => sections.flatMap(s => s.questions), [sections]);
@@ -57,8 +68,10 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
   // gates the rest of the intake UI until a region is chosen, so the right
   // instrument (and its scoring rules) always loads deliberately rather than
   // silently inheriting whatever bodyArea the patient happened to have.
-  const [regionConfirmed, setRegionConfirmed] = useState(false);
-  useEffect(() => { setRegionConfirmed(false); }, [patientId]);
+  // Skipped entirely when arriving via a PROM assignment — the doctor
+  // already chose the instrument in that flow.
+  const [regionConfirmed, setRegionConfirmed] = useState(!!promBodyArea);
+  useEffect(() => { setRegionConfirmed(!!promBodyArea); }, [patientId, promBodyArea]);
 
   const handleRegionConfirmed = (region) => {
     const persist = (region !== patient?.bodyArea && onUpdateBodyArea)
@@ -160,6 +173,7 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
     // QuickDASH, ODI/NDI, SEFAS, ...) — see utils/scoring.js computeFinalScore.
     const result = computeFinalScore(config, answers);
 
+    const enteredByName = user?.name || user?.email || 'Staff';
     const assessment = {
       id: `a${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -169,14 +183,27 @@ export default function PreVisitAssessment({ patients, onAddAssessment, onUpdate
       finalScore: result?.final ?? null,
       interpretation: result?.interpretation ?? null,
       promCode: result?.promCode ?? null,
-      bodyArea: patient?.bodyArea,
-      completedBy: 'Nurse Sara',
+      bodyArea: promBodyArea || patient?.bodyArea,
+      completedBy: enteredByName,
       chiefComplaint,
       answers,
     };
 
     if (onAddAssessment) onAddAssessment(patientId, assessment);
     if (onUpdateStatus) onUpdateStatus(patientId, 'assessment-completed');
+
+    // Close out the PROM assignment that sent us here (clerk-assisted /
+    // physician-assisted-now) so it drops off the clerk queue / doctor's
+    // "PROM Not Completed" alert — see routers/prom_assignments.py.
+    if (promAssignmentId) {
+      api.patch(`/api/prom-assignments/${promAssignmentId}`, {
+        status: 'completed',
+        answeredBy: promRespondent || 'patient',
+        enteredBy: enteredByName,
+        completedAt: new Date().toISOString(),
+        assessmentId: assessment.id,
+      }).catch(() => {});
+    }
 
     // Clear draft
     localStorage.removeItem(DRAFT_KEY(patientId));

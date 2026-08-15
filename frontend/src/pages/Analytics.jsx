@@ -11,7 +11,7 @@ const CATEGORICAL = {
   light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#4a3aa7'],
   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9'],
 };
-const OTHER_COLOR = { light: '#94a3b8', dark: '#6b7894' };
+const OTHER_COLOR = { light: '#7a9a9e', dark: '#5f8a8f' };
 const MAX_CATEGORICAL_SLOTS = 6;
 
 // Assessment.promCode values whose native scoring direction is 0=best/100=worst

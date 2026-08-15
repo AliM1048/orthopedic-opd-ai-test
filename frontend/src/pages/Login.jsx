@@ -41,7 +41,7 @@ export default function Login({ onLogin }) {
         <div className="login-logo">
           <div className="login-logo-icon"><Activity size={24} /></div>
           <div>
-            <h1>OrthoOPD</h1>
+            <h1>OPD AI Unit</h1>
             <p>Patient Management System</p>
           </div>
         </div>
