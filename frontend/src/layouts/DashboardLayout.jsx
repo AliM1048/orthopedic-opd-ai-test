@@ -13,9 +13,9 @@ const NAV_ITEMS = [
   { label: 'PHYSICIAN', items: [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
   ]},
-  { label: 'CLERK', items: [
-    { to: '/clerk-tasks', icon: ClipboardList, text: 'PROM Tasks' },
-  ]},
+  // { label: 'CLERK', items: [
+  //   { to: '/clerk-tasks', icon: ClipboardList, text: 'PROM Tasks' },
+  // ]},
   { label: 'RECORDS', items: [
     { to: '/analytics',      icon: Activity,        text: 'Analytics' },
     { to: '/records',        icon: Users,           text: 'Patient Status' },
