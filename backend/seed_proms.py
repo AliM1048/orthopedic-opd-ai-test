@@ -4,18 +4,16 @@ from the official PDFs in the scores/ directory:
 
   scores/KOOS.pdf                       → KOOS-JR (7 items, Saudi-Arabic)
   scores/hoos_hip_survey.pdf            → Full HOOS (40 items, 6 subscales)
-  scores/wirsthand elbow shoulder.pdf   → DASH, 29 mandatory items (Shoulder/Elbow/Hand&Wrist) —
-                                           item 21 "sexual activities" and the optional Work /
-                                           Sports-Performing-Arts modules (PDF page 4) are excluded
-                                           per the source PDF, which marks them optional
+  QuickDASH-11 (Shoulder/Elbow/Hand&Wrist)  → the official 11-item short form,
+                                               not the full 30-item DASH
   scores/how_we_calc_for_all_and_distribution.jpg → scoring rules
   scores/Koos_how_to_calcuate_score.txt → KOOS-JR Rasch conversion table
 
 Scoring formulas (from clinic guide image):
   KOOS-JR:   Raw 0-28 → official Rasch table → 0-100 (higher=better)
   HOOS full: 100 - (rawSum / (n*4)) * 100 → 0-100 (higher=better)
-  DASH:      ((sum/n) - 1) × 25 → 0-100 (lower=better disability score); n = answered
-             out of 29 mandatory items, min 26 required
+  QuickDASH: ((sum/n) - 1) × 25 → 0-100 (lower=better disability score); n = answered
+             out of 11 items, min 10 required (at most 1 missing)
   ODI/NDI:   (total / (answered×5)) × 100 → 0-100% (lower=better)
   SEFAS:     (raw / 48) × 100 → 0-100 (higher=better)
 
@@ -220,11 +218,15 @@ def hoos_sections():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DASH Full (30 items) — Shoulder / Elbow / Hand & Wrist
-# Source: scores/wirsthand elbow shoulder.pdf  (Arabic DASH, 30-item main module)
-# Scored 1-5 per item (1=No difficulty / No symptoms → 5=Unable / Extreme)
+# QuickDASH-11 — Shoulder / Elbow / Hand & Wrist
+# 11-item short form (not the full 30-item DASH — replaced after being
+# re-verified against the actual QuickDASH instrument, which is what
+# scoreCalculation="quickdash" was always meant to score).
+# Scored 1-5 per item (1=No difficulty/None → 5=Unable/Extreme)
 # Formula: ((sum / n) − 1) × 25  →  0–100  (0=no disability, 100=maximum)
-# Minimum: 27 of 30 items must be completed.
+# Minimum: 10 of 11 items must be completed (at most 1 missing) — a tighter
+# tolerance than the full DASH's "3 of 30" rule since there are far fewer
+# items to begin with; see frontend/src/utils/scoring.js calculateQuickDASH.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 DASH_DIFF  = ["بلا صعوبة (No Difficulty)", "بصعوبة خفيفة (Mild Difficulty)",
@@ -240,110 +242,56 @@ DASH_PAIN   = ["لا يوجد (None)", "قليلاً (Mild)", "بشكل متوس
 DASH_SLEEP  = ["لا صعوبة (No difficulty)", "صعوبة خفيفة (Mild difficulty)",
                "صعوبة متوسطة (Moderate difficulty)", "صعوبة شديدة (Severe difficulty)",
                "بحيث لا أقدر على النوم (So much I can't sleep)"]
-DASH_AGREE  = ["لا أوافق بشدة (Strongly Disagree)", "لا أوافق (Disagree)",
-               "لست موافقاً ولا معترضاً (Neither)", "أوافق (Agree)",
-               "أوافق بشدة (Strongly Agree)"]
 
 DASH_SV = [1, 2, 3, 4, 5]   # 1=best, 5=worst; formula uses raw sum directly
 
 
-def dash_questions():
-    # Exact 30 items from Arabic DASH PDF (pages 1–3)
+def quickdash_questions():
     return [
-        # ── Activities (items 1–21) ──
-        radio("d_1",  "1. أن تفتح علبة جديدة أو محكمة الإغلاق\n   (Open a tight or new jar)",
+        radio("qd_1",  "1. فتح مرطبان أو غطاء محكم الإغلاق\n   (Open a tight or new jar)",
               DASH_DIFF, DASH_SV),
-        radio("d_2",  "2. أن تكتب\n   (Write)",
+        radio("qd_2",  "2. القيام بأعمال منزلية تتطلب مجهودًا بالذراع\n   (Do heavy household chores)",
               DASH_DIFF, DASH_SV),
-        radio("d_3",  "3. أن تدير / تبرم مفتاحاً (مثل تشغيل مفتاح السيارة)\n   (Turn a key, e.g. car ignition)",
+        radio("qd_3",  "3. حمل كيس مشتريات أو حقيبة\n   (Carry a shopping bag or briefcase)",
               DASH_DIFF, DASH_SV),
-        radio("d_4",  "4. أن تحضّر / تعدّ وجبة طعام\n   (Prepare a meal)",
+        radio("qd_4",  "4. غسل أو الوصول إلى منطقة الظهر\n   (Wash your back)",
               DASH_DIFF, DASH_SV),
-        radio("d_5",  "5. أن تدفع لتفتح باباً ثقيلاً\n   (Push open a heavy door)",
+        radio("qd_5",  "5. استخدام السكين لتقطيع الطعام\n   (Use a knife to cut food)",
               DASH_DIFF, DASH_SV),
-        radio("d_6",  "6. أن تضع شيئاً على رف فوق مستوى رأسك\n   (Place an object on a shelf above your head)",
+        radio("qd_6",  "6. القيام بنشاط ترفيهي يتطلب قوة أو ضغطًا على الذراع/الكتف/اليد\n   (Recreational activities with force/impact through arm, shoulder or hand)",
               DASH_DIFF, DASH_SV),
-        radio("d_7",  "7. أن تقوم بأعمال المنزل الثقيلة (مثل غسل الحيطان أو إزاحة الأثاث)\n   (Do heavy household chores, e.g. wash walls, move furniture)",
-              DASH_DIFF, DASH_SV),
-        radio("d_8",  "8. أن تعمل في الحديقة أو فناء الدار\n   (Garden or do yard work)",
-              DASH_DIFF, DASH_SV),
-        radio("d_9",  "9. أن ترتب السرير\n   (Make a bed)",
-              DASH_DIFF, DASH_SV),
-        radio("d_10", "10. أن تحمل كيس التسوق أو حقيبة الوثائق\n   (Carry a shopping bag or briefcase)",
-               DASH_DIFF, DASH_SV),
-        radio("d_11", "11. أن تحمل غرضاً ثقيلاً (يزيد وزنه عن 10 أرطال / 4.5 كيلوغرام)\n   (Carry a heavy object, more than 10 lbs / 4.5 kg)",
-               DASH_DIFF, DASH_SV),
-        radio("d_12", "12. أن تغيّر لمبة المصباح من فوق رأسك\n   (Change a lightbulb overhead)",
-               DASH_DIFF, DASH_SV),
-        radio("d_13", "13. أن تغسل شعرك أو تنشفه بالمجفف الهوائي\n   (Wash or blow-dry your hair)",
-               DASH_DIFF, DASH_SV),
-        radio("d_14", "14. أن تغسل ظهرك\n   (Wash your back)",
-               DASH_DIFF, DASH_SV),
-        radio("d_15", "15. أن تلبس كنزة / ثوب / بلوزة ذات أكمام طويلة\n   (Put on a sweater / pullover)",
-               DASH_DIFF, DASH_SV),
-        radio("d_16", "16. أن تستخدم سكيناً لتقطيع الطعام\n   (Use a knife to cut food)",
-               DASH_DIFF, DASH_SV),
-        radio("d_17", "17. أن تقوم بنشاطات ترفيهية تتطلب جهداً خفيفاً (مثل لعب الشطرنج)\n   (Recreational activities requiring little effort, e.g. cards / chess)",
-               DASH_DIFF, DASH_SV),
-        radio("d_18", "18. أن تقوم بنشاطات ترفيهية فيها قوة عبر الذراع أو الكتف أو اليد (مثل لعب التنس)\n   (Recreational activities with force through arm / shoulder / hand, e.g. tennis, hammering)",
-               DASH_DIFF, DASH_SV),
-        radio("d_19", "19. أن تقوم بنشاطات ترفيهية تحرك ذراعك بحرية (مثل رمي القرص / الفريسبي)\n   (Recreational activities in which you move your arm freely, e.g. frisbee, badminton)",
-               DASH_DIFF, DASH_SV),
-        radio("d_20", "20. أن تتنقل بالمواصلات من مكان لآخر بمساعدة أعضاء جسدك العلوية (مثل الإمساك بمقود السيارة)\n   (Transport yourself from place to place using upper limbs, e.g. steering)",
-               DASH_DIFF, DASH_SV),
-        # Item 21 "Sexual activities" is explicitly marked optional in the
-        # source PDF ("الإجابه على هذا السؤال اختياري") and is intentionally
-        # excluded here — only the mandatory 29 items are asked. The Work
-        # Module and Sports/Performing Arts Module on PDF page 4 are also
-        # optional add-on modules and are likewise excluded.
-
-        # ── Social / Work Impact (items 22–23) ──
-        radio("d_22", "22. هل أثرت المشكلة في ذراعك أو كتفك أو يدك خلال الأسبوع الماضي على نشاطاتك الاجتماعية العادية مع العائلة أو الأصدقاء؟\n   (During the past week, to what extent has your arm/shoulder/hand problem interfered with your normal social activities?)",
-               DASH_IMPACT, DASH_SV),
-        radio("d_23", "23. هل أثرت المشكلة في ذراعك أو كتفك أو يدك خلال الأسبوع الماضي على عملك أو نشاطاتك اليومية الاعتيادية الأخرى؟\n   (During the past week, were you limited in your work or other regular daily activities?)",
-               DASH_LIMIT, DASH_SV),
-
-        # ── Symptoms (items 24–28) ──
-        radio("d_24", "24. وجع / ألم / عوار في الذراع أو الكتف أو اليد\n   (Arm, shoulder or hand pain)",
-               DASH_PAIN, DASH_SV),
-        radio("d_25", "25. وجع / ألم في الذراع أو الكتف أو اليد حينما أديت نشاطاً معيّناً\n   (Arm, shoulder or hand pain when doing a specific activity)",
-               DASH_PAIN, DASH_SV),
-        radio("d_26", "26. وخز (مثل وخز الإبر والدبابيس) في يدك أو ذراعك أو كتفك\n   (Tingling — pins and needles — in arm, shoulder or hand)",
-               DASH_PAIN, DASH_SV),
-        radio("d_27", "27. ضعف في ذراعك أو كتفك أو يدك\n   (Weakness in your arm, shoulder or hand)",
-               DASH_PAIN, DASH_SV),
-        radio("d_28", "28. تيبّس / تصلّب في ذراعك أو كتفك أو يدك\n   (Stiffness in your arm, shoulder or hand)",
-               DASH_PAIN, DASH_SV),
-
-        # ── Sleep (item 29) ──
-        radio("d_29", "29. كم كانت صعوبة نومك خلال الأسبوع الماضي بسبب الوجع / الألم في ذراعك أو كتفك أو يدك؟\n   (During the past week, how much difficulty did you have sleeping because of pain in arm/shoulder/hand?)",
-               DASH_SLEEP, DASH_SV),
-
-        # ── Confidence (item 30) ──
-        radio("d_30", "30. أشعر بأنني أقل ثقةً بنفسي بسبب مشكلة ذراعي أو كتفي أو يدي\n   (I feel less capable, less confident or less useful because of my arm/shoulder/hand problem)",
-               DASH_AGREE, DASH_SV),
+        radio("qd_7",  "7. إلى أي درجة أثرت المشكلة على نشاطاتك الاجتماعية؟\n   (During the past week, to what extent has your problem interfered with your normal social activities?)",
+              DASH_IMPACT, DASH_SV),
+        radio("qd_8",  "8. إلى أي درجة حدّت المشكلة من عملك أو نشاطاتك اليومية المعتادة؟\n   (During the past week, were you limited in your work or other regular daily activities?)",
+              DASH_LIMIT, DASH_SV),
+        radio("qd_9",  "9. ما شدة الألم في الذراع أو الكتف أو اليد؟\n   (Arm, shoulder or hand pain)",
+              DASH_PAIN, DASH_SV),
+        radio("qd_10", "10. ما شدة التنميل أو الوخز؟\n   (Tingling — pins and needles — in arm, shoulder or hand)",
+              DASH_PAIN, DASH_SV),
+        radio("qd_11", "11. إلى أي درجة أثرت المشكلة على نومك؟\n   (How much difficulty did you have sleeping because of the pain?)",
+              DASH_SLEEP, DASH_SV),
     ]
 
 
-def dash_sections(region_prefix):
-    """Returns DASH sections with unique IDs per region so the DB doesn't clash.
-    29 mandatory items total (item 21 "Sexual activities" excluded — see
-    dash_questions() above)."""
+def quickdash_sections(region_prefix):
+    """Returns QuickDASH-11 sections with unique IDs per region so the DB
+    doesn't clash across Shoulder/Elbow/Hand & Wrist."""
+    qs = quickdash_questions()
     return [
         {
             "id": f"{region_prefix}_activities",
-            "title": "الأنشطة والمهام اليومية / Daily Activities (Items 1–20)",
-            "questions": dash_questions()[:20],
+            "title": "الأنشطة اليومية / Daily Activities (Items 1–6)",
+            "questions": qs[:6],
         },
         {
             "id": f"{region_prefix}_impact",
-            "title": "التأثير الاجتماعي والوظيفي / Social & Work Impact (Items 22–23)",
-            "questions": dash_questions()[20:22],
+            "title": "التأثير الاجتماعي والوظيفي / Social & Work Impact (Items 7–8)",
+            "questions": qs[6:8],
         },
         {
             "id": f"{region_prefix}_symptoms",
-            "title": "الأعراض والنوم / Symptoms & Sleep (Items 24–30)",
-            "questions": dash_questions()[22:],
+            "title": "الأعراض والنوم / Symptoms & Sleep (Items 9–11)",
+            "questions": qs[8:],
         },
     ]
 
@@ -649,62 +597,59 @@ CONFIGS = [
     # ── SHOULDER ──────────────────────────────────────────────────────────────
     {
         "bodyArea": "Shoulder",
-        "configId": "shoulder-dash",
-        "title": "DASH — Shoulder / الكتف",
+        "configId": "shoulder-quickdash",
+        "title": "QuickDASH — Shoulder / الكتف",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
-            "the official optional 'sexual activities' item and the optional Work / "
-            "Sports modules are excluded. Each item scored 1–5 (1=No difficulty, 5=Unable). "
+            "QuickDASH — 11-item short form of Disabilities of the Arm, Shoulder and Hand (Arabic). "
+            "Each item scored 1–5 (1=No difficulty/None, 5=Unable/Extreme). "
             "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum disability). "
-            "Minimum 26 of 29 items required."
+            "Minimum 10 of 11 items required."
         ),
-        "promName": "DASH",
-        "scoreCalculation": "quickdash",      # same formula works for full DASH
+        "promName": "QuickDASH",
+        "scoreCalculation": "quickdash",
         "scoreDirection": "lower_better",
-        "rawMax": 145,                         # 29 items × 5 (for reference only, formula uses avg)
+        "rawMax": 55,                         # 11 items × 5 (for reference only, formula uses avg)
         "conversionTable": None,
         "icon": "🙆",
-        "sections": [intake_section()] + dash_sections("shoulder"),
+        "sections": [intake_section()] + quickdash_sections("shoulder"),
     },
 
     # ── ELBOW ─────────────────────────────────────────────────────────────────
     {
         "bodyArea": "Elbow",
-        "configId": "elbow-dash",
-        "title": "DASH — Elbow / الكوع",
+        "configId": "elbow-quickdash",
+        "title": "QuickDASH — Elbow / الكوع",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
-            "the official optional 'sexual activities' item and the optional Work / "
-            "Sports modules are excluded. "
-            "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum)."
+            "QuickDASH — 11-item short form of Disabilities of the Arm, Shoulder and Hand (Arabic). "
+            "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum). "
+            "Minimum 10 of 11 items required."
         ),
-        "promName": "DASH",
+        "promName": "QuickDASH",
         "scoreCalculation": "quickdash",
         "scoreDirection": "lower_better",
-        "rawMax": 145,
+        "rawMax": 55,
         "conversionTable": None,
         "icon": "💪",
-        "sections": [intake_section()] + dash_sections("elbow"),
+        "sections": [intake_section()] + quickdash_sections("elbow"),
     },
 
     # ── HAND & WRIST ──────────────────────────────────────────────────────────
     {
         "bodyArea": "Hand & Wrist",
-        "configId": "hand-wrist-dash",
-        "title": "DASH — Hand & Wrist / اليد والمعصم",
+        "configId": "hand-wrist-quickdash",
+        "title": "QuickDASH — Hand & Wrist / اليد والمعصم",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
-            "the official optional 'sexual activities' item and the optional Work / "
-            "Sports modules are excluded. "
-            "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum)."
+            "QuickDASH — 11-item short form of Disabilities of the Arm, Shoulder and Hand (Arabic). "
+            "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum). "
+            "Minimum 10 of 11 items required."
         ),
-        "promName": "DASH",
+        "promName": "QuickDASH",
         "scoreCalculation": "quickdash",
         "scoreDirection": "lower_better",
-        "rawMax": 145,
+        "rawMax": 55,
         "conversionTable": None,
         "icon": "✋",
-        "sections": [intake_section()] + dash_sections("handwrist"),
+        "sections": [intake_section()] + quickdash_sections("handwrist"),
     },
 
     # ── LOW BACK ──────────────────────────────────────────────────────────────

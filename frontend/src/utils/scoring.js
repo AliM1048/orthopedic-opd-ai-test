@@ -4,8 +4,10 @@ export function calculateQuickDASH(answers, questions) {
   if (scoredQuestions.length === 0) return null;
 
   const answered = scoredQuestions.filter(q => answers[q.id] !== undefined && answers[q.id] !== null);
-  // DASH requires at least 26 of 29 mandatory items (or 10 of 11 for QuickDASH)
-  const minRequired = Math.max(1, scoredQuestions.length - 3);
+  // QuickDASH-11 requires at least 10 of 11 items (at most 1 missing) — a
+  // tighter tolerance than the full 30-item DASH's "3 missing" rule, since
+  // this is the only DASH-family instrument seeded (see backend/seed_proms.py).
+  const minRequired = Math.max(1, scoredQuestions.length - 1);
   if (answered.length < minRequired) return null;
 
   const sum = answered.reduce((acc, q) => {

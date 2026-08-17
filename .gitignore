@@ -13,7 +13,7 @@ build/
 .venv/
 venv/
 env/
-
+audio/
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
@@ -32,3 +32,4 @@ Thumbs.db
 
 # Logs
 *.log
+
