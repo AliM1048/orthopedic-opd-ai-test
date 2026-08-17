@@ -13,6 +13,7 @@ import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
 import PromAssignmentModal from '../components/PromAssignmentModal';
+import PromTrendChart from '../components/PromTrendChart';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
 
 const API_BASE = 'http://localhost:8000';
@@ -910,29 +911,6 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#dc2626' : painNRS > 3 ? '#d97706' : '#059669';
   const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
 
-  // PROM Trend — only plotted from real assessment history (2+ visits with a
-  // resolvable score). With fewer than 2, there's nothing real to trend, so
-  // no points are fabricated — the chart shows an empty-history message.
-  const assessmentHistory = (patient.assessments || []).slice().sort((a, b) => a.date.localeCompare(b.date));
-  const trendPoints = assessmentHistory.length >= 2
-    ? assessmentHistory
-        .map((a, idx) => {
-          const s = resolveFinalScore(a);
-          if (s === null) return null;
-          const x = (idx / (assessmentHistory.length - 1)) * 170 + 15;
-          const y = 55 - (s / 100) * 45;
-          return { score: s, label: a.date, x, y };
-        })
-        .filter(Boolean)
-    : [];
-
-  const firstPt = trendPoints[0] || null;
-  const lastPt = trendPoints[trendPoints.length - 1] || null;
-  const trendDiff = lastPt && firstPt ? lastPt.score - firstPt.score : null;
-
-  const trendLinePath = trendPoints.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '');
-  const trendAreaPath = (firstPt && lastPt) ? `${trendLinePath} L ${lastPt.x} 60 L ${firstPt.x} 60 Z` : '';
-
   // Prefer the just-recorded dictation (playable immediately, before the
   // doctor hits "Confirm & Save All") over the last persisted evaluation's
   // audio, which only exists once a recording has actually been saved.
@@ -1150,65 +1128,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
             {/* Card 4 — PROM Trend */}
             <SCard title={`PROM Trend — ${promName}`} icon={TrendingUp}>
-              {trendPoints.length === 0 ? (
-                <p className="pe-empty-note">Not enough visit history yet — needs 2+ completed assessments to plot a trend.</p>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)' }}>
-                        {finalScore === null ? '—' : finalScore} <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>/ 100</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Overall {promName} Score
-                      </div>
-                    </div>
-                    {trendDiff !== null && (() => {
-                      // For a lower_better instrument a falling score is the
-                      // improvement, so the up/down arrow's good/bad colour
-                      // (not its direction) flips relative to higher_better.
-                      const improving = scoreDirection === 'lower_better' ? trendDiff <= 0 : trendDiff >= 0;
-                      return (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                          background: improving ? '#05966918' : '#dc262618',
-                          color: improving ? '#059669' : '#dc2626',
-                          border: `1px solid ${improving ? '#05966930' : '#dc262630'}`
-                        }}>
-                          {trendDiff >= 0 ? `▲ +${trendDiff}` : `▼ ${trendDiff}`}
-                        </span>
-                      );
-                    })()}
-                  </div>
-
-                  <div style={{ width: '100%', height: 75, position: 'relative', marginTop: 8 }}>
-                    <svg width="100%" height="75" viewBox="0 0 200 65" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="koosGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      <path d={trendAreaPath} fill="url(#koosGrad)" />
-                      <path d={trendLinePath} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" />
-                      {trendPoints.map((pt, i) => (
-                        <g key={i}>
-                          <circle cx={pt.x} cy={pt.y} r="4" fill="#fff" stroke="var(--primary)" strokeWidth="2.5" />
-                          <text x={pt.x} y={pt.y - 8} fontSize="9" fontWeight="700" fill="var(--text-primary)" textAnchor="middle">
-                            {pt.score}
-                          </text>
-                        </g>
-                      ))}
-                    </svg>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
-                    {trendPoints.map((pt, i) => (
-                      <span key={i}>{pt.label}</span>
-                    ))}
-                  </div>
-                </>
-              )}
+              <PromTrendChart patientId={patientId} scoreDirection={scoreDirection} />
             </SCard>
 
           </div>{/* end left col */}

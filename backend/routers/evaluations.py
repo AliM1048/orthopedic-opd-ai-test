@@ -4,6 +4,7 @@ from database import get_db
 from models import Patient, Evaluation
 from schemas import EvaluationCreate, EvaluationUpdate, PatientOut
 from .patients import _build_patient
+from .followups import generate_followup_schedule
 
 router = APIRouter(prefix="/api/patients", tags=["Evaluations"])
 
@@ -13,9 +14,15 @@ def add_evaluation(patient_id: str, body: EvaluationCreate, db: Session = Depend
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
+    is_first_evaluation = db.query(Evaluation).filter(Evaluation.patient_id == patient_id).count() == 0
     evaluation = Evaluation(**body.model_dump(), patient_id=patient_id)
     db.add(evaluation)
     db.commit()
+    # First evaluation on file for this patient kicks off their recurring
+    # PROM follow-up call schedule (e.g. 3/6/9 months out) — see
+    # routers/followups.py.
+    if is_first_evaluation:
+        generate_followup_schedule(patient, evaluation, db)
     return _build_patient(patient, db)
 
 

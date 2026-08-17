@@ -34,10 +34,14 @@ from routers.diagnostics import router as diagnostics_router
 from routers.treatments import router as treatments_router
 from routers.lookup import router as lookup_router
 from routers.auth import router as auth_router
+from routers.followups import router as followups_router
+from routers.prom_assignments import router as prom_assignments_router
+from routers.prom_public import router as prom_public_router
+from routers.prom_trend import router as prom_trend_router
 
 load_dotenv()
 
-app = FastAPI(title="Orthopedic OPD AI - Backend")
+app = FastAPI(title="OPD AI Unit - Backend")
 
 # CORS
 app.add_middleware(
@@ -63,6 +67,12 @@ app.include_router(evaluations_router, dependencies=[Depends(get_current_user)])
 app.include_router(diagnostics_router, dependencies=[Depends(get_current_user)])
 app.include_router(treatments_router, dependencies=[Depends(get_current_user)])
 app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
+app.include_router(followups_router, dependencies=[Depends(get_current_user)])
+app.include_router(prom_assignments_router, dependencies=[Depends(get_current_user)])
+app.include_router(prom_trend_router, dependencies=[Depends(get_current_user)])
+
+# Public (no login) — the tokenized patient self-completion link/QR
+app.include_router(prom_public_router)
 
 
 @app.on_event("startup")
@@ -76,6 +86,10 @@ def on_startup():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"chiefComplaint\" VARCHAR"))
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"sentToPatient\" BOOLEAN NOT NULL DEFAULT FALSE"))
+            conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"soapNote\" JSON"))
+            conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS \"followUpIntervalsMonths\" JSON"))
+            conn.execute(text("ALTER TABLE followup_calls ALTER COLUMN \"intervalMonths\" DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE followup_calls ADD COLUMN IF NOT EXISTS \"promAssignmentId\" VARCHAR"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" INTEGER"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"interpretation\" JSON"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"promCode\" VARCHAR"))
@@ -218,7 +232,7 @@ def transcribe_with_fallback(path: str, language: str | None = None) -> dict:
 @app.get("/")
 def root():
     return {
-        "status": "Orthopedic OPD AI API is running",
+        "status": "OPD AI Unit API is running",
         "opd_api": "/api/patients",
     }
 

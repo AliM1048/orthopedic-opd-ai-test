@@ -4,14 +4,18 @@ from the official PDFs in the scores/ directory:
 
   scores/KOOS.pdf                       → KOOS-JR (7 items, Saudi-Arabic)
   scores/hoos_hip_survey.pdf            → Full HOOS (40 items, 6 subscales)
-  scores/wirsthand elbow shoulder.pdf   → Full DASH 30-item (Shoulder/Elbow/Hand&Wrist)
+  scores/wirsthand elbow shoulder.pdf   → DASH, 29 mandatory items (Shoulder/Elbow/Hand&Wrist) —
+                                           item 21 "sexual activities" and the optional Work /
+                                           Sports-Performing-Arts modules (PDF page 4) are excluded
+                                           per the source PDF, which marks them optional
   scores/how_we_calc_for_all_and_distribution.jpg → scoring rules
   scores/Koos_how_to_calcuate_score.txt → KOOS-JR Rasch conversion table
 
 Scoring formulas (from clinic guide image):
   KOOS-JR:   Raw 0-28 → official Rasch table → 0-100 (higher=better)
   HOOS full: 100 - (rawSum / (n*4)) * 100 → 0-100 (higher=better)
-  DASH 30:   ((sum/n) - 1) × 25 → 0-100 (lower=better disability score)
+  DASH:      ((sum/n) - 1) × 25 → 0-100 (lower=better disability score); n = answered
+             out of 29 mandatory items, min 26 required
   ODI/NDI:   (total / (answered×5)) × 100 → 0-100% (lower=better)
   SEFAS:     (raw / 48) × 100 → 0-100 (higher=better)
 
@@ -287,8 +291,11 @@ def dash_questions():
                DASH_DIFF, DASH_SV),
         radio("d_20", "20. أن تتنقل بالمواصلات من مكان لآخر بمساعدة أعضاء جسدك العلوية (مثل الإمساك بمقود السيارة)\n   (Transport yourself from place to place using upper limbs, e.g. steering)",
                DASH_DIFF, DASH_SV),
-        radio("d_21", "21. النشاطات الجنسية (اختياري)\n   (Sexual activities — optional)",
-               DASH_DIFF, DASH_SV, required=False),
+        # Item 21 "Sexual activities" is explicitly marked optional in the
+        # source PDF ("الإجابه على هذا السؤال اختياري") and is intentionally
+        # excluded here — only the mandatory 29 items are asked. The Work
+        # Module and Sports/Performing Arts Module on PDF page 4 are also
+        # optional add-on modules and are likewise excluded.
 
         # ── Social / Work Impact (items 22–23) ──
         radio("d_22", "22. هل أثرت المشكلة في ذراعك أو كتفك أو يدك خلال الأسبوع الماضي على نشاطاتك الاجتماعية العادية مع العائلة أو الأصدقاء؟\n   (During the past week, to what extent has your arm/shoulder/hand problem interfered with your normal social activities?)",
@@ -319,22 +326,24 @@ def dash_questions():
 
 
 def dash_sections(region_prefix):
-    """Returns DASH sections with unique IDs per region so the DB doesn't clash."""
+    """Returns DASH sections with unique IDs per region so the DB doesn't clash.
+    29 mandatory items total (item 21 "Sexual activities" excluded — see
+    dash_questions() above)."""
     return [
         {
             "id": f"{region_prefix}_activities",
-            "title": "الأنشطة والمهام اليومية / Daily Activities (Items 1–21)",
-            "questions": dash_questions()[:21],
+            "title": "الأنشطة والمهام اليومية / Daily Activities (Items 1–20)",
+            "questions": dash_questions()[:20],
         },
         {
             "id": f"{region_prefix}_impact",
             "title": "التأثير الاجتماعي والوظيفي / Social & Work Impact (Items 22–23)",
-            "questions": dash_questions()[21:23],
+            "questions": dash_questions()[20:22],
         },
         {
             "id": f"{region_prefix}_symptoms",
             "title": "الأعراض والنوم / Symptoms & Sleep (Items 24–30)",
-            "questions": dash_questions()[23:],
+            "questions": dash_questions()[22:],
         },
     ]
 
@@ -643,15 +652,16 @@ CONFIGS = [
         "configId": "shoulder-dash",
         "title": "DASH — Shoulder / الكتف",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – Full 30-item questionnaire (Arabic). "
-            "Each item scored 1–5 (1=No difficulty, 5=Unable). "
+            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
+            "the official optional 'sexual activities' item and the optional Work / "
+            "Sports modules are excluded. Each item scored 1–5 (1=No difficulty, 5=Unable). "
             "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum disability). "
-            "Minimum 27 of 30 items required."
+            "Minimum 26 of 29 items required."
         ),
         "promName": "DASH",
         "scoreCalculation": "quickdash",      # same formula works for full DASH
         "scoreDirection": "lower_better",
-        "rawMax": 150,                         # 30 items × 5 (for reference only, formula uses avg)
+        "rawMax": 145,                         # 29 items × 5 (for reference only, formula uses avg)
         "conversionTable": None,
         "icon": "🙆",
         "sections": [intake_section()] + dash_sections("shoulder"),
@@ -663,13 +673,15 @@ CONFIGS = [
         "configId": "elbow-dash",
         "title": "DASH — Elbow / الكوع",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – Full 30-item questionnaire (Arabic). "
+            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
+            "the official optional 'sexual activities' item and the optional Work / "
+            "Sports modules are excluded. "
             "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum)."
         ),
         "promName": "DASH",
         "scoreCalculation": "quickdash",
         "scoreDirection": "lower_better",
-        "rawMax": 150,
+        "rawMax": 145,
         "conversionTable": None,
         "icon": "💪",
         "sections": [intake_section()] + dash_sections("elbow"),
@@ -681,13 +693,15 @@ CONFIGS = [
         "configId": "hand-wrist-dash",
         "title": "DASH — Hand & Wrist / اليد والمعصم",
         "description": (
-            "Disabilities of the Arm, Shoulder and Hand – Full 30-item questionnaire (Arabic). "
+            "Disabilities of the Arm, Shoulder and Hand – 29 mandatory items (Arabic); "
+            "the official optional 'sexual activities' item and the optional Work / "
+            "Sports modules are excluded. "
             "Formula: ((sum/n) − 1) × 25 → 0–100 (0=no disability, 100=maximum)."
         ),
         "promName": "DASH",
         "scoreCalculation": "quickdash",
         "scoreDirection": "lower_better",
-        "rawMax": 150,
+        "rawMax": 145,
         "conversionTable": None,
         "icon": "✋",
         "sections": [intake_section()] + dash_sections("handwrist"),

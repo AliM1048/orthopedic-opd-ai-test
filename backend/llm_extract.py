@@ -391,6 +391,14 @@ Return JSON with exactly this shape:
 {{
   "diagnosis": "short diagnosis label, e.g. Osteoarthritis Grade 3, Right Knee",
   "notes": "clinical notes summarizing history/exam/findings from the evaluation part",
+  "soap": {{
+    "chiefComplaint": "the patient's presenting complaint, in their own words if stated",
+    "historyOfPresentIllness": "onset, duration, character, aggravating/relieving factors of the current problem",
+    "pastMedicalHistory": "relevant prior conditions, surgeries, medications mentioned — empty string if none was said",
+    "examination": "physical exam findings described (inspection, palpation, range of motion, special tests, etc.)",
+    "assessment": "the clinical assessment / diagnosis, same content as the top-level diagnosis field",
+    "plan": "the management plan in prose — may restate the diagnostic tests and treatments below in sentence form"
+  }},
   "diagnostic_tests": ["<ids from the known diagnostic test ids that were mentioned>"],
   "treatments": [
     {{"type": "<id from the known treatment ids>", "duration": "<e.g. 6 weeks, or null>", "details": "<instructions mentioned>", "followUpDate": "<YYYY-MM-DD or null>"}}
@@ -400,6 +408,11 @@ Return JSON with exactly this shape:
 Rules:
 - If a section wasn't mentioned at all, return an empty string/array for it
   instead of guessing.
+- Write every "soap" field in clear, grammatically correct clinical English —
+  the doctor is dictating out loud, so silently fix any spoken disfluency,
+  filler word, or grammatical slip; never transcribe verbatim if the phrasing
+  was awkward. Keep the clinical meaning exact; do not add information that
+  was not said.
 - Only use ids from the known lists above for diagnostic_tests and
   treatments[].type — never invent new ids.
 - If the same treatment (e.g. physiotherapy) has a duration AND a follow-up
@@ -427,6 +440,19 @@ def _clean_str(value) -> str:
 def _clean_date(value):
     cleaned = _clean_str(value)
     return cleaned or None
+
+
+_SOAP_FIELDS = (
+    "chiefComplaint", "historyOfPresentIllness", "pastMedicalHistory",
+    "examination", "assessment", "plan",
+)
+
+
+def _clean_soap(raw) -> dict:
+    """Normalises the LLM's `soap` object to always carry all 6 fields as
+    plain strings, regardless of whether the model included every key."""
+    raw = raw if isinstance(raw, dict) else {}
+    return {field: _clean_str(raw.get(field)) for field in _SOAP_FIELDS}
 
 
 def call_openai_extract(prompt: str) -> dict | None:
@@ -463,7 +489,8 @@ def extract_structured(transcript: str) -> dict:
 
     if not transcript.strip():
         return {
-            "diagnosis": "", "notes": "", "diagnostic_tests": [], "treatments": [],
+            "diagnosis": "", "notes": "", "soap": _clean_soap(None),
+            "diagnostic_tests": [], "treatments": [],
             "sections": sections, "ai_structured": False,
         }
 
@@ -472,16 +499,22 @@ def extract_structured(transcript: str) -> dict:
     if parsed is None:
         # Extraction call failed: still honor the keyword-matched
         # tests/treatments so voice selection works even with the API down —
-        # just without an AI-written diagnosis/notes/duration/follow-up date.
+        # just without an AI-written diagnosis/notes/soap/duration/follow-up
+        # date. The one soap field a deterministic fallback CAN populate is
+        # historyOfPresentIllness, from the same "evaluation" chunk `notes`
+        # already falls back to below — better than leaving it blank.
         treatments = [
             {"type": t, "duration": "", "details": "", "followUpDate": None}
             for t in keyword_treatment_types
         ]
         _apply_details_fallback(treatments, fallback_details)
         _apply_followup_date_fallback(treatments, fallback_followup_date)
+        fallback_soap = _clean_soap(None)
+        fallback_soap["historyOfPresentIllness"] = sections["evaluation"]
         return {
             "diagnosis": "",
             "notes": sections["evaluation"] or transcript,
+            "soap": fallback_soap,
             "diagnostic_tests": keyword_tests,
             "treatments": treatments,
             "sections": sections,
@@ -517,6 +550,7 @@ def extract_structured(transcript: str) -> dict:
     return {
         "diagnosis": _clean_str(parsed.get("diagnosis")),
         "notes": _clean_str(parsed.get("notes")) or sections["evaluation"],
+        "soap": _clean_soap(parsed.get("soap")),
         "diagnostic_tests": diagnostic_tests,
         "treatments": treatments,
         "sections": sections,

@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo   Whisper STT App - Starting Backend
+echo   OPD AI Unit - Starting Backend
 echo ============================================
 cd /d "%~dp0backend"
 echo Installing/verifying Python dependencies...

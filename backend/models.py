@@ -21,6 +21,9 @@ class Patient(Base):
     status = Column(String, nullable=False, default="pending")
     bodyArea = Column(String, nullable=False)
     avatar = Column(String, nullable=False)
+    # Per-patient override of the clinic-wide PROM follow-up call schedule
+    # (see FollowUpSettings.intervalsMonths) — null means "use the default".
+    followUpIntervalsMonths = Column(JSON, nullable=True)
 
 
 class Assessment(Base):
@@ -52,6 +55,7 @@ class Evaluation(Base):
     diagnosis = Column(String, nullable=True)
     audioUrl = Column(String, nullable=True)
     sentToPatient = Column(Boolean, nullable=False, default=False)
+    soapNote = Column(JSON, nullable=True)
 
 
 class Diagnostic(Base):
@@ -113,6 +117,81 @@ class StatusConfig(Base):
     badgeClass = Column(String, nullable=False)
     color = Column(String, nullable=False)
     sortOrder = Column(Integer, nullable=False, default=0)
+
+
+class FollowUpSettings(Base):
+    """Single-row table (id='default') holding the clinic-wide PROM follow-up
+    call schedule, e.g. [3, 6, 9] months after a patient's first evaluation."""
+    __tablename__ = "followup_settings"
+
+    id = Column(String, primary_key=True)
+    intervalsMonths = Column(JSON, nullable=False)
+
+
+class FollowUpCall(Base):
+    """A scheduled nurse call to re-run the PROM questionnaire on a patient at
+    a fixed interval after their first doctor evaluation (e.g. 3/6/9 months
+    out), so outcome scores get tracked over time instead of just at intake.
+    Generated automatically when a patient's first evaluation is saved — see
+    routers/followups.py:generate_followup_schedule()."""
+    __tablename__ = "followup_calls"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    # Null for a manually-added, one-off call that doesn't correspond to a
+    # 3/6/9-month interval — see POST /patients/{id}/followups.
+    intervalMonths = Column(Integer, nullable=True)
+    scheduledDate = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")  # pending | completed
+    anchorEvaluationId = Column(String, nullable=True)
+    completedAssessmentId = Column(String, nullable=True)
+    # Set once the auto-send sweep (routers/prom_assignments.py:auto_progress_prom_assignments)
+    # creates the linked self-completion PROMAssignment for this call's date.
+    promAssignmentId = Column(String, nullable=True)
+
+
+class InjuryEvent(Base):
+    """A clinical timeline marker — new injury, surgery, injection, or start
+    of physiotherapy — plotted as a vertical line on the PROM trend graph.
+    Surgery/Injection/Physiotherapy are usually already on file as Treatment
+    rows and are read from there; this table exists for "New Injury", which
+    has no other home in the data model."""
+    __tablename__ = "injury_events"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    date = Column(String, nullable=False)
+    note = Column(String, nullable=True)
+
+
+class PROMAssignment(Base):
+    """Tracks a doctor-directed request to complete a PROM questionnaire that
+    wasn't filled in ahead of the visit — e.g. a walk-in/ER referral who
+    skipped the normal pre-visit call. The doctor selects the instrument and
+    routes it (self-completion link/QR, clerk-assisted, physician-assisted
+    now, or deferred) but never answers on the patient's behalf. See
+    routers/prom_assignments.py and routers/prom_public.py."""
+    __tablename__ = "prom_assignments"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    evaluationId = Column(String, nullable=True)
+    bodyArea = Column(String, nullable=False)
+    promName = Column(String, nullable=True)
+    respondentType = Column(String, nullable=False)       # patient | parent_caregiver
+    completionMethod = Column(String, nullable=False)     # self_completion | clerk_assisted | physician_assisted | deferred
+    timing = Column(String, nullable=True)                # before_exam | after_exam | after_intervention
+    # sent_pending | assigned_to_clerk | completed | deferred | declined
+    # ("overdue" is a derived display state computed from assignedAt — see routers/prom_assignments.py)
+    status = Column(String, nullable=False, default="sent_pending")
+    deferReason = Column(String, nullable=True)
+    assignedBy = Column(String, nullable=True)
+    assignedAt = Column(String, nullable=True)
+    answeredBy = Column(String, nullable=True)             # patient | parent_caregiver
+    enteredBy = Column(String, nullable=True)              # name of whoever typed the answers in
+    completedAt = Column(String, nullable=True)
+    assessmentId = Column(String, nullable=True)
+    accessToken = Column(String, nullable=True, unique=True)
 
 
 class DiagnosticTestOption(Base):
