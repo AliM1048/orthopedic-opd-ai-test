@@ -39,7 +39,7 @@ export default function PatientStatus({ patients }) {
           <div className="card ps-list-col">
             <div className="search-bar" style={{ marginBottom: 12 }}>
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search by name, MRN, or body area…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder="Search patients…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
 
             {filtered.length === 0 ? (

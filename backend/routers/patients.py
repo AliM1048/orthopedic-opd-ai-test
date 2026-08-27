@@ -3,10 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from database import get_db
-from models import Patient, Assessment, Evaluation, Diagnostic, Treatment
+from models import Patient, Assessment, Evaluation, SurgeryEvaluation, Diagnostic, Treatment, Document
 from schemas import (
     PatientOut, PatientListResponse, UpdateStatusRequest, UpdateBodyAreaRequest,
-    AssessmentOut, EvaluationOut, DiagnosticOut, TreatmentOut,
+    AssessmentOut, EvaluationOut, SurgeryEvaluationOut, DiagnosticOut, TreatmentOut, DocumentOut,
     PatientCreate,
 )
 import uuid
@@ -52,8 +52,13 @@ def _is_follow_up_due(treatments, assessments):
 def _build_patient(patient: Patient, db: Session) -> PatientOut:
     assessments = db.query(Assessment).filter(Assessment.patient_id == patient.id).all()
     evaluations = db.query(Evaluation).filter(Evaluation.patient_id == patient.id).all()
+    surgery_evaluations = db.query(SurgeryEvaluation).filter(SurgeryEvaluation.patient_id == patient.id).all()
     diagnostics = db.query(Diagnostic).filter(Diagnostic.patient_id == patient.id).all()
     treatments = db.query(Treatment).filter(Treatment.patient_id == patient.id).all()
+    documents = db.query(Document).filter(Document.patient_id == patient.id).all()
+    documents_by_evaluation = {}
+    for doc in documents:
+        documents_by_evaluation.setdefault(doc.evaluation_id, []).append(doc)
 
     # Roll the patient into the existing 'follow-up' status bucket once their
     # follow-up date is within FOLLOW_UP_LEAD_DAYS — this reuses the nurse
@@ -66,7 +71,14 @@ def _build_patient(patient: Patient, db: Session) -> PatientOut:
     return PatientOut(
         **{c.name: getattr(patient, c.name) for c in patient.__table__.columns},
         assessments=[AssessmentOut.model_validate(a) for a in assessments],
-        evaluations=[EvaluationOut.model_validate(e) for e in evaluations],
+        evaluations=[
+            EvaluationOut(
+                **{c.name: getattr(e, c.name) for c in e.__table__.columns},
+                documents=[DocumentOut.model_validate(doc) for doc in documents_by_evaluation.get(e.id, [])],
+            )
+            for e in evaluations
+        ],
+        surgeryEvaluations=[SurgeryEvaluationOut.model_validate(e) for e in surgery_evaluations],
         diagnostics=[DiagnosticOut.model_validate(d) for d in diagnostics],
         treatments=[TreatmentOut.model_validate(t) for t in treatments],
     )

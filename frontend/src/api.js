@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8000';
+// VITE_API_BASE_URL lets this be overridden when the page is loaded from a
+// different device than the one running the dev server — e.g. embedded in
+// the mobile app's WebView on a phone, where "localhost" would otherwise
+// mean the phone itself, not the dev machine.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE,

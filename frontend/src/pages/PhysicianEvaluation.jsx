@@ -12,6 +12,7 @@ import { getOdiNdiInterpretation } from '../utils/scoring';
 import DictationRecordingModal from '../components/DictationRecordingModal';
 import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
+import PrintTypeModal from '../components/PrintTypeModal';
 import PromAssignmentModal from '../components/PromAssignmentModal';
 import PromTrendChart from '../components/PromTrendChart';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
@@ -279,12 +280,30 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
 
 function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, latestAssessment, promName, scoreDirection, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
   const [printOrder, setPrintOrder] = React.useState(null);
+  const [showPrintTypeModal, setShowPrintTypeModal] = React.useState(false);
+  const [printDocType, setPrintDocType] = React.useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const evaluation = (patient?.evaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
   const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
 
+  // Printing is blocking in mainstream browsers — window.print() only returns
+  // once the print dialog closes — so resetting printDocType right after the
+  // call still leaves the insurance flag visible for the whole print/preview.
+  React.useEffect(() => {
+    if (printDocType) {
+      window.print();
+      setPrintDocType(null);
+    }
+  }, [printDocType]);
+
   return (
-    <div className="pe-review-root" style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div className="pe-review-root" data-doc-type={printDocType || 'standard'} style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Insurance flag — placeholder until the real insurance layout is provided */}
+      {printDocType === 'insurance' && (
+        <div style={{ background: '#fef3c7', color: '#92400e', textAlign: 'center', padding: '6px 12px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
+          🏷 INSURANCE COPY
+        </div>
+      )}
       {/* Top bar */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -297,7 +316,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           </div>
         </div>
         <div className="topbar-right">
-          <button onClick={() => window.print()} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             🖨 Print Full Summary
           </button>
         </div>
@@ -503,7 +522,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 
           {/* Print full doc button */}
           <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', gap: 8 }}>
-            <button onClick={() => window.print()} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={() => setShowPrintTypeModal(true)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               🖨 Print Full Document
             </button>
           </div>
@@ -518,12 +537,19 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           onClose={() => setPrintOrder(null)}
         />
       )}
+
+      {showPrintTypeModal && (
+        <PrintTypeModal
+          onChoose={(type) => { setShowPrintTypeModal(false); setPrintDocType(type); }}
+          onClose={() => setShowPrintTypeModal(false)}
+        />
+      )}
     </div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */
-export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent }) {
+export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent, onUploadDocument, onDeleteDocument }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -816,6 +842,26 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       .finally(() => setSendingToPatient(false));
   };
 
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const handleUploadDocument = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !currentEvaluationId || !onUploadDocument) return;
+    setUploadingDoc(true);
+    Promise.resolve(onUploadDocument(patientId, currentEvaluationId, file, physicianName))
+      .then(() => notifySuccess('Document uploaded'))
+      .catch(() => notifyError('Failed to upload document'))
+      .finally(() => setUploadingDoc(false));
+  };
+
+  const handleDeleteDocument = (documentId) => {
+    if (!onDeleteDocument || !currentEvaluationId) return;
+    Promise.resolve(onDeleteDocument(patientId, currentEvaluationId, documentId))
+      .then(() => notifySuccess('Document removed'))
+      .catch(() => notifyError('Failed to remove document'));
+  };
+
   const handleDeleteOrder = async (order) => {
     if (deletingOrderId) return;
     const confirmed = await Swal.fire({
@@ -887,6 +933,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const activeStep  = getActiveStepIndex(patient);
 
   const latestEvaluation = latestByDate(patient.evaluations);
+  const currentEvaluationDocuments = patient.evaluations.find((e) => e.id === currentEvaluationId)?.documents || [];
   const latestTreatment   = latestByDate(patient.treatments);
   const sortedDiagnostics = [...(patient.diagnostics || [])].sort((a, b) => b.date.localeCompare(a.date));
   const medications        = (patient.treatments || []).filter((t) => t.type === 'Medication').sort((a, b) => b.date.localeCompare(a.date));
@@ -897,7 +944,12 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const promName = assessmentConfig?.promName || assessmentConfig?.title || 'PROM';
   const scoreDirection = assessmentConfig?.scoreDirection || 'higher_better';
   const finalScore = resolveFinalScore(latestAssessment);
-  const disabilityInterpretation = latestAssessment?.interpretation || getOdiNdiInterpretation(finalScore);
+  // getOdiNdiInterpretation assumes ODI/NDI's native 0=best/100=worst scale —
+  // only usable as a fallback for a lower_better instrument. Applying it to a
+  // higher_better score (e.g. a good 72% function score) would mislabel it
+  // with disability-index language like "Crippled".
+  const disabilityInterpretation = latestAssessment?.interpretation
+    || (scoreDirection === 'lower_better' ? getOdiNdiInterpretation(finalScore) : null);
   const directionCaption = scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function';
 
   // Pain NRS score (0-10) — real only, straight from the shared pain_scale
@@ -1342,6 +1394,60 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               )}
 
               <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
+
+              {/* ── Attached Documents (MRI scans, reports, etc.) ── */}
+              <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
+                <FileText size={13} /> Attached Documents
+              </div>
+              {!currentEvaluationId ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Save the evaluation (Complete Visit) before attaching documents.</p>
+              ) : (
+                <>
+                  {currentEvaluationDocuments.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>No documents attached yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      {currentEvaluationDocuments.map((doc) => (
+                        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '8px 12px' }}>
+                          <FileText size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                          <a
+                            href={`${API_BASE}/documents/${doc.filename}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {doc.originalName}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            title="Remove document"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              width: 22, height: 22, borderRadius: 6, border: 'none',
+                              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="btn btn-outline btn-sm" style={{ display: 'inline-flex', cursor: uploadingDoc ? 'not-allowed' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
+                    {uploadingDoc ? 'Uploading…' : '+ Attach Document (JPG/PNG/PDF)'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,application/pdf"
+                      onChange={handleUploadDocument}
+                      disabled={uploadingDoc}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </>
+              )}
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
 
               {/* ── Follow-Up ── */}
               <div>

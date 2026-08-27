@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, JSON, Text, Boolean
+from sqlalchemy import Column, String, Integer, Float, JSON, Text, Boolean
 from database import Base
 
 
@@ -39,7 +39,9 @@ class Assessment(Base):
     completedBy = Column(String, nullable=False)
     chiefComplaint = Column(String, nullable=True)
     answers = Column(JSON, nullable=True)
-    finalScore = Column(Integer, nullable=True)
+    # Float, not Integer: some scoring formulas (e.g. ODI/NDI's percent-of-max)
+    # deliberately keep one decimal place of precision.
+    finalScore = Column(Float, nullable=True)
     interpretation = Column(JSON, nullable=True)
     promCode = Column(String, nullable=True)
 
@@ -56,6 +58,40 @@ class Evaluation(Base):
     audioUrl = Column(String, nullable=True)
     sentToPatient = Column(Boolean, nullable=False, default=False)
     soapNote = Column(JSON, nullable=True)
+    # AI-generated plain-language summary for the patient's mobile app,
+    # generated once at the moment sentToPatient flips True — see
+    # patient_summary.py.
+    patientSummary = Column(Text, nullable=True)
+
+
+class SurgeryEvaluation(Base):
+    __tablename__ = "surgery_evaluations"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    date = Column(String, nullable=False)
+    surgeon = Column(String, nullable=False)
+    notes = Column(Text, nullable=True)
+    diagnosis = Column(String, nullable=True)
+    audioUrl = Column(String, nullable=True)
+    sentToPatient = Column(Boolean, nullable=False, default=False)
+    soapNote = Column(JSON, nullable=True)
+    patientSummary = Column(Text, nullable=True)
+
+
+class Document(Base):
+    """A doctor-uploaded file (MRI image, scan report, etc.) attached to a
+    specific Evaluation entry. See routers/documents.py."""
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    evaluation_id = Column(String, nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    originalName = Column(String, nullable=False)
+    contentType = Column(String, nullable=False)
+    uploadedBy = Column(String, nullable=False)
+    uploadedAt = Column(String, nullable=False)
 
 
 class Diagnostic(Base):
@@ -192,6 +228,76 @@ class PROMAssignment(Base):
     completedAt = Column(String, nullable=True)
     assessmentId = Column(String, nullable=True)
     accessToken = Column(String, nullable=True, unique=True)
+
+
+class PatientOTP(Base):
+    """A one-time login code issued to a patient's phone number for the
+    mobile app. See routers/patient_auth.py — dev-mode only for now (no SMS
+    provider wired up), so the code is also logged/returned to the caller
+    behind OTP_DEV_MODE."""
+    __tablename__ = "patient_otps"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    phone = Column(String, nullable=False)
+    codeHash = Column(String, nullable=False)
+    expiresAt = Column(String, nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    createdAt = Column(String, nullable=False)
+
+
+class PatientNotification(Base):
+    """In-app inbox row for the mobile app — created whenever a doctor or
+    surgeon marks a visit report sentToPatient=True. See notifications.py
+    and routers/patient_self.py."""
+    __tablename__ = "patient_notifications"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    type = Column(String, nullable=False, default="visit_report")
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=True)
+    relatedType = Column(String, nullable=True)  # evaluation | surgery_evaluation
+    relatedId = Column(String, nullable=True)
+    isRead = Column(Boolean, nullable=False, default=False)
+    createdAt = Column(String, nullable=False)
+
+
+class StaffNotification(Base):
+    """Dashboard-wide inbox row for staff — created when a patient
+    self-completes a pre-visit PROM via the mobile app, so a nurse sees a
+    toast without having to notice the "Pre-Visit Calls Due" list changed.
+    Not scoped to one nurse's login — every staff dashboard shares the same
+    queue. See notifications.py and routers/prom_public.py."""
+    __tablename__ = "staff_notifications"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    type = Column(String, nullable=False, default="prom_self_completed")
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=True)
+    relatedType = Column(String, nullable=True)  # assessment
+    relatedId = Column(String, nullable=True)
+    isRead = Column(Boolean, nullable=False, default=False)
+    createdAt = Column(String, nullable=False)
+
+
+class ChatMessage(Base):
+    """One message in a patient's single running conversation with the
+    clinic — shared between the mobile app (patient side, shown as
+    "Care Assistant") and the web dashboard (staff side, one thread per
+    patient, open to any logged-in nurse/physician). Plain send-only
+    history — no edit/delete, no read-receipts beyond the existing
+    Patient/StaffNotification unread badges. See routers/patient_self.py
+    (patient endpoints) and routers/chat.py (staff endpoints)."""
+    __tablename__ = "chat_messages"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    senderType = Column(String, nullable=False)  # "patient" | "staff"
+    senderName = Column(String, nullable=True)   # staff member's display name; null for patient-sent messages
+    text = Column(Text, nullable=False)
+    createdAt = Column(String, nullable=False)
 
 
 class DiagnosticTestOption(Base):

@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Patient, Evaluation, FollowUpCall, FollowUpSettings
+from models import Patient, Evaluation, FollowUpCall, FollowUpSettings, PROMAssignment
 from schemas import (
     FollowUpCallOut, FollowUpCallDue, FollowUpCallUpdate, FollowUpCallCreate,
     FollowUpSettingsOut, FollowUpSettingsUpdate, PatientFollowUpSettingsUpdate,
@@ -29,7 +29,15 @@ from .patients import _build_patient
 router = APIRouter(prefix="/api", tags=["Follow-Up Calls"])
 
 DEFAULT_INTERVALS_MONTHS = [3, 6, 9]
-REMINDER_LEAD_DAYS = 2
+
+# "Pre-Visit Calls Due" (both the very first pre-visit call and a recurring
+# follow-up check-in) shows a patient only while their relevant date —
+# scheduledDate for a follow-up, appointmentDate for an initial pre-visit —
+# is within this many days from today. Once that date has passed, the entry
+# drops off the list entirely rather than lingering as "overdue": a missed
+# call has nothing left to remind about once the appointment/check-in date
+# is behind us.
+REMINDER_LEAD_DAYS = 3
 
 
 def add_months(d: date, months: int) -> date:
@@ -93,19 +101,97 @@ def _to_due(call: FollowUpCall, patient: Patient) -> FollowUpCallDue:
     )
 
 
+def _initial_pre_visit_due(patient: Patient) -> FollowUpCallDue:
+    # Not a real FollowUpCall row — synthesized in the same shape so the
+    # dashboard's existing "Pre-Visit Calls Due" card renders it without any
+    # special-casing. intervalMonths stays None, which the frontend uses to
+    # tell an initial reminder apart from a recurring N-month check-in.
+    return FollowUpCallDue(
+        id=f"initial-{patient.id}", patient_id=patient.id, intervalMonths=None,
+        scheduledDate=patient.appointmentDate, status="pending",
+        anchorEvaluationId=None, completedAssessmentId=None,
+        patientName=patient.name, patientMrn=patient.mrn,
+        patientPhone=patient.phone, patientAvatar=patient.avatar,
+    )
+
+
+def _patients_needing_initial_pre_visit(db: Session) -> list[Patient]:
+    """Never-assessed patients (status still 'pending') whose appointment is
+    within REMINDER_LEAD_DAYS. Once the appointment date has passed they're
+    excluded — a missed pre-visit call has nothing left to remind about."""
+    today_iso = date.today().strftime("%Y-%m-%d")
+    cutoff = (date.today() + timedelta(days=REMINDER_LEAD_DAYS)).strftime("%Y-%m-%d")
+    return (
+        db.query(Patient)
+        .filter(
+            Patient.status == "pending",
+            Patient.appointmentDate >= today_iso,
+            Patient.appointmentDate <= cutoff,
+        )
+        .all()
+    )
+
+
+def _auto_create_initial_prom_assignments(db: Session, patients: list[Patient]) -> None:
+    """Gives each of these patients a self-completion PROM link, the same
+    mechanism already used for follow-up calls and doctor-assigned walk-ins
+    (see prom_assignments.auto_progress_prom_assignments) — so the mobile
+    app's existing self-service screen picks it up with no mobile-side
+    changes (it already reads any pending self_completion assignment for the
+    logged-in patient). Skips patients that already have one on file."""
+    for patient in patients:
+        existing = (
+            db.query(PROMAssignment)
+            .filter(
+                PROMAssignment.patient_id == patient.id,
+                PROMAssignment.completionMethod == "self_completion",
+                PROMAssignment.status.in_(["sent_pending", "assigned_to_clerk"]),
+            )
+            .first()
+        )
+        if existing:
+            continue
+        db.add(PROMAssignment(
+            id=str(uuid.uuid4()),
+            patient_id=patient.id,
+            bodyArea=patient.bodyArea,
+            respondentType="patient",
+            completionMethod="self_completion",
+            timing="before_exam",
+            status="sent_pending",
+            assignedBy="System (auto-sent for pre-visit)",
+            assignedAt=datetime.utcnow().isoformat() + "Z",
+            accessToken=str(uuid.uuid4()),
+        ))
+    db.commit()
+
+
 @router.get("/followups/due", response_model=list[FollowUpCallDue])
 def list_due_followups(db: Session = Depends(get_db)):
-    """Every pending call scheduled within REMINDER_LEAD_DAYS (also surfaces
-    anything overdue, since a missed reminder shouldn't just disappear) —
-    powers the nurse dashboard reminder widget. Also runs the auto-progress
-    sweep (auto-sends the PROM for calls whose date has arrived, routes
-    non-responders to the clerk) since this is the endpoint every dashboard
-    load hits — see prom_assignments.auto_progress_prom_assignments."""
+    """Every pending call scheduled within REMINDER_LEAD_DAYS (past-due ones
+    drop off rather than lingering as "overdue" — see REMINDER_LEAD_DAYS),
+    PLUS never-assessed patients whose appointment is within that same
+    window — powers the nurse dashboard's "Pre-Visit Calls Due" widget for
+    both the very first pre-visit call and recurring outcome-tracking
+    follow-ups. Also runs the auto-progress sweep (auto-sends the PROM for
+    calls whose date has arrived, routes non-responders to the clerk, and now
+    also seeds a self-completion link for the initial-visit patients below)
+    since this is the endpoint every dashboard load hits — see
+    prom_assignments.auto_progress_prom_assignments."""
     auto_progress_prom_assignments(db)
+
+    initial_patients = _patients_needing_initial_pre_visit(db)
+    _auto_create_initial_prom_assignments(db, initial_patients)
+
+    today_iso = date.today().strftime("%Y-%m-%d")
     cutoff = (date.today() + timedelta(days=REMINDER_LEAD_DAYS)).strftime("%Y-%m-%d")
     rows = (
         db.query(FollowUpCall)
-        .filter(FollowUpCall.status == "pending", FollowUpCall.scheduledDate <= cutoff)
+        .filter(
+            FollowUpCall.status == "pending",
+            FollowUpCall.scheduledDate >= today_iso,
+            FollowUpCall.scheduledDate <= cutoff,
+        )
         .order_by(FollowUpCall.scheduledDate)
         .all()
     )
@@ -114,6 +200,9 @@ def list_due_followups(db: Session = Depends(get_db)):
         patient = db.query(Patient).filter(Patient.id == call.patient_id).first()
         if patient:
             out.append(_to_due(call, patient))
+    for patient in initial_patients:
+        out.append(_initial_pre_visit_due(patient))
+    out.sort(key=lambda d: d.scheduledDate)
     return out
 
 

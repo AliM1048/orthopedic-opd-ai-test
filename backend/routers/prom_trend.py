@@ -51,7 +51,14 @@ def get_prom_trend(patient_id: str, db: Session = Depends(get_db)):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
+    return compute_prom_trend(patient, db)
 
+
+def compute_prom_trend(patient: Patient, db: Session) -> PromTrendOut:
+    """Shared by the staff endpoint above and the patient-scoped mobile
+    equivalent (routers/patient_self.py) — same trend, same rules, just a
+    different auth gate in front of it."""
+    patient_id = patient.id
     assessments = (
         db.query(Assessment)
         .filter(Assessment.patient_id == patient_id, Assessment.finalScore.isnot(None))

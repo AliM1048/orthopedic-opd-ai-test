@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './index.css';
 
 import DashboardLayout from './layouts/DashboardLayout';
@@ -12,20 +12,37 @@ import NurseDashboard from './pages/NurseDashboard';
 import PatientProfile from './pages/PatientProfile';
 import PreVisitAssessment from './pages/PreVisitAssessment';
 import PhysicianEvaluation from './pages/PhysicianEvaluation';
+import SurgeryEvaluation from './pages/SurgeryEvaluation';
+import Surgeries from './pages/Surgeries';
 import AllPatients from './pages/AllPatients';
 import Analytics from './pages/Analytics';
 import DocumentGenerator from './pages/DocumentGenerator';
 import PatientStatus from './pages/PatientStatus';
 import ClerkTasks from './pages/ClerkTasks';
+import Messages from './pages/Messages';
 import PromPublicFill from './pages/PromPublicFill';
+
+// Nurses are restricted to the dashboard + physician evaluation + patient
+// messaging (chat isn't a specialized clinical action — the backend itself
+// gates it on "any logged-in staff", no role restriction); every other role
+// keeps seeing everything, unchanged (see DashboardLayout's matching
+// `restricted` nav-item flags, and forbid_roles("nurse") on the backend for
+// the surgery-evaluations endpoints).
+const NURSE_ALLOWED_PATHS = ['/', '/evaluation', '/messages'];
 
 // Everything a logged-in user can reach — split out so the public,
 // no-login PROM link route (below) never gets caught behind the auth gate.
 function AuthedApp({ user, patients, actions }) {
+  const location = useLocation();
   const {
     updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
-    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent,
+    addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
+    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
   } = actions;
+
+  if (user?.role === 'nurse' && !NURSE_ALLOWED_PATHS.includes(location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <LookupProvider>
@@ -64,6 +81,28 @@ function AuthedApp({ user, patients, actions }) {
                 onAddTreatment={addTreatment}
                 onDeleteTreatment={deleteTreatment}
                 onMarkEvaluationSent={markEvaluationSent}
+                onUploadDocument={uploadEvaluationDocument}
+                onDeleteDocument={deleteEvaluationDocument}
+              />
+            }
+          />
+          <Route
+            path="/surgeries"
+            element={<Surgeries patients={patients} />}
+          />
+          <Route
+            path="/surgery-evaluation"
+            element={
+              <SurgeryEvaluation
+                patients={patients}
+                user={user}
+                onAddSurgeryEvaluation={addSurgeryEvaluation}
+                onUpdateSurgeryEvaluation={updateSurgeryEvaluation}
+                onAddDiagnostic={addDiagnostic}
+                onDeleteDiagnostic={deleteDiagnostic}
+                onAddTreatment={addTreatment}
+                onDeleteTreatment={deleteTreatment}
+                onMarkSurgeryEvaluationSent={markSurgeryEvaluationSent}
               />
             }
           />
@@ -82,6 +121,10 @@ function AuthedApp({ user, patients, actions }) {
           <Route
             path="/clerk-tasks"
             element={<ClerkTasks />}
+          />
+          <Route
+            path="/messages"
+            element={<Messages />}
           />
           <Route
             path="/documents/new"
@@ -107,11 +150,16 @@ export default function App() {
     addAssessment,
     addEvaluation,
     updateEvaluation,
+    addSurgeryEvaluation,
+    updateSurgeryEvaluation,
+    uploadEvaluationDocument,
+    deleteEvaluationDocument,
     addDiagnostic,
     deleteDiagnostic,
     addTreatment,
     deleteTreatment,
     markEvaluationSent,
+    markSurgeryEvaluationSent,
     createPatient
   } = usePatients(token);
 
@@ -137,7 +185,8 @@ export default function App() {
                   patients={patients}
                   actions={{
                     updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
-                    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent,
+                    addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
+                    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
                     createPatient,
                   }}
                 />

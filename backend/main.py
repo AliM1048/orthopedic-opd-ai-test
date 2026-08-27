@@ -25,11 +25,13 @@ from pydub import AudioSegment
 
 from sqlalchemy import text
 from database import engine, Base
-from auth import get_current_user
+from auth import get_current_user, get_current_patient, forbid_roles
 from llm_extract import extract_structured, detect_language
 from routers.patients import router as patients_router
 from routers.assessments import router as assessments_router
 from routers.evaluations import router as evaluations_router
+from routers.surgery_evaluations import router as surgery_evaluations_router
+from routers.documents import router as documents_router
 from routers.diagnostics import router as diagnostics_router
 from routers.treatments import router as treatments_router
 from routers.lookup import router as lookup_router
@@ -38,6 +40,10 @@ from routers.followups import router as followups_router
 from routers.prom_assignments import router as prom_assignments_router
 from routers.prom_public import router as prom_public_router
 from routers.prom_trend import router as prom_trend_router
+from routers.patient_auth import router as patient_auth_router
+from routers.patient_self import router as patient_self_router
+from routers.staff_notifications import router as staff_notifications_router
+from routers.chat import router as chat_router
 
 load_dotenv()
 
@@ -51,7 +57,14 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:5175",
         "http://localhost:3000",
+        "http://localhost:8081",  # Expo web dev server (`npm run web` / `expo start --web`)
+        "http://localhost:19006",  # Expo web dev server, older SDK default port
     ],
+    # Also allow any private-LAN-IP origin on the usual dev ports — needed when a
+    # physical phone (Expo Go, or the mobile app's PROM-fill WebView loading the
+    # frontend dev server) hits this backend via the dev machine's LAN IP instead
+    # of localhost. Dev-only convenience, not used for any deployed environment.
+    allow_origin_regex=r"http://(192\.168|10\.\d+|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+:(3000|5173|5174|5175|8000|8081|19006)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,15 +77,25 @@ app.include_router(auth_router)
 app.include_router(patients_router, dependencies=[Depends(get_current_user)])
 app.include_router(assessments_router, dependencies=[Depends(get_current_user)])
 app.include_router(evaluations_router, dependencies=[Depends(get_current_user)])
+app.include_router(surgery_evaluations_router, dependencies=[Depends(forbid_roles("nurse"))])
+app.include_router(documents_router, dependencies=[Depends(get_current_user)])
 app.include_router(diagnostics_router, dependencies=[Depends(get_current_user)])
 app.include_router(treatments_router, dependencies=[Depends(get_current_user)])
 app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
 app.include_router(followups_router, dependencies=[Depends(get_current_user)])
+app.include_router(staff_notifications_router, dependencies=[Depends(get_current_user)])
+app.include_router(chat_router, dependencies=[Depends(get_current_user)])
 app.include_router(prom_assignments_router, dependencies=[Depends(get_current_user)])
 app.include_router(prom_trend_router, dependencies=[Depends(get_current_user)])
 
 # Public (no login) — the tokenized patient self-completion link/QR
 app.include_router(prom_public_router)
+
+# Mobile app: patient-scoped auth (public) + self-service routes (protected by
+# the patient JWT, audience-separated from the staff token above — see
+# auth.py's get_current_patient / PATIENT_AUDIENCE)
+app.include_router(patient_auth_router)
+app.include_router(patient_self_router, dependencies=[Depends(get_current_patient)])
 
 
 @app.on_event("startup")
@@ -90,7 +113,10 @@ def on_startup():
             conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS \"followUpIntervalsMonths\" JSON"))
             conn.execute(text("ALTER TABLE followup_calls ALTER COLUMN \"intervalMonths\" DROP NOT NULL"))
             conn.execute(text("ALTER TABLE followup_calls ADD COLUMN IF NOT EXISTS \"promAssignmentId\" VARCHAR"))
-            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" INTEGER"))
+            conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" DOUBLE PRECISION"))
+            # Was INTEGER — widened to allow one-decimal scores like ODI/NDI's
+            # percent-of-max (e.g. 52.3). No-op if already DOUBLE PRECISION.
+            conn.execute(text("ALTER TABLE assessments ALTER COLUMN \"finalScore\" TYPE DOUBLE PRECISION"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"interpretation\" JSON"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"promCode\" VARCHAR"))
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"promName\" VARCHAR"))
@@ -99,6 +125,8 @@ def on_startup():
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"rawMax\" INTEGER"))
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"conversionTable\" JSON"))
             conn.execute(text("ALTER TABLE assessment_configs ADD COLUMN IF NOT EXISTS \"icon\" VARCHAR"))
+            conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"patientSummary\" TEXT"))
+            conn.execute(text("ALTER TABLE surgery_evaluations ADD COLUMN IF NOT EXISTS \"patientSummary\" TEXT"))
     except Exception as e:
         print(f"⚠️  Column migration skipped/failed (safe to ignore on a fresh DB): {e}")
 
@@ -283,11 +311,14 @@ async def dictate(
     audio: UploadFile = File(...),
     patient_id: str = Form(default=None),
     language: str = Form(default=""),
+    note_type: str = Form(default="physician"),
 ):
     """
-    One-take physician dictation: the doctor speaks diagnosis, diagnostics to
-    order, and the treatment plan in a single recording instead of filling out
-    three separate screens.
+    One-take physician/surgeon dictation: the doctor speaks in a single
+    recording instead of filling out several separate screens. `note_type`
+    ("physician" or "surgery") selects which soap-field shape and extraction
+    prompt llm_extract.extract_structured() structures the speech into — see
+    that function's docstring.
 
     1. Transcribe via the OpenAI API. `language` normally arrives already
        detected from the live-preview phase (see /transcribe/preview — the
@@ -333,7 +364,7 @@ async def dictate(
 
         speaker_id, similarity_score = None, 0.0
 
-        structured = extract_structured(text)
+        structured = extract_structured(text, note_type=note_type)
 
         doc = {
             "id": str(uuid.uuid4()),
@@ -362,9 +393,28 @@ def get_audio(filename: str):
     file_path = AUDIO_DIR / filename
     if not file_path.exists():
         return JSONResponse(status_code=404, content={"error": "Audio file not found"})
-    
+
     # Determine media type based on file extension
     suffix = file_path.suffix.lower()
     media_type = "audio/webm" if suffix == ".webm" else "audio/wav" if suffix == ".wav" else "audio/mpeg"
-    
+
+    return FileResponse(file_path, media_type=media_type)
+
+
+DOCUMENT_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".pdf": "application/pdf",
+}
+
+
+@app.get("/documents/{filename}")
+def get_document(filename: str):
+    """Serve doctor-uploaded documents (MRI images, PDF reports, etc.)."""
+    file_path = Path("documents") / filename
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content={"error": "Document not found"})
+
+    media_type = DOCUMENT_MEDIA_TYPES.get(file_path.suffix.lower(), "application/octet-stream")
     return FileResponse(file_path, media_type=media_type)

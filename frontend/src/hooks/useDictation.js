@@ -3,13 +3,14 @@ import axios from 'axios';
 
 const API_BASE = 'http://localhost:8000';
 
-// One-take physician dictation: records a single clip covering diagnosis,
-// diagnostics to order, and treatment plan, then sends it to /dictate which
+// One-take dictation: records a single clip, then sends it to /dictate which
 // transcribes it and returns AI-structured fields ready to pre-fill the form.
+// `noteType` ("physician" or "surgery") tells the backend which field shape
+// to structure the speech into — see llm_extract.extract_structured().
 const PREVIEW_INTERVAL_MS = 4000;
 const PREVIEW_MIN_CHUNKS = 5; // ~0.5s at the 100ms timeslice below — skip near-empty previews
 
-export function useDictation({ patientId, onResult, onError }) {
+export function useDictation({ patientId, noteType = 'physician', onResult, onError }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -184,6 +185,7 @@ export function useDictation({ patientId, onResult, onError }) {
       const formData = new FormData();
       formData.append('audio', blob, `dictation${ext}`);
       if (patientId) formData.append('patient_id', patientId);
+      formData.append('note_type', noteType);
       // Whatever was detected from the first preview chunk, if any — see
       // sendPreview. Left empty on a recording too short for a preview to
       // have fired; the backend detects it from the full transcript instead.

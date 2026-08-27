@@ -438,6 +438,18 @@ input, textarea, select { font-family: inherit; outline: none; }
   font-variant-numeric: tabular-nums;
   height: 13px;
   line-height: 13px;
+  flex-shrink: 0;
+}
+/* Bar height is set as a % of this track, not of the whole column — without
+   it, a bar at 100% height (e.g. the only/max column) grows to the full
+   column height and pushes the axis label below out past the card. */
+.an-vbar-track {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 .an-vbar-bar {
   width: 100%;
@@ -459,6 +471,7 @@ input, textarea, select { font-family: inherit; outline: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  flex-shrink: 0;
 }
 
 /* ── Status Badges ── */
@@ -3468,4 +3481,66 @@ textarea.form-control { resize: vertical; min-height: 100px; }
     margin: 0 !important;
     padding: 12mm !important;
   }
+}
+
+/* ── Staff notification toast (nurse dashboard — patient self-completed a
+   pre-visit PROM via the mobile app) — top-center, fading in/out instead of
+   SweetAlert2's default slide-and-pop, styled to match the app's cards
+   rather than the library's stock look. See NurseDashboard.jsx's
+   notifyToast mixin (showClass/hideClass/customClass wire these in). ── */
+@keyframes opd-toast-fade-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes opd-toast-fade-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-10px) scale(0.98); }
+}
+.opd-toast-in { animation: opd-toast-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.opd-toast-out { animation: opd-toast-fade-out 0.25s ease-in both; }
+
+.opd-toast.swal2-popup {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--border) !important;
+  border-left: 4px solid var(--success) !important;
+  padding: 16px 20px !important;
+  margin-top: 14px !important;
+  min-width: 340px !important;
+  max-width: 420px !important;
+}
+/* Note: no `gap` here — .swal2-toast is a CSS Grid with several
+   always-present-but-empty grid items (close button, loader, etc.), and
+   `gap` inserts spacing between EVERY implicit row/column those create,
+   not just the visible ones — it blew the toast up to 1400px tall in
+   testing. Icon/text spacing is done with margin instead. */
+.opd-toast .swal2-icon {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  margin: 1px 12px 0 0 !important;
+}
+.opd-toast .swal2-title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+  text-align: left !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.4 !important;
+}
+.opd-toast .swal2-html-container {
+  font-size: 12.5px !important;
+  color: var(--text-muted) !important;
+  text-align: left !important;
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+}
+.opd-toast .swal2-timer-progress-bar {
+  background: var(--success) !important;
+  opacity: 0.5;
+}
+.opd-toast .swal2-close {
+  color: var(--text-muted) !important;
 }

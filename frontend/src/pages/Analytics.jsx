@@ -74,14 +74,16 @@ function VBar({ cols, unit = '' }) {
             <div className="an-vbar-value">
               {(labelAll || c.value === max || i === cols.length - 1) ? `${c.value}${unit}` : ''}
             </div>
-            <div
-              className="an-vbar-bar"
-              style={{ height: `${Math.max(2, (c.value / max) * 100)}%`, background: c.color }}
-              tabIndex={0}
-              role="img"
-              aria-label={`${c.label}: ${c.value}${unit}`}
-              title={`${c.label}: ${c.value}${unit}`}
-            />
+            <div className="an-vbar-track">
+              <div
+                className="an-vbar-bar"
+                style={{ height: `${Math.max(2, (c.value / max) * 100)}%`, background: c.color }}
+                tabIndex={0}
+                role="img"
+                aria-label={`${c.label}: ${c.value}${unit}`}
+                title={`${c.label}: ${c.value}${unit}`}
+              />
+            </div>
             <div className="an-vbar-label">{c.label}</div>
           </div>
         ))}

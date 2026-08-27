@@ -17,7 +17,7 @@ Pipeline:
 import os
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from openai import OpenAI
 
@@ -193,25 +193,35 @@ def keyword_match(text: str, synonyms: dict) -> list[str]:
 # English medical terms), which is realistic for a bilingual clinic. Arabic
 # alternatives are written in normalised form (see _normalize_arabic above);
 # matched against the normalised haystack in segment_dictation() below.
+#
+# Every alternative — Latin-script ones included — gets the same optional
+# leading `(?:و)?(?:ال)?` already used for the Arabic terms: ASR output for
+# code-switched speech commonly glues "و" (and) and/or "ال" (the) directly
+# onto a borrowed English word with zero space regardless of script
+# ("والTreatment plan" = و + ال + "Treatment plan", not "و Treatment plan").
+# Since Arabic letters count as \w just like Latin ones, `\b` sees no
+# boundary at that exact script transition and the marker silently fails to
+# match — which used to make the whole rest of the dictation fall into
+# whichever section came before it instead of "treatment"/etc.
 _SECTION_PATTERNS = [
     ("treatment", re.compile(
-        r"\btreatment\s*plan\b|\btreatment\b|\bprescri(?:be|bing|ption)\b"
+        r"\b(?:و)?(?:ال)?treatment\s*plan\b|\b(?:و)?(?:ال)?treatment\b|\b(?:و)?(?:ال)?prescri(?:be|bing|ption)\b"
         r"|\b(?:و)?(?:ال)?خطه\s*(?:و)?(?:ال)?علاج\b|\b(?:و)?(?:ال)?علاج\b|\b(?:و)?(?:ال)?وصفه\s*(?:و)?(?:ال)?طبيه\b|\bصرف\s*(?:و)?(?:ال)?دواء\b"
-        r"|\bplan\s*de\s*traitement\b|\btraitement\b|\bprescription\b|\bordonnance\b",
+        r"|\b(?:و)?(?:ال)?plan\s*de\s*traitement\b|\b(?:و)?(?:ال)?traitement\b|\b(?:و)?(?:ال)?prescription\b|\b(?:و)?(?:ال)?ordonnance\b",
         re.I)),
     ("diagnostics", re.compile(
-        r"\bdiagnostics?\b|\border(?:ing)?\s+(?:tests?|imaging)\b|\brequest(?:ing)?\s+(?:tests?|imaging)\b|\blabs?\b|\bimaging\b"
+        r"\b(?:و)?(?:ال)?diagnostics?\b|\b(?:و)?(?:ال)?order(?:ing)?\s+(?:tests?|imaging)\b|\b(?:و)?(?:ال)?request(?:ing)?\s+(?:tests?|imaging)\b|\b(?:و)?(?:ال)?labs?\b|\b(?:و)?(?:ال)?imaging\b"
         r"|\b(?:و)?(?:ال)?فحوصات\b|\b(?:و)?(?:ال)?تحاليل\b|\b(?:و)?(?:ال)?اشعه\b|\bطلب\s*(?:و)?(?:ال)?فحوصات\b|\b(?:و)?(?:ال)?تصوير\b"
-        r"|\bexamens?\b|\banalyses?\b|\bimagerie\b|\bdemande\s*d.examens?\b",
+        r"|\b(?:و)?(?:ال)?examens?\b|\b(?:و)?(?:ال)?analyses?\b|\b(?:و)?(?:ال)?imagerie\b|\b(?:و)?(?:ال)?demande\s*d.examens?\b",
         re.I)),
     ("evaluation", re.compile(
-        r"\bdiagnosis\b|\bevaluation\b|\bassessment\b|\bfindings\b"
+        r"\b(?:و)?(?:ال)?diagnosis\b|\b(?:و)?(?:ال)?evaluation\b|\b(?:و)?(?:ال)?assessment\b|\b(?:و)?(?:ال)?findings\b"
         r"|\b(?:و)?(?:ال)?تشخيص\b|\b(?:و)?(?:ال)?تقييم\b|\b(?:و)?(?:ال)?نتائج\b|\b(?:و)?(?:ال)?فحص\b"
         # French "diagnostic" (noun) is spelled identically to the English
         # adjective in "diagnostic tests" — the negative lookahead keeps this
         # cue for standalone French use without stealing English "diagnostic
         # tests"/"diagnostic imaging" away from the diagnostics pattern above.
-        r"|\bdiagnostic\b(?!\s+(?:tests?|imaging))|\b[ée]valuation\b|\br[ée]sultats\b|\bconstatations\b",
+        r"|\b(?:و)?(?:ال)?diagnostic\b(?!\s+(?:tests?|imaging))|\b(?:و)?(?:ال)?[ée]valuation\b|\b(?:و)?(?:ال)?r[ée]sultats\b|\b(?:و)?(?:ال)?constatations\b",
         re.I)),
 ]
 
@@ -257,9 +267,13 @@ def _apply_details_fallback(treatments: list, fallback_details: str) -> None:
 # two-digit numbers). Deterministic parsing wins over the AI guess here, the
 # same as keyword_match already does for diagnostic tests/treatment types.
 _FOLLOWUP_DATE_CUE_PATTERN = re.compile(
-    r"\bfollow[\s-]?up\s*(?:date|visit)?\b\s*[:,]?\s*"
-    r"|\bموعد\s*المتابعه\b\s*[:,]?\s*|\bتاريخ\s*المتابعه\b\s*[:,]?\s*|\bموعد\s*المراجعه\b\s*[:,]?\s*"
-    r"|\bdate\s*de\s*suivi\b\s*[:,]?\s*|\brendez[\s-]?vous\s*de\s*suivi\b\s*[:,]?\s*|\bdate\s*de\s*contr[oô]le\b\s*[:,]?\s*",
+    r"\b(?:و)?(?:ال)?follow[\s-]?up\s*(?:date|visit)?\b\s*[:,]?\s*"
+    # (?:و)?(?:ال)? optional, same convention as the synonym lists above —
+    # colloquial speech commonly drops the definite article and/or glues a
+    # leading "و" (and) directly onto the next word with no space
+    # ("وموعد متابعة" not "و موعد المتابعة").
+    r"|\b(?:و)?موعد\s*(?:ال)?متابعه\b\s*[:,]?\s*|\b(?:و)?تاريخ\s*(?:ال)?متابعه\b\s*[:,]?\s*|\b(?:و)?موعد\s*(?:ال)?مراجعه\b\s*[:,]?\s*"
+    r"|\b(?:و)?(?:ال)?date\s*de\s*suivi\b\s*[:,]?\s*|\b(?:و)?(?:ال)?rendez[\s-]?vous\s*de\s*suivi\b\s*[:,]?\s*|\b(?:و)?(?:ال)?date\s*de\s*contr[oô]le\b\s*[:,]?\s*",
     re.I)
 
 
@@ -303,6 +317,41 @@ def _numbers_to_iso_date(numbers: list[int], today: datetime) -> str | None:
         return None
 
 
+# A follow-up cue is far more often said as a RELATIVE offset ("in 3 weeks",
+# "بعد 3 أسابيع", "dans 2 semaines") than as a spelled-out calendar date — but
+# _numbers_to_iso_date (below) was built for the latter and has no concept of
+# units, so a lone small number like "3" gets misread as a 2-digit year
+# (2003), fails the sanity-range check, and silently produces nothing. Tried
+# first, before falling back to the absolute-digit-sequence parse, since a
+# number immediately followed by a day/week/month word is unambiguous.
+_DUAL_DURATION_DAYS = {"يومين": 2, "اسبوعين": 14, "شهرين": 60}
+_DURATION_UNIT_DAYS = {
+    "day": 1, "days": 1, "يوم": 1, "ايام": 1, "jour": 1, "jours": 1,
+    "week": 7, "weeks": 7, "اسبوع": 7, "اسابيع": 7, "semaine": 7, "semaines": 7,
+    "month": 30, "months": 30, "شهر": 30, "اشهر": 30, "mois": 30,
+}
+_RELATIVE_DURATION_PATTERN = re.compile(
+    r"(\d+)\s*(day|days|week|weeks|month|months|يوم|ايام|اسبوع|اسابيع|شهر|اشهر|jours?|semaines?|mois)\b",
+    re.I)
+_DUAL_DURATION_PATTERN = re.compile(r"\b(يومين|اسبوعين|شهرين)\b")
+
+
+def _relative_duration_to_iso_date(text: str, today: datetime) -> str | None:
+    """Parses a relative offset ("in 3 weeks" / "بعد 3 أسابيع" / "dans 2
+    semaines", or an Arabic dual form like "أسبوعين" with no digit at all)
+    into an absolute date, or None if the text doesn't contain one."""
+    haystack = _normalize_arabic(text)
+    m = _RELATIVE_DURATION_PATTERN.search(haystack)
+    if m:
+        unit_days = _DURATION_UNIT_DAYS.get(m.group(2).lower())
+        if unit_days:
+            return (today + timedelta(days=int(m.group(1)) * unit_days)).strftime("%Y-%m-%d")
+    m2 = _DUAL_DURATION_PATTERN.search(haystack)
+    if m2:
+        return (today + timedelta(days=_DUAL_DURATION_DAYS[m2.group(1)])).strftime("%Y-%m-%d")
+    return None
+
+
 def extract_followup_date_cue(treatment_text: str, today: datetime) -> str | None:
     """Return an ISO date parsed from whatever was said after a "follow-up
     date" cue in the treatment section, or None if the cue wasn't used or
@@ -319,18 +368,28 @@ def extract_followup_date_cue(treatment_text: str, today: datetime) -> str | Non
     if period != -1:
         cutoff = min(cutoff, period)
     tail = tail[:cutoff]
+    relative = _relative_duration_to_iso_date(tail, today)
+    if relative:
+        return relative
     numbers = [int(n) for n in re.findall(r"\d+", tail)]
     return _numbers_to_iso_date(numbers, today)
 
 
 def _apply_followup_date_fallback(treatments: list, fallback_date: str | None) -> None:
     """If the doctor used an explicit "follow-up date" cue and it parsed
-    cleanly, that value overrides whatever the LLM guessed for the last
-    treatment mentioned — see extract_followup_date_cue for why the
-    deterministic parse is trusted over the AI here."""
+    cleanly, use it to fill in whichever treatment doesn't already have its
+    own followUpDate (the AI should have derived that one from its own
+    duration already — see the prompt's followUpDate rules). Checked from
+    the end since the general follow-up mention is typically about whatever
+    was said last. Never overwrites a date the AI already set — this is a
+    safety net for the gap the AI leaves, not an override of a correct
+    per-treatment answer."""
     if not fallback_date or not treatments:
         return
-    treatments[-1]["followUpDate"] = fallback_date
+    for entry in reversed(treatments):
+        if not entry.get("followUpDate"):
+            entry["followUpDate"] = fallback_date
+            return
 
 
 def segment_dictation(text: str) -> dict:
@@ -359,6 +418,83 @@ def segment_dictation(text: str) -> dict:
         sections[label] += text[start:end].strip() + " "
 
     return {k: v.strip() for k, v in sections.items()}
+
+
+_SURGERY_FIELDS = ("procedurePerformed", "findings", "postoperativePlan")
+
+
+def _build_surgery_prompt(transcript: str, sections: dict) -> str:
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    test_list = ", ".join(f'"{k}" ({v})' for k, v in DIAGNOSTIC_TESTS.items())
+    treatment_list = ", ".join(f'"{k}" ({v})' for k, v in TREATMENT_OPTIONS.items())
+
+    return f"""You are a clinical scribe assistant for an orthopedic surgeon dictating an
+operative note in one continuous recording, covering the procedure performed,
+intraoperative findings, and the postoperative plan. Extract structured data as
+JSON ONLY (no markdown fences, no commentary, just the JSON object).
+
+Today's date is {today}. Resolve relative dates ("in two weeks", "next month") to
+an absolute YYYY-MM-DD date using today's date as the reference. Use null if no
+date was mentioned.
+
+Known diagnostic test ids (use ONLY these ids): {test_list}
+Known treatment ids (use ONLY these ids): {treatment_list}
+
+Full transcript:
+\"\"\"{transcript}\"\"\"
+
+Rough pre-split of the same transcript (may be incomplete/imperfect, use only as
+a hint — the full transcript above is the source of truth):
+- Evaluation part: \"\"\"{sections.get('evaluation', '')}\"\"\"
+- Diagnostics part: \"\"\"{sections.get('diagnostics', '')}\"\"\"
+- Treatment part: \"\"\"{sections.get('treatment', '')}\"\"\"
+
+Return JSON with exactly this shape:
+{{
+  "diagnosis": "short preoperative/postoperative diagnosis label, e.g. Meniscus Tear, Right Knee",
+  "notes": "clinical notes summarizing the procedure from the evaluation part",
+  "soap": {{
+    "procedurePerformed": "the surgical procedure performed, including laterality/approach if stated",
+    "findings": "intraoperative findings — tissue condition, damage observed, etc.",
+    "postoperativePlan": "postoperative plan — pain management, follow-up, rehab, restrictions, may restate the diagnostic tests and treatments below in sentence form"
+  }},
+  "diagnostic_tests": ["<ids from the known diagnostic test ids that were mentioned>"],
+  "treatments": [
+    {{"type": "<id from the known treatment ids>", "duration": "<e.g. 6 weeks, or null>", "details": "<instructions mentioned>", "followUpDate": "<YYYY-MM-DD or null>"}}
+  ]
+}}
+
+Rules:
+- If a section wasn't mentioned at all, return an empty string/array for it
+  instead of guessing.
+- Write every "soap" field in clear, grammatically correct clinical English —
+  the surgeon is dictating out loud, so silently fix any spoken disfluency,
+  filler word, or grammatical slip; never transcribe verbatim if the phrasing
+  was awkward. Keep the clinical meaning exact; do not add information that
+  was not said.
+- Only use ids from the known lists above for diagnostic_tests and
+  treatments[].type — never invent new ids.
+- If the same treatment (e.g. physiotherapy) has a duration AND a follow-up
+  date, put BOTH on the SAME treatment object — never create a second,
+  separate treatment object just to hold a follow-up date.
+- followUpDate rules (each treatment's date must reflect what was actually
+  said ABOUT THAT TREATMENT, not a date meant for a different one):
+  1. If a treatment has its own stated duration (e.g. "physiotherapy for 4
+     weeks") and no more specific follow-up was mentioned for that same
+     treatment, set that treatment's followUpDate to today's date plus its
+     OWN duration — do not borrow a duration or date that was said about a
+     different treatment.
+  2. If the dictation separately mentions a general follow-up appointment
+     that is not tied to any one specific treatment (e.g. "follow-up
+     appointment in 3 weeks" said on its own, after listing the treatments),
+     assign that date to whichever treatment does NOT already have a
+     followUpDate from rule 1 above — never overwrite a treatment's own
+     duration-derived date with this general one, and never invent a new
+     treatment object just to hold it.
+  3. A treatment with neither its own duration nor any applicable follow-up
+     mention keeps followUpDate as null — do not guess.
+- Do not wrap string values in extra quote characters; "diagnosis": "Meniscus Tear"
+  is correct, "diagnosis": "'Meniscus Tear'" is NOT."""
 
 
 def _build_prompt(transcript: str, sections: dict) -> str:
@@ -418,6 +554,22 @@ Rules:
 - If the same treatment (e.g. physiotherapy) has a duration AND a follow-up
   date, put BOTH on the SAME treatment object — never create a second,
   separate treatment object just to hold a follow-up date.
+- followUpDate rules (each treatment's date must reflect what was actually
+  said ABOUT THAT TREATMENT, not a date meant for a different one):
+  1. If a treatment has its own stated duration (e.g. "physiotherapy for 4
+     weeks") and no more specific follow-up was mentioned for that same
+     treatment, set that treatment's followUpDate to today's date plus its
+     OWN duration — do not borrow a duration or date that was said about a
+     different treatment.
+  2. If the dictation separately mentions a general follow-up appointment
+     that is not tied to any one specific treatment (e.g. "follow-up
+     appointment in 3 weeks" said on its own, after listing the treatments),
+     assign that date to whichever treatment does NOT already have a
+     followUpDate from rule 1 above — never overwrite a treatment's own
+     duration-derived date with this general one, and never invent a new
+     treatment object just to hold it.
+  3. A treatment with neither its own duration nor any applicable follow-up
+     mention keeps followUpDate as null — do not guess.
 - Do not wrap string values in extra quote characters; "diagnosis": "Osteoarthritis"
   is correct, "diagnosis": "'Osteoarthritis'" is NOT."""
 
@@ -448,11 +600,12 @@ _SOAP_FIELDS = (
 )
 
 
-def _clean_soap(raw) -> dict:
-    """Normalises the LLM's `soap` object to always carry all 6 fields as
-    plain strings, regardless of whether the model included every key."""
+def _clean_note(raw, fields: tuple) -> dict:
+    """Normalises the LLM's `soap` object to always carry every field in
+    `fields` as a plain string, regardless of whether the model included
+    every key."""
     raw = raw if isinstance(raw, dict) else {}
-    return {field: _clean_str(raw.get(field)) for field in _SOAP_FIELDS}
+    return {field: _clean_str(raw.get(field)) for field in fields}
 
 
 def call_openai_extract(prompt: str) -> dict | None:
@@ -470,8 +623,15 @@ def call_openai_extract(prompt: str) -> dict | None:
         return None
 
 
-def extract_structured(transcript: str) -> dict:
+def extract_structured(transcript: str, note_type: str = "physician") -> dict:
     """Best-effort structuring of a raw dictation transcript.
+
+    `note_type` selects which prompt/field-shape to structure the "soap" note
+    into — "physician" (chief complaint / HPI / PMH / exam / assessment /
+    plan, for a clinic visit) or "surgery" (procedure performed / findings /
+    postoperative plan, for an operative note). Diagnostic-test and
+    treatment-type extraction is identical either way — both note types can
+    order follow-up imaging/treatment.
 
     Diagnostic tests and treatment types are matched by keyword regardless of
     whether the LLM is available — those two fields are picks from a small
@@ -480,6 +640,14 @@ def extract_structured(transcript: str) -> dict:
     only relied on for the genuinely free-text parts: the diagnosis label,
     clinical notes, and resolving things like "duration" / follow-up dates.
     """
+    is_surgery = note_type == "surgery"
+    fields = _SURGERY_FIELDS if is_surgery else _SOAP_FIELDS
+    build_prompt = _build_surgery_prompt if is_surgery else _build_prompt
+    # The one field a deterministic fallback CAN populate when the LLM call
+    # fails — the free-text field closest to the raw "evaluation" chunk for
+    # each note type.
+    fallback_field = "findings" if is_surgery else "historyOfPresentIllness"
+
     today = datetime.utcnow()
     sections = segment_dictation(transcript)
     keyword_tests = keyword_match(sections["diagnostics"], DIAGNOSTIC_TEST_SYNONYMS)
@@ -489,28 +657,26 @@ def extract_structured(transcript: str) -> dict:
 
     if not transcript.strip():
         return {
-            "diagnosis": "", "notes": "", "soap": _clean_soap(None),
+            "diagnosis": "", "notes": "", "soap": _clean_note(None, fields),
             "diagnostic_tests": [], "treatments": [],
             "sections": sections, "ai_structured": False,
         }
 
-    parsed = call_openai_extract(_build_prompt(transcript, sections))
+    parsed = call_openai_extract(build_prompt(transcript, sections))
 
     if parsed is None:
         # Extraction call failed: still honor the keyword-matched
         # tests/treatments so voice selection works even with the API down —
         # just without an AI-written diagnosis/notes/soap/duration/follow-up
-        # date. The one soap field a deterministic fallback CAN populate is
-        # historyOfPresentIllness, from the same "evaluation" chunk `notes`
-        # already falls back to below — better than leaving it blank.
+        # date.
         treatments = [
             {"type": t, "duration": "", "details": "", "followUpDate": None}
             for t in keyword_treatment_types
         ]
         _apply_details_fallback(treatments, fallback_details)
         _apply_followup_date_fallback(treatments, fallback_followup_date)
-        fallback_soap = _clean_soap(None)
-        fallback_soap["historyOfPresentIllness"] = sections["evaluation"]
+        fallback_soap = _clean_note(None, fields)
+        fallback_soap[fallback_field] = sections["evaluation"]
         return {
             "diagnosis": "",
             "notes": sections["evaluation"] or transcript,
@@ -550,7 +716,7 @@ def extract_structured(transcript: str) -> dict:
     return {
         "diagnosis": _clean_str(parsed.get("diagnosis")),
         "notes": _clean_str(parsed.get("notes")) or sections["evaluation"],
-        "soap": _clean_soap(parsed.get("soap")),
+        "soap": _clean_note(parsed.get("soap"), fields),
         "diagnostic_tests": diagnostic_tests,
         "treatments": treatments,
         "sections": sections,

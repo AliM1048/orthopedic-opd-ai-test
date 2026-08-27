@@ -2,31 +2,44 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Stethoscope, Users, FileSignature,
-  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon, ClipboardList
+  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon, ClipboardList, Scissors, MessageCircle
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { label: 'NURSE', items: [
     { to: '/',            icon: LayoutDashboard, text: 'Dashboard' },
+    { to: '/messages',    icon: MessageCircle,   text: 'Messages' },
   ]},
   { label: 'PHYSICIAN', items: [
     { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
+  ]},
+  { label: 'SURGERY', items: [
+    { to: '/surgeries', icon: Scissors, text: 'Surgeries', restricted: true },
   ]},
   // { label: 'CLERK', items: [
   //   { to: '/clerk-tasks', icon: ClipboardList, text: 'PROM Tasks' },
   // ]},
   { label: 'RECORDS', items: [
-    { to: '/analytics',      icon: Activity,        text: 'Analytics' },
-    { to: '/records',        icon: Users,           text: 'Patient Status' },
-    { to: '/documents/new',  icon: FileSignature,   text: 'Generate Document' },
+    { to: '/analytics',      icon: Activity,        text: 'Analytics', restricted: true },
+    { to: '/records',        icon: Users,           text: 'Patient Status', restricted: true },
+    { to: '/documents/new',  icon: FileSignature,   text: 'Generate Document', restricted: true },
   ]},
 ];
+
+// Nurses are restricted to the dashboard + physician evaluation (see
+// NURSE_ALLOWED_PATHS in App.jsx for the matching route guard); every other
+// role keeps seeing everything, unchanged. `restricted: true` on a nav item
+// above marks it as one of the pages hidden from that role.
 
 export default function DashboardLayout({ children, user }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+  const isNurse = user?.role === 'nurse';
+  const visibleNavSections = NAV_ITEMS
+    .map((section) => ({ ...section, items: section.items.filter((item) => !(isNurse && item.restricted)) }))
+    .filter((section) => section.items.length > 0);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -65,7 +78,7 @@ export default function DashboardLayout({ children, user }) {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((section) => (
+          {visibleNavSections.map((section) => (
             <div key={section.label}>
               <div className="sidebar-section-label">{section.label}</div>
               {section.items.map((item) => (

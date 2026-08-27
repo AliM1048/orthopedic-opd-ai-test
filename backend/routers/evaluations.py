@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Patient, Evaluation
+from notifications import create_report_notification
+from patient_summary import generate_patient_summary
 from schemas import EvaluationCreate, EvaluationUpdate, PatientOut
 from .patients import _build_patient
 from .followups import generate_followup_schedule
@@ -36,7 +38,24 @@ def update_evaluation(patient_id: str, evaluation_id: str, body: EvaluationUpdat
     ).first()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
+    was_sent = evaluation.sentToPatient
     for key, val in body.model_dump(exclude_none=True).items():
         setattr(evaluation, key, val)
+    if body.sentToPatient and not was_sent:
+        soap = evaluation.soapNote or {}
+        evaluation.patientSummary = generate_patient_summary(
+            provider_label=evaluation.physician,
+            date=evaluation.date,
+            diagnosis=evaluation.diagnosis,
+            assessment=soap.get("assessment"),
+            plan=soap.get("plan"),
+        )
     db.commit()
+    if body.sentToPatient and not was_sent:
+        create_report_notification(
+            db, patient_id,
+            related_type="evaluation", related_id=evaluation.id,
+            title=f"New report from {evaluation.physician}",
+            body=evaluation.diagnosis,
+        )
     return _build_patient(patient, db)

@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Patient, Assessment, AssessmentConfig, PROMAssignment
+from models import Patient, Assessment, AssessmentConfig, FollowUpCall, PROMAssignment
+from notifications import create_staff_notification
 from schemas import PublicPromConfigOut, PublicPromSubmit
 
 router = APIRouter(prefix="/api/public", tags=["Public PROM Link"])
@@ -68,6 +69,10 @@ def submit_public_prom(token: str, body: PublicPromSubmit, db: Session = Depends
     if assignment.status == "completed":
         raise HTTPException(status_code=410, detail="This questionnaire has already been completed.")
 
+    patient = db.query(Patient).filter(Patient.id == assignment.patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
     now = datetime.utcnow()
     answered_by_label = "Parent/Caregiver (self-service)" if assignment.respondentType == "parent_caregiver" else "Patient (self-service)"
 
@@ -93,5 +98,28 @@ def submit_public_prom(token: str, body: PublicPromSubmit, db: Session = Depends
     assignment.completedAt = now.isoformat() + "Z"
     assignment.assessmentId = assessment.id
 
+    # Mirrors what the nurse's own web flow does after saving an assessment
+    # (frontend/src/pages/PreVisitAssessment.jsx): flip the patient out of
+    # "pending" so the dashboard's "Start Call" button and status badge
+    # update immediately, same as if the nurse had made this call herself.
+    if patient.status == "pending":
+        patient.status = "assessment-completed"
+
+    # If this assignment was auto-sent for a recurring follow-up call (see
+    # prom_assignments.auto_progress_prom_assignments), close that call out
+    # too — otherwise it would keep showing as due even though it's answered.
+    linked_call = db.query(FollowUpCall).filter(FollowUpCall.promAssignmentId == assignment.id).first()
+    if linked_call and linked_call.status == "pending":
+        linked_call.status = "completed"
+        linked_call.completedAssessmentId = assessment.id
+
     db.commit()
+
+    create_staff_notification(
+        db, patient.id,
+        title=f"{patient.name} completed their {'follow-up' if linked_call else 'pre-visit'} questionnaire",
+        body=f"{assignment.bodyArea} PROM · completed via mobile self-service",
+        related_type="assessment", related_id=assessment.id,
+    )
+
     return {"status": "ok"}

@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
+import PrintTypeModal from './PrintTypeModal';
 
 export default function PrintDocModal({ order, patient, physicianName, onClose }) {
+  const [docType, setDocType] = useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const handlePrint = () => window.print();
+
+  if (!docType) {
+    return <PrintTypeModal onChoose={setDocType} onClose={onClose} />;
+  }
+
   return (
     <div
       className="print-doc-backdrop"
@@ -20,7 +28,15 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
         }}
         onClick={(e) => e.stopPropagation()}
         id="print-doc-root"
+        data-doc-type={docType}
       >
+        {/* Insurance flag — placeholder until the real insurance layout is provided */}
+        {docType === 'insurance' && (
+          <div style={{ background: '#fef3c7', color: '#92400e', textAlign: 'center', padding: '6px 12px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
+            🏷 INSURANCE COPY
+          </div>
+        )}
+
         {/* Letterhead */}
         <div style={{ padding: '24px 32px 18px', borderBottom: '3px solid #0369a1' }}>
           <button onClick={onClose} className="no-print" style={{ float: 'right', background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#64748b', fontSize: 18, lineHeight: 1 }}>×</button>
@@ -84,7 +100,7 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
         <div className="no-print" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '14px 32px', display: 'flex', gap: 10, justifyContent: 'flex-end', borderRadius: '0 0 16px 16px' }}>
           <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#475569' }}>Close</button>
           <button onClick={handlePrint} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-            🖨 Print Document
+            🖨 Print {docType === 'insurance' ? 'Insurance ' : ''}Document
           </button>
         </div>
       </div>

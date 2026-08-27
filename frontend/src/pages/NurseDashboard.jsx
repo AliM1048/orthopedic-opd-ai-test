@@ -1,8 +1,26 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, PhoneCall, ArrowRight } from 'lucide-react';
+import Swal from 'sweetalert2';
 import StatusBadge from '../components/common/StatusBadge';
 import api from '../api';
+
+// Top-center, fading in/out rather than the library's default slide-and-pop —
+// see the .opd-toast* rules in index.css for the actual look.
+const notifyToast = Swal.mixin({
+  toast: true,
+  position: 'top',
+  showConfirmButton: false,
+  timer: 6000,
+  timerProgressBar: true,
+  showClass: { popup: 'opd-toast-in' },
+  hideClass: { popup: 'opd-toast-out' },
+  customClass: { popup: 'opd-toast' },
+  didOpen: (el) => {
+    el.addEventListener('mouseenter', Swal.stopTimer);
+    el.addEventListener('mouseleave', Swal.resumeTimer);
+  },
+});
 
 export default function NurseDashboard({ patients, onUpdateStatus, createPatient }) {
   const [search, setSearch] = useState('');
@@ -13,12 +31,27 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
   });
   const navigate = useNavigate();
 
-  // Pre-visit call reminders — 2 days before a patient's scheduled 3/6/9-month
-  // PROM check-in, so it never gets missed. Full management lives on
-  // /followups; this is just the "look here today" prompt.
+  // Pre-visit call reminders — covers both the very first pre-visit PROM
+  // (patient still "pending" with an upcoming appointment) and the
+  // recurring 3/6/9-month follow-up check-ins, so either one shows here
+  // whether a nurse calls it in or the patient self-completes it via the
+  // mobile app. Full follow-up management lives on /followups; this is just
+  // the "look here today" prompt. See backend/routers/followups.py:list_due_followups.
   const [dueCalls, setDueCalls] = useState([]);
   useEffect(() => {
     api.get('/api/followups/due').then((res) => setDueCalls(res.data)).catch(() => setDueCalls([]));
+  }, []);
+
+  // Pop a toast for each unread staff notification (e.g. "patient completed
+  // their pre-visit questionnaire via the app") on dashboard load, then mark
+  // them read — the same lightweight "surfaced on next load" pattern as the
+  // due-calls reminder above, no live push infrastructure needed.
+  useEffect(() => {
+    api.get('/api/staff/notifications').then((res) => {
+      const unread = res.data.filter((n) => !n.isRead);
+      unread.forEach((n) => notifyToast.fire({ icon: 'success', title: n.title, text: n.body || undefined }));
+      if (unread.length) api.patch('/api/staff/notifications/read-all').catch(() => {});
+    }).catch(() => {});
   }, []);
 
   const filtered = useMemo(() => {
@@ -83,7 +116,11 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
           </div>
         </div>
 
-        {/* Pre-Visit Call Reminders — due within 2 days */}
+        {/* Pre-Visit Call Reminders — the very first pre-visit PROM for a
+            patient with an upcoming appointment, or a recurring 3/6/9-month
+            follow-up check-in. Either can be closed out by the nurse calling
+            it in here, or by the patient self-completing it via the mobile
+            app beforehand — this list just reflects whatever's still open. */}
         {dueCalls.length > 0 && (
           <div className="card" style={{ marginBottom: 16, borderColor: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 4%, var(--surface))' }}>
             <div className="card-header">
@@ -92,11 +129,11 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                   <PhoneCall size={15} style={{ color: 'var(--danger)' }} />
                   Pre-Visit Calls Due
                 </div>
-                <div className="card-subtitle">{dueCalls.length} patient{dueCalls.length !== 1 ? 's' : ''} need a follow-up PROM call in the next 2 days</div>
+                <div className="card-subtitle">{dueCalls.length} patient{dueCalls.length !== 1 ? 's' : ''} need a pre-visit or follow-up PROM call soon — call whoever hasn't self-completed it via the app</div>
               </div>
-              <button className="btn btn-outline btn-sm" onClick={() => navigate('/followups')}>
+              {/* <button className="btn btn-outline btn-sm" onClick={() => navigate('/followups')}>
                 View All <ArrowRight size={14} />
-              </button>
+              </button> */}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {dueCalls.slice(0, 4).map((call) => (
@@ -106,9 +143,14 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{call.intervalMonths}-month check-in · scheduled {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {call.intervalMonths ? `${call.intervalMonths}-month check-in` : 'Initial pre-visit questionnaire'} · {call.intervalMonths ? 'scheduled' : 'appointment'} {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}
+                    </div>
                   </div>
-                  <button className="btn btn-primary btn-sm" onClick={() => navigate(`/assessment?patient=${call.patient_id}`)}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => navigate(`/assessment?patient=${call.patient_id}${call.intervalMonths ? '&type=followup' : ''}`)}
+                  >
                     Start Call
                   </button>
                 </div>

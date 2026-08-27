@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall } from 'lucide-react';
+import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall, Scissors, Paperclip } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../api';
 import StatusBadge from '../common/StatusBadge';
@@ -15,6 +15,7 @@ const TABS = [
   { key: 'overview', label: 'Overview', icon: LayoutGrid },
   { key: 'assessments', label: 'Assessments', icon: ClipboardList },
   { key: 'evaluations', label: 'Evaluations', icon: Stethoscope },
+  { key: 'surgery', label: 'Surgery', icon: Scissors },
   { key: 'diagnostics', label: 'Diagnostics', icon: FileText },
   { key: 'treatments', label: 'Treatments', icon: Pill },
   { key: 'followups', label: 'Follow-Ups', icon: CalendarClock },
@@ -249,6 +250,44 @@ export default function PatientRecordPanel({ patient }) {
                   <div className="timeline-date">{ev.date} · {ev.physician}</div>
                   <div className="timeline-title">{ev.diagnosis}</div>
                   <div className="timeline-body">{ev.notes}</div>
+                  {ev.documents?.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                      {ev.documents.map((doc) => (
+                        <a
+                          key={doc.id}
+                          href={`${api.defaults.baseURL}/documents/${doc.filename}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--primary)', textDecoration: 'none' }}
+                        >
+                          <Paperclip size={12} /> {doc.originalName}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'surgery' && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title"><Scissors size={16} style={{ display: 'inline', marginRight: 6 }} />Surgery Evaluations</div>
+          </div>
+          {(patient.surgeryEvaluations || []).length === 0 ? (
+            <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>No surgeries yet.</p>
+          ) : (
+            <div className="timeline">
+              {patient.surgeryEvaluations.map((ev) => (
+                <div className="timeline-item" key={ev.id}>
+                  <div className="timeline-dot" />
+                  <div className="timeline-date">{ev.date} · {ev.surgeon}</div>
+                  <div className="timeline-title">{ev.diagnosis}</div>
+                  <div className="timeline-body">{ev.notes}</div>
                 </div>
               ))}
             </div>
@@ -357,7 +396,7 @@ export default function PatientRecordPanel({ patient }) {
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             {call.status === 'pending' && (
-                              <button className="btn btn-primary btn-sm" onClick={() => navigate(`/assessment?patient=${patient.id}`)}>
+                              <button className="btn btn-primary btn-sm" onClick={() => navigate(`/assessment?patient=${patient.id}&type=followup`)}>
                                 <PhoneCall size={13} /> Start Call
                               </button>
                             )}

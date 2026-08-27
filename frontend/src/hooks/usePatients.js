@@ -102,6 +102,64 @@ export function usePatients(token) {
       });
   }, []);
 
+  const addSurgeryEvaluation = useCallback((patientId, evaluation) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, surgeryEvaluations: [...(p.surgeryEvaluations || []), evaluation] }
+          : p
+      )
+    );
+    return api.post(`/api/patients/${patientId}/surgery-evaluations`, evaluation)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const updateSurgeryEvaluation = useCallback((patientId, evaluationId, updates) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              surgeryEvaluations: (p.surgeryEvaluations || []).map((e) =>
+                e.id === evaluationId ? { ...e, ...updates } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/surgery-evaluations/${evaluationId}`, updates)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const uploadEvaluationDocument = useCallback((patientId, evaluationId, file, uploadedBy) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('uploadedBy', uploadedBy);
+    return api.post(`/api/patients/${patientId}/evaluations/${evaluationId}/documents`, formData)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const deleteEvaluationDocument = useCallback((patientId, evaluationId, documentId) => {
+    return api.delete(`/api/patients/${patientId}/evaluations/${evaluationId}/documents/${documentId}`)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
   const addDiagnostic = useCallback((patientId, diagnostic) => {
     setPatients((prev) =>
       prev.map((p) =>
@@ -211,6 +269,28 @@ export function usePatients(token) {
       .catch(() => {});
   }, []);
 
+  const markSurgeryEvaluationSent = useCallback((patientId, evaluationId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              surgeryEvaluations: (p.surgeryEvaluations || []).map((e) =>
+                e.id === evaluationId ? { ...e, sentToPatient: true } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/surgery-evaluations/${evaluationId}`, { sentToPatient: true })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
   const createPatient = useCallback((patientData) => {
     // optimistic UI: add placeholder until server returns
     return api.post('/api/patients', patientData)
@@ -231,12 +311,17 @@ export function usePatients(token) {
     addAssessment,
     addEvaluation,
     updateEvaluation,
+    addSurgeryEvaluation,
+    updateSurgeryEvaluation,
+    uploadEvaluationDocument,
+    deleteEvaluationDocument,
     addDiagnostic,
     updateDiagnostic,
     deleteDiagnostic,
     addTreatment,
     deleteTreatment,
     markEvaluationSent,
+    markSurgeryEvaluationSent,
     createPatient
   };
 }
