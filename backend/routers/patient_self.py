@@ -13,7 +13,7 @@ from models import ChatMessage, Diagnostic, Document, Evaluation, Patient, Patie
 from notifications import create_staff_notification
 from schemas import (
     ActiveCareItemOut, ChatMessageCreate, ChatMessageOut, PatientAppointmentOut, PatientNotificationOut,
-    PatientProfileOut, PatientPromStatusOut, PromTrendOut, VisitReportDocumentOut, VisitReportOut,
+    PatientProfileOut, PatientProfileUpdate, PatientPromStatusOut, PromTrendOut, VisitReportDocumentOut, VisitReportOut,
 )
 from .prom_assignments import _with_derived_status
 from .prom_trend import compute_prom_trend
@@ -69,6 +69,16 @@ def _surgery_report(e: SurgeryEvaluation) -> VisitReportOut:
 @router.get("/me", response_model=PatientProfileOut)
 def get_me(current_patient: dict = Depends(get_current_patient), db: Session = Depends(get_db)):
     patient = _get_patient(current_patient["patient_id"], db)
+    return PatientProfileOut.model_validate(patient)
+
+
+@router.patch("/me", response_model=PatientProfileOut)
+def update_me(body: PatientProfileUpdate, current_patient: dict = Depends(get_current_patient), db: Session = Depends(get_db)):
+    patient = _get_patient(current_patient["patient_id"], db)
+    patient.email = body.email.strip()
+    patient.address = body.address.strip()
+    db.commit()
+    db.refresh(patient)
     return PatientProfileOut.model_validate(patient)
 
 

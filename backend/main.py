@@ -2,6 +2,8 @@ import os
 import sys
 import uuid
 import tempfile
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +46,8 @@ from routers.patient_auth import router as patient_auth_router
 from routers.patient_self import router as patient_self_router
 from routers.staff_notifications import router as staff_notifications_router
 from routers.chat import router as chat_router
+from routers.followups import auto_send_initial_prom_forms
+from database import SessionLocal
 
 load_dotenv()
 
@@ -129,6 +133,19 @@ def on_startup():
             conn.execute(text("ALTER TABLE surgery_evaluations ADD COLUMN IF NOT EXISTS \"patientSummary\" TEXT"))
     except Exception as e:
         print(f"⚠️  Column migration skipped/failed (safe to ignore on a fresh DB): {e}")
+
+    def send_due_forms_periodically():
+        while True:
+            db = SessionLocal()
+            try:
+                auto_send_initial_prom_forms(db)
+            except Exception as e:
+                print(f"Automatic pre-visit form check failed: {e}")
+            finally:
+                db.close()
+            time.sleep(60)
+
+    threading.Thread(target=send_due_forms_periodically, daemon=True, name="previsit-form-sender").start()
 
 
 # Audio storage directory

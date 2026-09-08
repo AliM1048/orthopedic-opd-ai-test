@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from auth import get_current_user
 from database import get_db
 from models import Patient, PROMAssignment, FollowUpCall
+from notifications import create_report_notification
 from schemas import (
     PROMAssignmentCreate, PROMAssignmentUpdate, PROMAssignmentOut, PROMAssignmentWithPatient,
 )
@@ -151,6 +152,15 @@ def create_prom_assignment(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
+    if body.completionMethod == "self_completion":
+        create_report_notification(
+            db, patient.id,
+            related_type="prom_assignment",
+            related_id=assignment.id,
+            title="A patient form is ready",
+            body=f"Please complete your {assignment.promName or assignment.bodyArea} questionnaire before your appointment.",
+            type="prom_assignment",
+        )
     return _to_out(assignment)
 
 

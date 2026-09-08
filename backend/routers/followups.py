@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Patient, Evaluation, FollowUpCall, FollowUpSettings, PROMAssignment
+from models import Patient, PatientNotification, Evaluation, FollowUpCall, FollowUpSettings, PROMAssignment
 from schemas import (
     FollowUpCallOut, FollowUpCallDue, FollowUpCallUpdate, FollowUpCallCreate,
     FollowUpSettingsOut, FollowUpSettingsUpdate, PatientFollowUpSettingsUpdate,
@@ -30,14 +30,9 @@ router = APIRouter(prefix="/api", tags=["Follow-Up Calls"])
 
 DEFAULT_INTERVALS_MONTHS = [3, 6, 9]
 
-# "Pre-Visit Calls Due" (both the very first pre-visit call and a recurring
-# follow-up check-in) shows a patient only while their relevant date —
-# scheduledDate for a follow-up, appointmentDate for an initial pre-visit —
-# is within this many days from today. Once that date has passed, the entry
-# drops off the list entirely rather than lingering as "overdue": a missed
-# call has nothing left to remind about once the appointment/check-in date
-# is behind us.
-REMINDER_LEAD_DAYS = 3
+# "Pre-Visit Forms Due" shows patients whose appointment is within this many
+# days. The automatic sender itself targets the exact four-day-before date.
+REMINDER_LEAD_DAYS = 4
 
 
 def add_months(d: date, months: int) -> date:
@@ -151,7 +146,7 @@ def _auto_create_initial_prom_assignments(db: Session, patients: list[Patient]) 
         )
         if existing:
             continue
-        db.add(PROMAssignment(
+        assignment = PROMAssignment(
             id=str(uuid.uuid4()),
             patient_id=patient.id,
             bodyArea=patient.bodyArea,
@@ -162,8 +157,35 @@ def _auto_create_initial_prom_assignments(db: Session, patients: list[Patient]) 
             assignedBy="System (auto-sent for pre-visit)",
             assignedAt=datetime.utcnow().isoformat() + "Z",
             accessToken=str(uuid.uuid4()),
+        )
+        db.add(assignment)
+        db.add(PatientNotification(
+            id=str(uuid.uuid4()),
+            patient_id=patient.id,
+            type="prom_assignment",
+            title="Your pre-visit form is ready",
+            body=f"Please complete your {assignment.bodyArea} questionnaire before your appointment.",
+            relatedType="prom_assignment",
+            relatedId=assignment.id,
+            isRead=False,
+            createdAt=datetime.utcnow().isoformat() + "Z",
         ))
     db.commit()
+
+
+def auto_send_initial_prom_forms(db: Session) -> None:
+    """Send the initial self-completion form exactly four days before an appointment.
+
+    The assignment check makes this idempotent, so the periodic worker and the
+    nurse dashboard can safely call it more than once.
+    """
+    target_date = (date.today() + timedelta(days=4)).strftime("%Y-%m-%d")
+    patients = (
+        db.query(Patient)
+        .filter(Patient.status == "pending", Patient.appointmentDate == target_date)
+        .all()
+    )
+    _auto_create_initial_prom_assignments(db, patients)
 
 
 @router.get("/followups/due", response_model=list[FollowUpCallDue])
@@ -181,8 +203,6 @@ def list_due_followups(db: Session = Depends(get_db)):
     auto_progress_prom_assignments(db)
 
     initial_patients = _patients_needing_initial_pre_visit(db)
-    _auto_create_initial_prom_assignments(db, initial_patients)
-
     today_iso = date.today().strftime("%Y-%m-%d")
     cutoff = (date.today() + timedelta(days=REMINDER_LEAD_DAYS)).strftime("%Y-%m-%d")
     rows = (

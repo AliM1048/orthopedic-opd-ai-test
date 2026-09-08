@@ -20,10 +20,10 @@ const TIMINGS = [
  * for the full workflow this drives. The doctor picks the instrument, who's
  * answering, and how it gets completed; they never fill it in themselves
  * (physician-assisted still means the patient answers, the doctor just types). */
-export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAssigned }) {
+export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAssigned, selfCompletionOnly = false }) {
   const [bodyArea, setBodyArea] = useState(patient?.bodyArea || bodyAreas?.[0]?.bodyArea || '');
   const [respondentType, setRespondentType] = useState('patient');
-  const [completionMethod, setCompletionMethod] = useState('physician_assisted');
+  const [completionMethod, setCompletionMethod] = useState(selfCompletionOnly ? 'self_completion' : 'physician_assisted');
   const [timing, setTiming] = useState('after_exam');
   const [deferReason, setDeferReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -109,9 +109,11 @@ export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAss
           </>
         ) : (
           <>
-            <h3>Select & Assign PROM</h3>
+            <h3>{selfCompletionOnly ? 'Send Patient Form' : 'Select & Assign PROM'}</h3>
             <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
-              No pre-visit questionnaire is on file for this patient. Choose the instrument and how it should get completed — you direct it, you do not answer for the patient.
+              {selfCompletionOnly
+                ? 'Choose the questionnaire topic. The patient will see it in the mobile app and complete it themselves.'
+                : 'No pre-visit questionnaire is on file for this patient. Choose the instrument and how it should get completed — you direct it, you do not answer for the patient.'}
             </p>
 
             <div className="form-group">
@@ -123,7 +125,7 @@ export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAss
               </select>
             </div>
 
-            <div className="form-group">
+            {!selfCompletionOnly && <div className="form-group">
               <label className="form-label">Respondent</label>
               <div className="prom-assign-radio-row">
                 <label className={`prom-assign-radio ${respondentType === 'patient' ? 'selected' : ''}`}>
@@ -135,9 +137,9 @@ export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAss
                   Parent / Caregiver <span className="text-muted" style={{ fontWeight: 500 }}>(pediatric)</span>
                 </label>
               </div>
-            </div>
+            </div>}
 
-            <div className="form-group">
+            {!selfCompletionOnly && <div className="form-group">
               <label className="form-label">Completion Method</label>
               <div className="prom-assign-method-grid">
                 {METHODS.map((m) => (
@@ -151,9 +153,9 @@ export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAss
                   </label>
                 ))}
               </div>
-            </div>
+            </div>}
 
-            {completionMethod === 'deferred' ? (
+            {!selfCompletionOnly && (completionMethod === 'deferred' ? (
               <div className="form-group">
                 <label className="form-label">Reason for Deferring</label>
                 <textarea className="form-control" rows={2} placeholder="e.g. Patient declined today, will complete at next visit." value={deferReason} onChange={(e) => setDeferReason(e.target.value)} />
@@ -165,14 +167,14 @@ export default function PromAssignmentModal({ patient, bodyAreas, onClose, onAss
                   {TIMINGS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
               </div>
-            )}
+            ))}
 
             {error && <p style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 4 }}>{error}</p>}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={onClose}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? 'Assigning…' : completionMethod === 'physician_assisted' ? 'Start Now' : 'Assign PROM'}
+                {submitting ? 'Sending…' : completionMethod === 'physician_assisted' ? 'Start Now' : selfCompletionOnly ? 'Send Form' : 'Assign PROM'}
               </button>
             </div>
           </>

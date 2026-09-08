@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall, Scissors, Paperclip } from 'lucide-react';
+import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall, Scissors, Paperclip, MessageCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../api';
+import { useLookup } from '../../hooks/useLookupData';
 import StatusBadge from '../common/StatusBadge';
 import FollowUpScheduleModal from './FollowUpScheduleModal';
+import PromAssignmentModal from '../PromAssignmentModal';
 
 function latestByDate(items) {
   if (!items || items.length === 0) return null;
@@ -58,6 +60,8 @@ export default function PatientRecordPanel({ patient }) {
   const [showAddCall, setShowAddCall] = useState(false);
   const [newCallDate, setNewCallDate] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showPromSendModal, setShowPromSendModal] = useState(false);
+  const { bodyAreas } = useLookup();
 
   const reloadFollowUps = useCallback(() => {
     api.get(`/api/patients/${patient.id}/followups`)
@@ -149,7 +153,23 @@ export default function PatientRecordPanel({ patient }) {
         <button className="btn btn-outline" onClick={() => navigate(`/evaluation?patient=${patient.id}`)}>
           <Stethoscope size={16} /> Physician Evaluation
         </button>
+        <button className="btn btn-outline" onClick={() => navigate(`/messages?patient=${encodeURIComponent(patient.id)}`)}>
+          <MessageCircle size={16} /> Message
+        </button>
+        <button className="btn btn-outline" onClick={() => setShowPromSendModal(true)}>
+          <ClipboardList size={16} /> Send / Resend Patient Form
+        </button>
       </div>
+
+      {showPromSendModal && (
+        <PromAssignmentModal
+          patient={patient}
+          bodyAreas={bodyAreas}
+          selfCompletionOnly
+          onClose={() => setShowPromSendModal(false)}
+          onAssigned={() => { setShowPromSendModal(false); notifySuccess('Patient form sent'); }}
+        />
+      )}
 
       {/* Tabs */}
       <div className="tabs">

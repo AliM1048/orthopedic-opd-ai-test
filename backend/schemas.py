@@ -406,11 +406,18 @@ class PatientProfileOut(BaseModel):
     mrn: str
     bodyArea: str
     phone: str
+    email: str
+    address: str
     appointmentDate: str
     appointmentTime: str
 
     class Config:
         from_attributes = True
+
+
+class PatientProfileUpdate(BaseModel):
+    email: str
+    address: str
 
 
 class VisitReportDocumentOut(BaseModel):

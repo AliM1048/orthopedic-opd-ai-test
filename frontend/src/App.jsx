@@ -28,7 +28,10 @@ import PromPublicFill from './pages/PromPublicFill';
 // keeps seeing everything, unchanged (see DashboardLayout's matching
 // `restricted` nav-item flags, and forbid_roles("nurse") on the backend for
 // the surgery-evaluations endpoints).
-const NURSE_ALLOWED_PATHS = ['/', '/evaluation', '/messages'];
+const NURSE_ALLOWED_PATHS = ['/', '/evaluation', '/messages', '/assessment'];
+// Dynamic segments the nurse dashboard itself links to (row click -> patient
+// profile) — checked separately since they aren't exact matches.
+const NURSE_ALLOWED_PREFIXES = ['/patient/'];
 
 // Everything a logged-in user can reach — split out so the public,
 // no-login PROM link route (below) never gets caught behind the auth gate.
@@ -40,7 +43,9 @@ function AuthedApp({ user, patients, actions }) {
     addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
   } = actions;
 
-  if (user?.role === 'nurse' && !NURSE_ALLOWED_PATHS.includes(location.pathname)) {
+  const nurseCanAccess = NURSE_ALLOWED_PATHS.includes(location.pathname)
+    || NURSE_ALLOWED_PREFIXES.some((p) => location.pathname.startsWith(p));
+  if (user?.role === 'nurse' && !nurseCanAccess) {
     return <Navigate to="/" replace />;
   }
 
@@ -124,7 +129,7 @@ function AuthedApp({ user, patients, actions }) {
           />
           <Route
             path="/messages"
-            element={<Messages />}
+            element={<Messages patients={patients} />}
           />
           <Route
             path="/documents/new"

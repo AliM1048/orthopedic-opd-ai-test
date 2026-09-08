@@ -25,7 +25,7 @@ function initials(name) {
 // no read receipts/edit/delete. Backend: routers/chat.py. No live push, so
 // this polls: the conversation list lightly (new chats appearing), and the
 // open thread more often (feels responsive while actually watching it).
-export default function Messages() {
+export default function Messages({ patients = [] }) {
   const [searchParams] = useSearchParams();
   const preselectId = searchParams.get('patient');
 
@@ -63,14 +63,27 @@ export default function Messages() {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread]);
 
-  const filtered = search.trim()
-    ? conversations.filter((c) => {
-        const q = search.toLowerCase();
-        return c.patientName.toLowerCase().includes(q) || c.patientMrn.toLowerCase().includes(q);
-      })
-    : conversations;
+  const conversationByPatient = conversations.reduce((result, conversation) => {
+    result[conversation.patientId] = conversation;
+    return result;
+  }, {});
 
-  const selected = conversations.find((c) => c.patientId === selectedId) || null;
+  const filtered = search.trim()
+    ? patients.filter((patient) => {
+        const q = search.toLowerCase();
+        return patient.name.toLowerCase().includes(q) || patient.mrn.toLowerCase().includes(q);
+      })
+    : patients;
+
+  const selectedPatient = patients.find((patient) => patient.id === selectedId) || null;
+  const selectedConversation = selectedId ? conversationByPatient[selectedId] : null;
+  const selected = selectedPatient ? {
+    patientId: selectedPatient.id,
+    patientName: selectedPatient.name,
+    patientMrn: selectedPatient.mrn,
+    patientAvatar: selectedPatient.avatar,
+    ...selectedConversation,
+  } : null;
 
   const handleSend = () => {
     const text = draft.trim();
@@ -101,38 +114,39 @@ export default function Messages() {
           <div className="card ps-list-col">
             <div className="search-bar" style={{ marginBottom: 12 }}>
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search conversations…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder="Search all patients…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
 
             {filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><MessageCircle size={32} /></div>
-                <p>No conversations yet.</p>
+                <p>No patients found.</p>
               </div>
             ) : (
               <div className="ps-patient-list">
-                {filtered.map((c) => {
-                  const needsReply = c.lastSenderType === 'patient';
+                {filtered.map((patient) => {
+                  const c = conversationByPatient[patient.id];
+                  const needsReply = c?.lastSenderType === 'patient';
                   return (
                     <button
-                      key={c.patientId}
+                      key={patient.id}
                       type="button"
-                      className={`ps-patient-row ${selectedId === c.patientId ? 'active' : ''}`}
-                      onClick={() => setSelectedId(c.patientId)}
+                      className={`ps-patient-row ${selectedId === patient.id ? 'active' : ''}`}
+                      onClick={() => setSelectedId(patient.id)}
                     >
-                      <div className="patient-avatar" style={{ background: c.patientAvatar, width: 36, height: 36, fontSize: 13 }}>
-                        {initials(c.patientName)}
+                      <div className="patient-avatar" style={{ background: patient.avatar, width: 36, height: 36, fontSize: 13 }}>
+                        {initials(patient.name)}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div className="ps-patient-name">{c.patientName}</div>
+                          <div className="ps-patient-name">{patient.name}</div>
                           {needsReply && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />}
                         </div>
                         <div className="text-muted" style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c.lastSenderType === 'staff' ? 'You: ' : ''}{c.lastMessageText}
+                          {c ? `${c.lastSenderType === 'staff' ? 'You: ' : ''}${c.lastMessageText}` : 'No messages yet'}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ fontSize: 10, flexShrink: 0, alignSelf: 'flex-start' }}>{timeAgo(c.lastMessageAt)}</div>
+                      {c ? <div className="text-muted" style={{ fontSize: 10, flexShrink: 0, alignSelf: 'flex-start' }}>{timeAgo(c.lastMessageAt)}</div> : null}
                     </button>
                   );
                 })}
@@ -145,7 +159,7 @@ export default function Messages() {
             {!selected ? (
               <div className="card empty-state" style={{ padding: 64 }}>
                 <div className="empty-state-icon"><MessageCircle size={40} /></div>
-                <p>Select a conversation from the list to view it.</p>
+                <p>Select a patient from the list to view or start a conversation.</p>
               </div>
             ) : (
               <div className="card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', padding: 0, overflow: 'hidden' }}>
