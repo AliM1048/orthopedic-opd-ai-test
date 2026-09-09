@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Calendar, ArrowLeft } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
+import { useLanguage } from '../hooks/useLanguage';
 
 export default function AllPatients({ patients }) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
@@ -23,8 +25,8 @@ export default function AllPatients({ patients }) {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1>All Patients</h1>
-            <p>{patients.length} patient records</p>
+            <h1>{t('allPatients.pageTitle')}</h1>
+            <p>{t('allPatients.patientRecordsCount', { count: patients.length })}</p>
           </div>
         </div>
       </div>
@@ -32,28 +34,28 @@ export default function AllPatients({ patients }) {
       <div className="page-body">
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Patient Records</div>
+            <div className="card-title">{t('allPatients.patientRecords')}</div>
             <div className="search-bar">
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search by name, MRN, or body area…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder={t('allPatients.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
 
           {filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">👤</div>
-              <p>No patients found.</p>
+              <p>{t('allPatients.noPatientsFound')}</p>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Patient</th>
-                  <th>MRN</th>
-                  <th>Body Area</th>
-                  <th>Assessments</th>
-                  <th>Evaluations</th>
-                  <th>Status</th>
+                  <th>{t('common.patient')}</th>
+                  <th>{t('allPatients.tableHeaderMrn')}</th>
+                  <th>{t('allPatients.tableHeaderBodyArea')}</th>
+                  <th>{t('allPatients.tableHeaderAssessments')}</th>
+                  <th>{t('allPatients.tableHeaderEvaluations')}</th>
+                  <th>{t('common.status')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,7 +68,7 @@ export default function AllPatients({ patients }) {
                         </div>
                         <div>
                           <div className="fw-600">{p.name}</div>
-                          <div className="text-muted">{p.age}y · {p.gender}</div>
+                          <div className="text-muted">{t('allPatients.ageYears', { age: p.age })} · {p.gender}</div>
                         </div>
                       </div>
                     </td>

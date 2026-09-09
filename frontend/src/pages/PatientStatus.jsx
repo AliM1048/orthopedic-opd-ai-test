@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Users } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import PatientRecordPanel from '../components/patient/PatientRecordPanel';
+import { useLanguage } from '../hooks/useLanguage';
 
 // Master-detail patient lookup: search/select on the left, full record on
 // the right — reuses the exact same PatientRecordPanel the /patient/:id
 // profile page renders, so switching patients here never navigates away.
 export default function PatientStatus({ patients }) {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const preselectId = searchParams.get('patient');
 
@@ -28,8 +30,8 @@ export default function PatientStatus({ patients }) {
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Patient Status</h1>
-          <p>Select a patient to view their full record</p>
+          <h1>{t('patientStatus.pageTitle')}</h1>
+          <p>{t('patientStatus.pageSubtitle')}</p>
         </div>
       </div>
 
@@ -39,13 +41,13 @@ export default function PatientStatus({ patients }) {
           <div className="card ps-list-col">
             <div className="search-bar" style={{ marginBottom: 12 }}>
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search patients…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder={t('patientStatus.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
 
             {filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">👤</div>
-                <p>No patients found.</p>
+                <p>{t('patientStatus.noPatientsFound')}</p>
               </div>
             ) : (
               <div className="ps-patient-list">
@@ -77,7 +79,7 @@ export default function PatientStatus({ patients }) {
             ) : (
               <div className="card empty-state" style={{ padding: 64 }}>
                 <div className="empty-state-icon"><Users size={40} /></div>
-                <p>Select a patient from the list to view their record.</p>
+                <p>{t('patientStatus.selectPatientPrompt')}</p>
               </div>
             )}
           </div>

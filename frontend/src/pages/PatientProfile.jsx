@@ -1,8 +1,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import PatientRecordPanel from '../components/patient/PatientRecordPanel';
+import { useLanguage } from '../hooks/useLanguage';
 
 export default function PatientProfile({ patients }) {
+  const { t } = useLanguage();
   const { id } = useParams();
   const navigate = useNavigate();
   const patient = patients.find((p) => p.id === id);
@@ -10,12 +12,12 @@ export default function PatientProfile({ patients }) {
   if (!patient) {
     return (
       <>
-        <div className="topbar"><div className="topbar-left"><h1>Patient Not Found</h1></div></div>
+        <div className="topbar"><div className="topbar-left"><h1>{t('patientProfile.patientNotFound')}</h1></div></div>
         <div className="page-body">
           <div className="empty-state">
             <div className="empty-state-icon">❌</div>
-            <p>No patient found with this ID.</p>
-            <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Back to Dashboard</button>
+            <p>{t('patientProfile.noPatientFoundId')}</p>
+            <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>{t('patientProfile.backToDashboard')}</button>
           </div>
         </div>
       </>
@@ -28,7 +30,7 @@ export default function PatientProfile({ patients }) {
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
           <div>
-            <h1>Patient Profile</h1>
+            <h1>{t('patientProfile.pageTitle')}</h1>
             <p>{patient.mrn}</p>
           </div>
         </div>

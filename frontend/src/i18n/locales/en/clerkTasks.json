@@ -1,0 +1,20 @@
+{
+  "title": "Clerk Tasks",
+  "subtitle": "PROM questionnaires assigned by a physician — record the patient's answers only, no history needed",
+  "totalTasks": "Total Tasks",
+  "statusOverdue": "Overdue",
+  "statusAssigned": "Assigned",
+  "respondentPatient": "Patient",
+  "respondentParentCaregiver": "Parent / Caregiver",
+  "searchPlaceholder": "Search by patient or MRN…",
+  "emptyState": "No PROM tasks assigned right now.",
+  "colProm": "PROM",
+  "colRespondent": "Respondent",
+  "colAssigned": "Assigned",
+  "start": "Start",
+  "decline": "Decline",
+  "declineDialogTitle": "Decline this PROM task?",
+  "declineReasonPlaceholder": "Reason (optional)",
+  "taskDeclined": "Task declined",
+  "updateFailed": "Failed to update"
+}

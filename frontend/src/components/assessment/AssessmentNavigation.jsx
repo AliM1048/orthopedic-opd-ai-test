@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Save, Send, AlertCircle } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function AssessmentNavigation({
   canGoPrev,
@@ -11,6 +12,7 @@ export default function AssessmentNavigation({
   onSaveDraft,
   onSubmit
 }) {
+  const { t } = useLanguage();
   return (
     <div className="anav-bar">
       <div className="anav-left">
@@ -19,7 +21,7 @@ export default function AssessmentNavigation({
           onClick={onPrev}
           disabled={!canGoPrev}
         >
-          <ChevronLeft size={16} /> Previous
+          <ChevronLeft size={16} /> {t('assessment.navigation.previous')}
         </button>
       </div>
 
@@ -30,7 +32,7 @@ export default function AssessmentNavigation({
           disabled={isSaving}
         >
           <Save size={14} />
-          {isSaving ? 'Saving…' : 'Save Draft'}
+          {isSaving ? t('assessment.navigation.saving') : t('assessment.navigation.saveDraft')}
         </button>
       </div>
 
@@ -38,7 +40,7 @@ export default function AssessmentNavigation({
         {hasErrors && (
           <div className="anav-error-hint">
             <AlertCircle size={13} />
-            Answer required questions
+            {t('assessment.navigation.answerRequired')}
           </div>
         )}
         {isLastSection ? (
@@ -46,14 +48,14 @@ export default function AssessmentNavigation({
             className="btn btn-primary"
             onClick={onSubmit}
           >
-            Review & Submit <Send size={15} />
+            {t('assessment.navigation.reviewSubmit')} <Send size={15} />
           </button>
         ) : (
           <button
             className="btn btn-primary"
             onClick={onNext}
           >
-            Next Section <ChevronRight size={16} />
+            {t('assessment.navigation.nextSection')} <ChevronRight size={16} />
           </button>
         )}
       </div>

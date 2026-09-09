@@ -1,0 +1,12 @@
+{
+  "pageTitle": "جميع المرضى",
+  "patientRecordsCount": "{{count}} سجل مريض",
+  "patientRecords": "سجلات المرضى",
+  "searchPlaceholder": "البحث بالاسم أو الرقم الطبي أو منطقة الجسم…",
+  "noPatientsFound": "لا يوجد مرضى.",
+  "tableHeaderMrn": "الرقم الطبي",
+  "tableHeaderBodyArea": "منطقة الجسم",
+  "tableHeaderAssessments": "التقييمات الأولية",
+  "tableHeaderEvaluations": "تقييمات الطبيب",
+  "ageYears": "{{age}} سنة"
+}

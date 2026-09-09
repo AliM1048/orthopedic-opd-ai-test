@@ -1,6 +1,8 @@
 import { ChevronDown } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function DropdownQuestion({ question, value = '', onChange, error }) {
+  const { t } = useLanguage();
   return (
     <div className="dq-wrap">
       <div className="dq-select-wrap">
@@ -10,7 +12,7 @@ export default function DropdownQuestion({ question, value = '', onChange, error
           value={value}
           onChange={e => onChange(e.target.value)}
         >
-          <option value="">Select an option…</option>
+          <option value="">{t('assessment.dropdown.selectOption')}</option>
           {question.options.map((opt, idx) => (
             <option key={idx} value={opt}>{opt}</option>
           ))}

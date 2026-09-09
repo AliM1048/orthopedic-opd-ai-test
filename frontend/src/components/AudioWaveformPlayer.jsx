@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Mic } from 'lucide-react';
 import { withAuthToken } from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 
 const BUCKET_COUNT = 100;
 
@@ -134,6 +135,7 @@ export default function AudioWaveformPlayer({
   audioProgress, audioCurrentTime, audioDuration, formatAudioTime,
   handleTimeUpdate, handleLoadedMetadata, handleAudioEnd,
 }) {
+  const { t } = useLanguage();
   const [peaks, setPeaks] = useState(null);
   const decodedRef = useRef(null);
   const waveformRef = useRef(null);
@@ -175,9 +177,9 @@ export default function AudioWaveformPlayer({
         />
       )}
       <div className="awp-header">
-        <span className="awp-label"><Mic size={12} /> Doctor Voice Note</span>
+        <span className="awp-label"><Mic size={12} /> {t('components.audioPlayer.doctorVoiceNote')}</span>
         <span className="awp-time">
-          {audioUrl ? `${formatAudioTime(audioCurrentTime)} / ${formatAudioTime(audioDuration)}` : 'No recording yet'}
+          {audioUrl ? `${formatAudioTime(audioCurrentTime)} / ${formatAudioTime(audioDuration)}` : t('components.audioPlayer.noRecordingYet')}
         </span>
       </div>
 

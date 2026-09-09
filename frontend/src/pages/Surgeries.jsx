@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scissors, Calendar } from 'lucide-react';
+import { useLanguage } from '../hooks/useLanguage';
 
 function todayIso() {
   return new Date().toISOString().split('T')[0];
@@ -48,14 +49,15 @@ function getUpcomingSurgeries(patients) {
 
 export default function Surgeries({ patients }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const rows = useMemo(() => getUpcomingSurgeries(patients), [patients]);
 
   return (
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Surgeries</h1>
-          <p>Patients with a scheduled or upcoming surgery</p>
+          <h1>{t('surgeries.title')}</h1>
+          <p>{t('surgeries.subtitle')}</p>
         </div>
       </div>
 
@@ -64,17 +66,17 @@ export default function Surgeries({ patients }) {
           {rows.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon"><Scissors size={32} /></div>
-              <p>No scheduled surgeries.</p>
+              <p>{t('surgeries.emptyState')}</p>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Patient</th>
-                  <th>MRN</th>
-                  <th>Surgery Date</th>
-                  <th>Details</th>
-                  <th>Status</th>
+                  <th>{t('common.patient')}</th>
+                  <th>{t('surgeries.mrn')}</th>
+                  <th>{t('surgeries.surgeryDate')}</th>
+                  <th>{t('surgeries.details')}</th>
+                  <th>{t('common.status')}</th>
                 </tr>
               </thead>
               <tbody>

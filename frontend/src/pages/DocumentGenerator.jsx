@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ArrowLeft, X, Printer } from 'lucide-react';
 import { useLookup } from '../hooks/useLookupData';
 import PrintDocModal from '../components/PrintDocModal';
+import { useLanguage } from '../hooks/useLanguage';
 
 function todayIso() {
   return new Date().toISOString().split('T')[0];
@@ -17,8 +18,9 @@ const EMPTY_FORM = { date: todayIso(), notes: '', duration: '', details: '', fol
 // name and MRN on it.
 export default function DocumentGenerator({ patients, user }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { diagnosticTests, treatmentOptions } = useLookup();
-  const physicianName = user?.name || 'Physician';
+  const physicianName = user?.name || t('common.physician');
 
   const [search, setSearch] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -52,22 +54,22 @@ export default function DocumentGenerator({ patients, user }) {
     if (!canGenerate) return;
     if (selectedType.kind === 'diagnostic') {
       setPrintOrder({
-        printTitle: `Diagnostic Request — ${selectedType.name}`,
+        printTitle: t('documentGenerator.diagnosticRequestTitle', { name: selectedType.name }),
         printBody: [
-          ['Examination', selectedType.name],
-          ['Date', form.date],
-          ...(form.notes.trim() ? [['Clinical Indication', form.notes.trim()]] : []),
+          [t('documentGenerator.examination'), selectedType.name],
+          [t('common.date'), form.date],
+          ...(form.notes.trim() ? [[t('documentGenerator.clinicalIndication'), form.notes.trim()]] : []),
         ],
       });
     } else {
       setPrintOrder({
-        printTitle: `${selectedType.name} Order`,
+        printTitle: t('documentGenerator.treatmentOrderTitle', { name: selectedType.name }),
         printBody: [
-          ['Treatment', selectedType.name],
-          ['Duration', form.duration.trim() || '—'],
-          ['Details', form.details.trim() || '—'],
-          ['Date', form.date],
-          ...(form.followUpDate ? [['Follow-Up Date', form.followUpDate]] : []),
+          [t('documentGenerator.treatment'), selectedType.name],
+          [t('documentGenerator.duration'), form.duration.trim() || '—'],
+          [t('documentGenerator.details'), form.details.trim() || '—'],
+          [t('common.date'), form.date],
+          ...(form.followUpDate ? [[t('documentGenerator.followUpDate'), form.followUpDate]] : []),
         ],
       });
     }
@@ -81,8 +83,8 @@ export default function DocumentGenerator({ patients, user }) {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1>Generate Document</h1>
-            <p>Print a signable order or request — not saved to the patient's record</p>
+            <h1>{t('documentGenerator.title')}</h1>
+            <p>{t('documentGenerator.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -91,7 +93,7 @@ export default function DocumentGenerator({ patients, user }) {
         <div className="card" style={{ maxWidth: 760, margin: '0 auto' }}>
           {/* Step 1 — Patient */}
           <div className="form-group" style={{ position: 'relative' }}>
-            <label className="form-label">Patient</label>
+            <label className="form-label">{t('common.patient')}</label>
             {selectedPatient ? (
               <div className="dg-selected-patient">
                 <div className="patient-avatar" style={{ background: selectedPatient.avatar, width: 30, height: 30, fontSize: 12 }}>
@@ -102,14 +104,14 @@ export default function DocumentGenerator({ patients, user }) {
                   <div className="text-muted" style={{ fontSize: 11 }}>{selectedPatient.mrn}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setSelectedPatient(null); setSelectedType(null); }}>
-                  <X size={14} /> Change
+                  <X size={14} /> {t('documentGenerator.change')}
                 </button>
               </div>
             ) : (
               <>
                 <div className="search-bar">
                   <Search size={16} color="var(--text-muted)" />
-                  <input placeholder="Search by name or MRN…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <input placeholder={t('documentGenerator.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
                 {suggestions.length > 0 && (
                   <div className="dg-suggestions">
@@ -133,33 +135,33 @@ export default function DocumentGenerator({ patients, user }) {
           {/* Step 2 — Document type */}
           {selectedPatient && (
             <div style={{ marginTop: 20 }}>
-              <label className="form-label">Document Type</label>
-              <div className="dg-type-section-label">Diagnostic Request</div>
+              <label className="form-label">{t('documentGenerator.documentType')}</label>
+              <div className="dg-type-section-label">{t('documentGenerator.diagnosticRequest')}</div>
               <div className="dg-type-grid">
-                {diagnosticTests.map((t) => (
+                {diagnosticTests.map((opt) => (
                   <button
-                    key={t.id}
+                    key={opt.id}
                     type="button"
-                    className={`dg-type-card ${selectedType?.kind === 'diagnostic' && selectedType.id === t.id ? 'selected' : ''}`}
-                    onClick={() => handlePickType('diagnostic', t)}
+                    className={`dg-type-card ${selectedType?.kind === 'diagnostic' && selectedType.id === opt.id ? 'selected' : ''}`}
+                    onClick={() => handlePickType('diagnostic', opt)}
                   >
-                    <span className="dg-type-icon">{t.icon}</span>
-                    <span className="dg-type-name">{t.name}</span>
+                    <span className="dg-type-icon">{opt.icon}</span>
+                    <span className="dg-type-name">{opt.name}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="dg-type-section-label">Treatment Order</div>
+              <div className="dg-type-section-label">{t('documentGenerator.treatmentOrder')}</div>
               <div className="dg-type-grid">
-                {treatmentOptions.map((t) => (
+                {treatmentOptions.map((opt) => (
                   <button
-                    key={t.id}
+                    key={opt.id}
                     type="button"
-                    className={`dg-type-card ${selectedType?.kind === 'treatment' && selectedType.id === t.id ? 'selected' : ''}`}
-                    onClick={() => handlePickType('treatment', t)}
+                    className={`dg-type-card ${selectedType?.kind === 'treatment' && selectedType.id === opt.id ? 'selected' : ''}`}
+                    onClick={() => handlePickType('treatment', opt)}
                   >
-                    <span className="dg-type-icon">{t.icon}</span>
-                    <span className="dg-type-name">{t.name}</span>
+                    <span className="dg-type-icon">{opt.icon}</span>
+                    <span className="dg-type-name">{opt.name}</span>
                   </button>
                 ))}
               </div>
@@ -171,16 +173,16 @@ export default function DocumentGenerator({ patients, user }) {
             <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
               <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label">Date</label>
+                  <label className="form-label">{t('common.date')}</label>
                   <input type="date" className="form-control" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                 </div>
 
                 {selectedType.kind === 'diagnostic' ? (
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label className="form-label">Clinical Indication / Notes (optional)</label>
+                    <label className="form-label">{t('documentGenerator.clinicalIndicationLabel')}</label>
                     <textarea
                       className="form-control" rows={3}
-                      placeholder="Reason for the request…"
+                      placeholder={t('documentGenerator.reasonPlaceholder')}
                       value={form.notes}
                       onChange={(e) => setForm({ ...form, notes: e.target.value })}
                     />
@@ -188,15 +190,15 @@ export default function DocumentGenerator({ patients, user }) {
                 ) : (
                   <>
                     <div className="form-group">
-                      <label className="form-label">Duration</label>
-                      <input className="form-control" placeholder="e.g. 6 weeks" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
+                      <label className="form-label">{t('documentGenerator.duration')}</label>
+                      <input className="form-control" placeholder={t('documentGenerator.durationPlaceholder')} value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Follow-Up Date (optional)</label>
+                      <label className="form-label">{t('documentGenerator.followUpDateLabel')}</label>
                       <input type="date" className="form-control" value={form.followUpDate} onChange={(e) => setForm({ ...form, followUpDate: e.target.value })} />
                     </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label">Details / Instructions</label>
+                      <label className="form-label">{t('documentGenerator.detailsInstructions')}</label>
                       <textarea className="form-control" rows={3} value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} />
                     </div>
                   </>
@@ -205,7 +207,7 @@ export default function DocumentGenerator({ patients, user }) {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
                 <button className="btn btn-primary" disabled={!canGenerate} onClick={handleGenerate}>
-                  <Printer size={16} /> Generate Document
+                  <Printer size={16} /> {t('documentGenerator.generateDocumentButton')}
                 </button>
               </div>
             </div>

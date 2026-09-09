@@ -1,0 +1,121 @@
+{
+  "audioPlayer": {
+    "doctorVoiceNote": "ملاحظة صوتية من الطبيب",
+    "noRecordingYet": "لا يوجد تسجيل بعد"
+  },
+  "dictationModal": {
+    "close": "إغلاق",
+    "title": "إملاء الزيارة",
+    "instructions": "قل «التشخيص...»، ثم «الفحوصات...»، ثم «خطة العلاج...» — اضغط إيقاف عند الانتهاء وسيتم ملء السجل تلقائياً.",
+    "languageHint": "تحدث بالإنجليزية أو العربية أو الفرنسية — يتم اكتشاف اللغة تلقائياً مما تقوله.",
+    "tapToStart": "اضغط على الميكروفون لبدء التسجيل",
+    "recordingStatus": "جارٍ تسجيل الزيارة كاملة… اضغط للإيقاف",
+    "cancel": "إلغاء",
+    "transcribing": "جارٍ تفريغ الصوت وملء السجل…",
+    "liveLabel": "مباشر — ما يسمعه الميكروفون",
+    "listening": "جارٍ الاستماع…",
+    "tryAgain": "إعادة المحاولة"
+  },
+  "promAssignment": {
+    "close": "إغلاق",
+    "resultTitle": "تم تعيين المقياس",
+    "shareInstructions": "اعرض رمز QR هذا أو شارك الرابط مع المريض — التسليم التلقائي عبر واتساب/الرسائل النصية غير مُفعّل بعد (يتطلب اختيار مزوّد رسائل بشكل منفصل). الحالة:",
+    "sentPending": "أُرسل إلى المريض — قيد الانتظار",
+    "copied": "تم النسخ",
+    "copy": "نسخ",
+    "routedToClerk": "تم توجيهه إلى قائمة مهام الموظف الإداري. الحالة:",
+    "assignedToClerk": "مُسند إلى الموظف الإداري",
+    "deferredReasonPrefix": "تم وضع علامة مؤجل. السبب المسجل:",
+    "done": "تم",
+    "sendPatientFormTitle": "إرسال نموذج للمريض",
+    "selectAssignTitle": "اختيار وتعيين مقياس PROM",
+    "sendPatientFormDesc": "اختر موضوع الاستبيان. سيظهر للمريض في تطبيق الجوال وسيقوم بإكماله بنفسه.",
+    "selectAssignDesc": "لا يوجد استبيان ما قبل الزيارة مسجل لهذا المريض. اختر الأداة وكيفية إكمالها — أنت من يوجّه العملية، ولا تجيب نيابة عن المريض.",
+    "promTypeLabel": "نوع المقياس",
+    "respondentLabel": "المُجيب",
+    "patientOption": "المريض",
+    "parentCaregiverOption": "الوالد / مقدم الرعاية",
+    "pediatricNote": "(للأطفال)",
+    "completionMethodLabel": "طريقة الإكمال",
+    "methods": {
+      "self_completion": {
+        "label": "إكمال ذاتي من المريض",
+        "desc": "رابط أو رمز QR يملؤه المريض بنفسه — على هاتفه أو على جهاز لوحي في العيادة."
+      },
+      "clerk_assisted": {
+        "label": "بمساعدة الموظف الإداري",
+        "desc": "يُوجَّه إلى قائمة مهام الموظف الإداري — يقرأ الأسئلة ويسجل إجابات المريض فقط."
+      },
+      "physician_assisted": {
+        "label": "بمساعدة الطبيب الآن",
+        "desc": "أجرِ الاستبيان مباشرة — يجيب المريض وتقوم أنت بتسجيل الإجابات."
+      },
+      "deferred": {
+        "label": "تأجيل / لا ينطبق",
+        "desc": "لم يُستكمل في هذه الزيارة — يُحفظ السبب في الملف."
+      }
+    },
+    "reasonForDeferringLabel": "سبب التأجيل",
+    "deferPlaceholder": "مثال: رفض المريض اليوم، سيُكمل في الزيارة القادمة.",
+    "timingLabel": "التوقيت بالنسبة للفحص",
+    "timings": {
+      "before_exam": "قبل الفحص",
+      "after_exam": "بعد الفحص",
+      "after_intervention": "بعد التدخل"
+    },
+    "deferReasonRequiredError": "السبب مطلوب للتأجيل.",
+    "assignFailedError": "فشل إنشاء التعيين. يرجى المحاولة مرة أخرى.",
+    "cancel": "إلغاء",
+    "sending": "جارٍ الإرسال…",
+    "startNow": "البدء الآن",
+    "sendFormButton": "إرسال النموذج",
+    "assignButton": "تعيين المقياس"
+  },
+  "promTrendChart": {
+    "loadingTrend": "جارٍ تحميل الاتجاه…",
+    "notEnoughHistory": "لا يوجد سجل زيارات كافٍ بعد — يلزم تقييم واحد على الأقل بدرجة لرسمه.",
+    "changeFromBaseline": "التغير عن خط الأساس",
+    "missing": "غير متوفر",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "logNewInjury": "تسجيل إصابة جديدة"
+  },
+  "printDoc": {
+    "insuranceCopyBadge": "نسخة التأمين",
+    "hospitalName": "مستشفى الرسول الأعظم",
+    "hospitalDept": "عيادة العظام الخارجية",
+    "officialClinicalDocument": "وثيقة سريرية رسمية",
+    "close": "إغلاق",
+    "fieldPatient": "المريض",
+    "fieldMrn": "رقم السجل الطبي",
+    "fieldDate": "التاريخ",
+    "fieldAge": "العمر",
+    "ageYears": "{{age}} سنة",
+    "generatedLabel": "تاريخ الإصدار",
+    "attendingPhysician": "الطبيب المعالج",
+    "printDocument": "طباعة المستند",
+    "printInsuranceDocument": "طباعة مستند التأمين"
+  },
+  "printTypeModal": {
+    "title": "اختر نوع المستند",
+    "subtitle": "اختر النسخة المطلوب طباعتها من هذا المستند.",
+    "standardDocument": "مستند قياسي",
+    "insuranceDocument": "مستند التأمين",
+    "cancel": "إلغاء"
+  },
+  "followUpSchedule": {
+    "title": "جدول مكالمات المتابعة",
+    "description": "عدد الأشهر بعد تقييم المريض الأول التي تُجدول عندها مكالمة متابعة PROM.",
+    "useClinicDefault": "استخدام الإعداد الافتراضي للعيادة ({{months}} أشهر)",
+    "customForPatient": "مخصص لهذا المريض",
+    "monthsLabel": "الأشهر (مفصولة بفواصل)",
+    "monthsPlaceholder": "مثال: 3, 6, 9",
+    "saveNote": "الحفظ يُعيد إنشاء مكالمات هذا المريض غير المكتملة اعتباراً من تاريخ تقييمه الأول — المكالمات المكتملة تبقى دون تغيير.",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "enterIntervalError": "أدخل فاصلاً زمنياً واحداً على الأقل، مثال: 3, 6, 9",
+    "scheduleUpdated": "تم تحديث الجدول",
+    "failedToSave": "فشل الحفظ"
+  }
+}

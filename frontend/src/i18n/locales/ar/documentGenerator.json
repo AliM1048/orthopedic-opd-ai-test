@@ -1,0 +1,23 @@
+{
+  "title": "إنشاء مستند",
+  "subtitle": "طباعة أمر أو طلب قابل للتوقيع — لا يتم حفظه في سجل المريض",
+  "change": "تغيير",
+  "searchPlaceholder": "البحث بالاسم أو رقم الملف الطبي…",
+  "documentType": "نوع المستند",
+  "diagnosticRequest": "طلب فحص تشخيصي",
+  "treatmentOrder": "أمر علاج",
+  "clinicalIndicationLabel": "الدواعي السريرية / ملاحظات (اختياري)",
+  "reasonPlaceholder": "سبب الطلب…",
+  "duration": "المدة",
+  "durationPlaceholder": "مثال: 6 أسابيع",
+  "followUpDateLabel": "تاريخ المتابعة (اختياري)",
+  "detailsInstructions": "التفاصيل / التعليمات",
+  "generateDocumentButton": "إنشاء مستند",
+  "diagnosticRequestTitle": "طلب فحص تشخيصي — {{name}}",
+  "treatmentOrderTitle": "أمر {{name}}",
+  "examination": "الفحص",
+  "clinicalIndication": "الدواعي السريرية",
+  "treatment": "العلاج",
+  "details": "التفاصيل",
+  "followUpDate": "تاريخ المتابعة"
+}

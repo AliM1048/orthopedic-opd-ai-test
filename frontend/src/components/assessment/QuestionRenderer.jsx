@@ -5,8 +5,10 @@ import DropdownQuestion from './DropdownQuestion';
 import NumericQuestion from './NumericQuestion';
 import DateQuestion from './DateQuestion';
 import { HelpCircle, AlertCircle } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function QuestionRenderer({ question, sectionIdx, questionIdx, totalSectionQuestions, value, onChange, error }) {
+  const { t } = useLanguage();
   const renderInput = () => {
     switch (question.type) {
       case 'radio':
@@ -30,7 +32,7 @@ export default function QuestionRenderer({ question, sectionIdx, questionIdx, to
   return (
     <div className={`qr-card ${error ? 'qr-card-error' : ''}`}>
       <div className="qr-counter">
-        Question {questionIdx + 1} <span className="qr-counter-of">of {totalSectionQuestions}</span>
+        {t('assessment.question.number', { current: questionIdx + 1 })} <span className="qr-counter-of">{t('assessment.question.of', { total: totalSectionQuestions })}</span>
       </div>
 
       <div className="qr-question-text">

@@ -67,6 +67,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8081",  # Expo web dev server (`npm run web` / `expo start --web`)
         "http://localhost:19006",  # Expo web dev server, older SDK default port
+        "https://orthopedic-opd-ai-test.onrender.com",  # deployed frontend (Render Static Site)
     ],
     # Also allow any private-LAN-IP origin on the usual dev ports — needed when a
     # physical phone (Expo Go, or the mobile app's PROM-fill WebView loading the

@@ -1,0 +1,130 @@
+{
+  "title": "Surgery Evaluation",
+  "noPatientSelected": "No patient selected.",
+  "backToSurgeries": "Back to Surgeries",
+  "allergiesLabel": "Allergies",
+  "noAllergiesOnFile": "None on file",
+  "ordersFollowUpHeading": "Orders & Follow-Up",
+  "postOpDiagnosticTestsLabel": "Post-Op Diagnostic Tests",
+  "postOpTreatmentPlanLabel": "Post-Op Treatment Plan",
+  "noTreatmentsAddedYet": "No treatments added yet.",
+  "selectTreatmentTypePlaceholder": "Select treatment type…",
+  "removeTreatmentTooltip": "Remove",
+  "removeOrderTooltip": "Remove order",
+  "durationPlaceholder": "Duration (e.g. 6 weeks)",
+  "detailsInstructionsPlaceholder": "Details / instructions",
+  "addTreatmentButton": "+ Add Treatment",
+  "followUpHeading": "Follow-Up",
+  "noFollowUpScheduled": "No follow-up scheduled yet.",
+
+  "patientStrip": {
+    "genderAgeBadge": "{{gender}} · {{age}}y",
+    "mrnBodyBloodLine": "MRN {{mrn}} · {{bodyArea}} · Blood Type {{bloodType}}"
+  },
+
+  "soap": {
+    "procedurePerformedLabel": "Procedure Performed",
+    "procedurePerformedPlaceholder": "e.g. Arthroscopic meniscus repair, right knee.",
+    "findingsLabel": "Findings",
+    "findingsPlaceholder": "Intraoperative findings — tissue condition, extent of damage, etc.",
+    "postoperativePlanLabel": "Postoperative Plan",
+    "postoperativePlanPlaceholder": "Recovery plan — pain management, weight-bearing status, rehab, follow-up…"
+  },
+
+  "dictation": {
+    "listeningPlaceholder": "Listening…",
+    "rawTranscriptHeading": "Raw Transcript",
+    "transcriptHelpText": "Check this against what was actually said — the sections below are the AI's structured, grammar-corrected read of it, and can be edited before you click Complete Visit.",
+    "stopRecording": "Stop Recording",
+    "startRecording": "Start Recording"
+  },
+
+  "orders": {
+    "treatmentOrderTitle": "{{type}} Order",
+    "diagnosticRequestTitle": "{{type}} Request",
+    "diagnosticRequestPrintTitle": "Diagnostic Request — {{type}}",
+    "durationSummary": "Duration: {{duration}}",
+    "pendingResultsText": "Pending results",
+    "pendingText": "Pending",
+    "orderedByLabel": "Ordered By",
+    "treatmentLabel": "Treatment",
+    "detailsLabel": "Details",
+    "durationFieldLabel": "Duration",
+    "followUpDateLabel": "Follow-Up Date",
+    "examinationLabel": "Examination",
+    "resultLabel": "Result",
+    "sectionTitle": "Orders",
+    "noOrdersRecorded": "No orders recorded.",
+    "noOrdersRecordedYet": "No orders recorded yet.",
+    "recordedOrdersHeading": "Recorded Orders",
+    "colOrder": "Order",
+    "colDetails": "Details",
+    "printOrderTooltip": "Print {{title}}",
+    "removeConfirmTitle": "Remove {{title}}?",
+    "removeConfirmText": "This order will be permanently removed from the patient record.",
+    "removeConfirmButton": "Remove"
+  },
+
+  "status": {
+    "pending": "Pending",
+    "active": "Active",
+    "completed": "Completed",
+    "scheduled": "Scheduled"
+  },
+
+  "review": {
+    "backToEvaluation": "Back to Evaluation",
+    "title": "Review & Print",
+    "printFullSummary": "Print Full Summary",
+    "insuranceCopy": "INSURANCE COPY",
+    "operativeNoteHeader": "Orthopedic OPD — Operative Note",
+    "procedureLabel": "Procedure:",
+    "surgeonLabel": "Surgeon:",
+    "dateColonLabel": "Date:",
+    "footerOrgLine": "Orthopedic OPD — Official Clinical Document",
+    "footerComputerGenerated": "This document is computer-generated.",
+    "attendingSurgeon": "Attending Surgeon"
+  },
+
+  "savedState": {
+    "title": "Operative Note Recorded",
+    "message": "Surgery evaluation saved for {{name}}.",
+    "viewProfile": "View Profile"
+  },
+
+  "quickActions": {
+    "label": "Quick Actions",
+    "newNote": "New Note",
+    "orderPrescription": "Order Prescription",
+    "completeEvaluationFirstTooltip": "Complete an evaluation first",
+    "sentToPatient": "Sent to Patient",
+    "sendToPatient": "Send to Patient",
+    "completeVisit": "Complete Visit"
+  },
+
+  "medication": {
+    "nameLabel": "Medication Name",
+    "namePlaceholder": "e.g. Diclofenac 75mg",
+    "doseLabel": "Dose",
+    "dosePlaceholder": "e.g. 1 tab twice daily",
+    "durationLabel": "Duration",
+    "durationPlaceholder": "e.g. 7 days"
+  },
+
+  "quickNote": {
+    "label": "Note",
+    "placeholder": "Add a quick note — appended to the Postoperative Plan section…"
+  },
+
+  "toast": {
+    "saveAllFailed": "Some changes failed to save — please try again",
+    "prescriptionSaved": "Prescription saved",
+    "prescriptionSaveFailed": "Failed to save prescription",
+    "noteSaved": "Note saved",
+    "noteSaveFailed": "Failed to save note",
+    "sentToPatient": "Sent to patient",
+    "sendToPatientFailed": "Failed to send to patient",
+    "orderRemoved": "Order removed",
+    "orderRemoveFailed": "Failed to remove order"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "pageTitle": "Patient Status",
+  "pageSubtitle": "Select a patient to view their full record",
+  "searchPlaceholder": "Search patients…",
+  "noPatientsFound": "No patients found.",
+  "selectPatientPrompt": "Select a patient from the list to view their record."
+}

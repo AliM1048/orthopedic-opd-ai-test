@@ -4,6 +4,7 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Scissors,
          FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
          FileText, Trash2, Search, ListChecks, AlertTriangle } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { useLanguage } from '../hooks/useLanguage';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup } from '../hooks/useLookupData';
 import DictationRecordingModal from '../components/DictationRecordingModal';
@@ -90,7 +91,8 @@ function SCard({ title, icon: Icon, children, style = {} }) {
 }
 
 /* ── Small modal wrapper (shares .modal-backdrop / .modal / .form-grid) ──── */
-function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children }) {
+function MiniModal({ title, onClose, onSubmit, submitLabel, children }) {
+  const { t } = useLanguage();
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
@@ -99,8 +101,8 @@ function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children })
           {children}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={onSubmit}>{submitLabel}</button>
+          <button className="btn btn-outline" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={onSubmit}>{submitLabel || t('common.save')}</button>
         </div>
       </div>
     </div>
@@ -121,25 +123,27 @@ function iconForName(name, options) {
   return options.find((o) => o.name.toLowerCase() === (name || '').toLowerCase())?.icon || '📄';
 }
 
-function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
-  const treatmentOrders = (patient.treatments || []).map((t) => ({
-    id: t.id,
+function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, t) {
+  const statusLabel = (s) => t(`surgeryEvaluation.status.${s}`);
+
+  const treatmentOrders = (patient.treatments || []).map((t2) => ({
+    id: t2.id,
     kind: 'treatment',
-    icon: iconForName(t.type, treatmentOptions),
-    title: `${t.type} Order`,
-    status: t.status,
-    statusColor: ORDER_STATUS_COLORS[t.status] || '#7a9a9e',
-    summary: t.details || t.type,
-    details: `Duration: ${t.duration}`,
+    icon: iconForName(t2.type, treatmentOptions),
+    title: t('surgeryEvaluation.orders.treatmentOrderTitle', { type: t2.type }),
+    status: t2.status,
+    statusColor: ORDER_STATUS_COLORS[t2.status] || '#7a9a9e',
+    summary: t2.details || t2.type,
+    details: t('surgeryEvaluation.orders.durationSummary', { duration: t2.duration }),
     note: null,
-    printTitle: `${t.type} Order`,
+    printTitle: t('surgeryEvaluation.orders.treatmentOrderTitle', { type: t2.type }),
     printBody: [
-      ['Ordered By', t.physician],
-      ['Treatment', t.type],
-      ['Details', t.details || '—'],
-      ['Duration', t.duration],
-      ['Date', t.date],
-      ...(t.followUpDate ? [['Follow-Up Date', t.followUpDate]] : []),
+      [t('surgeryEvaluation.orders.orderedByLabel'), t2.physician],
+      [t('surgeryEvaluation.orders.treatmentLabel'), t2.type],
+      [t('surgeryEvaluation.orders.detailsLabel'), t2.details || '—'],
+      [t('surgeryEvaluation.orders.durationFieldLabel'), t2.duration],
+      [t('common.date'), t2.date],
+      ...(t2.followUpDate ? [[t('surgeryEvaluation.orders.followUpDateLabel'), t2.followUpDate]] : []),
     ],
   }));
 
@@ -147,18 +151,18 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
     id: d.id,
     kind: 'diagnostic',
     icon: iconForName(d.type, diagnosticTests),
-    title: `${d.type} Request`,
+    title: t('surgeryEvaluation.orders.diagnosticRequestTitle', { type: d.type }),
     status: d.status,
     statusColor: ORDER_STATUS_COLORS[d.status] || '#7a9a9e',
     summary: d.type,
-    details: d.result || 'Pending results',
+    details: d.result || t('surgeryEvaluation.orders.pendingResultsText'),
     note: null,
-    printTitle: `Diagnostic Request — ${d.type}`,
+    printTitle: t('surgeryEvaluation.orders.diagnosticRequestPrintTitle', { type: d.type }),
     printBody: [
-      ['Examination', d.type],
-      ['Date', d.date],
-      ['Status', d.status],
-      ['Result', d.result || 'Pending'],
+      [t('surgeryEvaluation.orders.examinationLabel'), d.type],
+      [t('common.date'), d.date],
+      [t('common.status'), statusLabel(d.status)],
+      [t('surgeryEvaluation.orders.resultLabel'), d.result || t('surgeryEvaluation.orders.pendingText')],
     ],
   }));
 
@@ -167,13 +171,14 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
 
 /* ── Review & Print View ─────────────────────────────────────────────────── */
 function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, onBack, diagnosticTests, treatmentOptions }) {
+  const { t } = useLanguage();
   const [printOrder, setPrintOrder] = React.useState(null);
   const [showPrintTypeModal, setShowPrintTypeModal] = React.useState(false);
   const [printDocType, setPrintDocType] = React.useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const evaluation = (patient?.surgeryEvaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
   const soap = evaluation?.soapNote || {};
-  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, t);
 
   // Printing is blocking in mainstream browsers — window.print() only returns
   // once the print dialog closes — so resetting printDocType right after the
@@ -190,23 +195,23 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
       {/* Insurance flag — placeholder until the real insurance layout is provided */}
       {printDocType === 'insurance' && (
         <div style={{ background: '#fef3c7', color: '#92400e', textAlign: 'center', padding: '6px 12px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
-          🏷 INSURANCE COPY
+          🏷 {t('surgeryEvaluation.review.insuranceCopy')}
         </div>
       )}
       {/* Top bar */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ArrowLeft size={18} /> Back to Evaluation
+            <ArrowLeft size={18} /> {t('surgeryEvaluation.review.backToEvaluation')}
           </button>
           <div>
-            <h1>Review & Print</h1>
+            <h1>{t('surgeryEvaluation.review.title')}</h1>
             <p>{patient?.name} · {patient?.mrn}</p>
           </div>
         </div>
         <div className="topbar-right">
           <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            🖨 Print Full Summary
+            🖨 {t('surgeryEvaluation.review.printFullSummary')}
           </button>
         </div>
       </div>
@@ -221,9 +226,9 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{patient?.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{patient?.mrn} · {patient?.age} yrs · {patient?.bodyArea}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                <div><span style={{ fontWeight: 600 }}>Procedure:</span> {soap.procedurePerformed || evaluation?.diagnosis || '—'}</div>
-                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Surgeon:</span> {surgeonName}</div>
-                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Date:</span> {today}</div>
+                <div><span style={{ fontWeight: 600 }}>{t('surgeryEvaluation.review.procedureLabel')}</span> {soap.procedurePerformed || evaluation?.diagnosis || '—'}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>{t('surgeryEvaluation.review.surgeonLabel')}</span> {surgeonName}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>{t('surgeryEvaluation.review.dateColonLabel')}</span> {today}</div>
               </div>
             </div>
           </div>
@@ -252,13 +257,13 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
               <img src={rasoulLogo} alt="Al-Rasoul Al-Aazam Hospital" style={{ width: 56, height: 56, flexShrink: 0, objectFit: 'contain' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Al-Rasoul Al-Aazam Hospital</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD — Operative Note</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('surgeryEvaluation.review.operativeNoteHeader')}</div>
               </div>
             </div>
             <div style={{ padding: '20px 24px' }}>
               {SOAP_SECTIONS.map((s) => (
                 <div key={s.id} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{t(`surgeryEvaluation.soap.${s.id}Label`)}</div>
                   <div style={{ fontSize: 13, color: '#0f172a', whiteSpace: 'pre-wrap' }}>{soap[s.id] || '—'}</div>
                 </div>
               ))}
@@ -266,17 +271,17 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
           </div>
 
           <div style={{ background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '16px 24px' }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Orders</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>{t('surgeryEvaluation.orders.sectionTitle')}</div>
             {orders.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('surgeryEvaluation.orders.noOrdersRecorded')}</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>Order</th>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>Details</th>
-                    <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>Status</th>
-                    <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>Print</th>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colOrder')}</th>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colDetails')}</th>
+                    <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('common.status')}</th>
+                    <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('common.print')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -288,13 +293,13 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
                       </td>
                       <td style={{ padding: '9px 8px', color: '#475569' }}>{order.summary}</td>
                       <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}25` }}>{order.status}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}25` }}>{t(`surgeryEvaluation.status.${order.status}`)}</span>
                       </td>
                       <td style={{ padding: '9px 8px', textAlign: 'center' }}>
                         <button
                           onClick={() => setPrintOrder(order)}
                           style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#64748b', fontWeight: 600 }}
-                          title={`Print ${order.title}`}
+                          title={t('surgeryEvaluation.orders.printOrderTooltip', { title: order.title })}
                         >
                           🖨
                         </button>
@@ -308,14 +313,14 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
 
           <div style={{ background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>
-              <div>Date: {today}</div>
-              <div style={{ marginTop: 3 }}>Orthopedic OPD — Official Clinical Document</div>
-              <div style={{ marginTop: 3, fontWeight: 600 }}>This document is computer-generated.</div>
+              <div>{t('surgeryEvaluation.review.dateColonLabel')} {today}</div>
+              <div style={{ marginTop: 3 }}>{t('surgeryEvaluation.review.footerOrgLine')}</div>
+              <div style={{ marginTop: 3, fontWeight: 600 }}>{t('surgeryEvaluation.review.footerComputerGenerated')}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 140, borderBottom: '2px solid #334155', marginBottom: 4 }} />
               <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{surgeonName}</div>
-              <div style={{ fontSize: 10, color: '#64748b' }}>Attending Surgeon</div>
+              <div style={{ fontSize: 10, color: '#64748b' }}>{t('surgeryEvaluation.review.attendingSurgeon')}</div>
             </div>
           </div>
         </div>
@@ -344,11 +349,12 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
 
 export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluation, onUpdateSurgeryEvaluation, onCreateEncounter, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkSurgeryEvaluationSent }) {
   /* eslint-disable no-use-before-define */
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
   const patient   = patients.find((p) => p.id === patientId);
-  const surgeonName = user?.name || 'Surgeon';
+  const surgeonName = user?.name || t('common.surgeon');
 
   const [soap, setSoap]                       = useState(EMPTY_SOAP);
   const [selectedTests, setSelectedTests]     = useState([]);
@@ -569,7 +575,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
       await Promise.all(pendingWrites);
       setSaved(true);
     } catch {
-      notifyError('Some changes failed to save — please try again');
+      notifyError(t('surgeryEvaluation.toast.saveAllFailed'));
     }
   };
 
@@ -582,8 +588,8 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
       id: uid(), type: 'Medication', date: todayIso(), physician: surgeonName, encounter_id: activeEncounterId,
       duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
     }))
-      .then(() => notifySuccess('Prescription saved'))
-      .catch(() => notifyError('Failed to save prescription'));
+      .then(() => notifySuccess(t('surgeryEvaluation.toast.prescriptionSaved')))
+      .catch(() => notifyError(t('surgeryEvaluation.toast.prescriptionSaveFailed')));
     setMedForm({ name: '', dose: '', duration: '' });
     setShowMedModal(false);
   };
@@ -614,8 +620,8 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
       return;
     }
     Promise.resolve(promise)
-      .then(() => notifySuccess('Note saved'))
-      .catch(() => notifyError('Failed to save note'));
+      .then(() => notifySuccess(t('surgeryEvaluation.toast.noteSaved')))
+      .catch(() => notifyError(t('surgeryEvaluation.toast.noteSaveFailed')));
     setNoteText('');
     setShowNoteModal(false);
   };
@@ -624,8 +630,8 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
     if (!onMarkSurgeryEvaluationSent || sendingToPatient) return;
     setSendingToPatient(true);
     Promise.resolve(onMarkSurgeryEvaluationSent(patientId, evaluationId))
-      .then(() => notifySuccess('Sent to patient'))
-      .catch(() => notifyError('Failed to send to patient'))
+      .then(() => notifySuccess(t('surgeryEvaluation.toast.sentToPatient')))
+      .catch(() => notifyError(t('surgeryEvaluation.toast.sendToPatientFailed')))
       .finally(() => setSendingToPatient(false));
   };
 
@@ -633,12 +639,12 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
     if (deletingOrderId) return;
     const confirmed = await Swal.fire({
       icon: 'warning',
-      title: `Remove ${order.title}?`,
-      text: 'This order will be permanently removed from the patient record.',
+      title: t('surgeryEvaluation.orders.removeConfirmTitle', { title: order.title }),
+      text: t('surgeryEvaluation.orders.removeConfirmText'),
       showCancelButton: true,
-      confirmButtonText: 'Remove',
+      confirmButtonText: t('surgeryEvaluation.orders.removeConfirmButton'),
       confirmButtonColor: 'var(--danger)',
-      cancelButtonText: 'Cancel',
+      cancelButtonText: t('common.cancel'),
     }).then((r) => r.isConfirmed);
     if (!confirmed) return;
 
@@ -646,20 +652,20 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
     if (!handler) return;
     setDeletingOrderId(order.id);
     Promise.resolve(handler(patientId, order.id))
-      .then(() => notifySuccess('Order removed'))
-      .catch(() => notifyError('Failed to remove order'))
+      .then(() => notifySuccess(t('surgeryEvaluation.toast.orderRemoved')))
+      .catch(() => notifyError(t('surgeryEvaluation.toast.orderRemoveFailed')))
       .finally(() => setDeletingOrderId(null));
   };
 
   /* ── Empty / saved states ── */
   if (!patient) return (
     <>
-      <div className="topbar"><div className="topbar-left"><h1>Surgery Evaluation</h1></div></div>
+      <div className="topbar"><div className="topbar-left"><h1>{t('surgeryEvaluation.title')}</h1></div></div>
       <div className="page-body">
         <div className="empty-state">
           <div className="empty-state-icon"><Scissors size={36} /></div>
-          <p>No patient selected.</p>
-          <button className="btn btn-primary mt-4" onClick={() => navigate('/surgeries')}>Back to Surgeries</button>
+          <p>{t('surgeryEvaluation.noPatientSelected')}</p>
+          <button className="btn btn-primary mt-4" onClick={() => navigate('/surgeries')}>{t('surgeryEvaluation.backToSurgeries')}</button>
         </div>
       </div>
     </>
@@ -667,15 +673,15 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
 
   if (saved) return (
     <>
-      <div className="topbar"><div className="topbar-left"><h1>Operative Note Recorded</h1></div></div>
+      <div className="topbar"><div className="topbar-left"><h1>{t('surgeryEvaluation.savedState.title')}</h1></div></div>
       <div className="page-body">
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Operative Note Recorded</h2>
-          <p className="text-muted mb-4">Surgery evaluation saved for {patient.name}.</p>
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t('surgeryEvaluation.savedState.title')}</h2>
+          <p className="text-muted mb-4">{t('surgeryEvaluation.savedState.message', { name: patient.name })}</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
-            <button className="btn btn-outline"  onClick={() => navigate('/surgeries')}>Back to Surgeries</button>
+            <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>{t('surgeryEvaluation.savedState.viewProfile')}</button>
+            <button className="btn btn-outline"  onClick={() => navigate('/surgeries')}>{t('surgeryEvaluation.backToSurgeries')}</button>
           </div>
         </div>
       </div>
@@ -694,7 +700,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
     || latestEvaluation?.audioUrl
     || null;
 
-  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, t);
 
   if (showReview) {
     return (
@@ -726,7 +732,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/surgeries')}><ArrowLeft size={18} /></button>
           <div>
-            <h1>Surgery Evaluation</h1>
+            <h1>{t('surgeryEvaluation.title')}</h1>
             <p>{patient.name} · {patient.mrn}</p>
           </div>
         </div>
@@ -748,10 +754,10 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{patient.name}</span>
-              <span className="badge badge-completed">{patient.gender} · {patient.age}y</span>
+              <span className="badge badge-completed">{t('surgeryEvaluation.patientStrip.genderAgeBadge', { gender: patient.gender, age: patient.age })}</span>
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-              MRN {patient.mrn} · {patient.bodyArea} · Blood Type {patient.bloodType}
+              {t('surgeryEvaluation.patientStrip.mrnBodyBloodLine', { mrn: patient.mrn, bodyArea: patient.bodyArea, bloodType: patient.bloodType })}
             </div>
           </div>
           <div style={{
@@ -760,10 +766,10 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
             border: hasAllergies ? '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' : '1px solid var(--border)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: hasAllergies ? 'var(--danger)' : 'var(--text-muted)' }}>
-              {hasAllergies && <AlertTriangle size={12} />} Allergies
+              {hasAllergies && <AlertTriangle size={12} />} {t('surgeryEvaluation.allergiesLabel')}
             </div>
             <div style={{ fontWeight: 700, color: hasAllergies ? 'var(--danger)' : 'var(--text-primary)', fontSize: 13, marginTop: 2 }}>
-              {patient.allergies || 'None on file'}
+              {patient.allergies || t('surgeryEvaluation.noAllergiesOnFile')}
             </div>
           </div>
         </div>
@@ -801,25 +807,25 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                 {isRecording && (
                   <div className="pe-soap-live-caption">
                     <Mic size={12} />
-                    <span>{liveCaption || 'Listening…'}</span>
+                    <span>{liveCaption || t('surgeryEvaluation.dictation.listeningPlaceholder')}</span>
                   </div>
                 )}
                 {dictation?.text && (
                   <div className="pe-note-section pe-soap-transcript">
-                    <h4 className="pe-note-h4"><FileText size={13} /> Raw Transcript</h4>
+                    <h4 className="pe-note-h4"><FileText size={13} /> {t('surgeryEvaluation.dictation.rawTranscriptHeading')}</h4>
                     <p style={{ fontStyle: 'italic' }}>{dictation.text}</p>
                     <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Check this against what was actually said — the sections below are the AI's structured, grammar-corrected read of it, and can be edited before you click Complete Visit.
+                      {t('surgeryEvaluation.dictation.transcriptHelpText')}
                     </p>
                   </div>
                 )}
-                {SOAP_SECTIONS.map(({ id, label, icon: Icon, rows, placeholder }) => (
+                {SOAP_SECTIONS.map(({ id, icon: Icon, rows }) => (
                   <div className="pe-note-section pe-soap-section" key={id}>
-                    <h4 className="pe-note-h4"><Icon size={13} /> {label}</h4>
+                    <h4 className="pe-note-h4"><Icon size={13} /> {t(`surgeryEvaluation.soap.${id}Label`)}</h4>
                     <textarea
                       className="form-control pe-soap-textarea"
                       rows={rows}
-                      placeholder={placeholder}
+                      placeholder={t(`surgeryEvaluation.soap.${id}Placeholder`)}
                       value={soap[id]}
                       onChange={(e) => updateSoap(id, e.target.value)}
                     />
@@ -833,7 +839,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                   onClick={isRecording ? stopRecording : handleStartDictation}
                 >
                   <Mic size={20} />
-                  {isRecording ? 'Stop Recording' : 'Start Recording'}
+                  {isRecording ? t('surgeryEvaluation.dictation.stopRecording') : t('surgeryEvaluation.dictation.startRecording')}
                 </button>
               </div>
 
@@ -843,14 +849,14 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
           {/* ── RIGHT COLUMN — post-op orders & follow-up ────────────── */}
           <div className="pe-col pe-col-right">
 
-            <SCard title="Orders & Follow-Up" icon={ClipboardList} style={{ flex: 1 }}>
+            <SCard title={t('surgeryEvaluation.ordersFollowUpHeading')} icon={ClipboardList} style={{ flex: 1 }}>
 
               {/* ── Draft orders for this visit — dictation-filled or added
                   manually, editable right up until Complete Visit persists
                   them below as Diagnostic/Treatment records. ── */}
               <div className="pe-orders-draft">
                 <div className="pe-orders-draft-label">
-                  <FlaskConical size={13} /> Post-Op Diagnostic Tests
+                  <FlaskConical size={13} /> {t('surgeryEvaluation.postOpDiagnosticTestsLabel')}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
                   {diagnosticTests.map((t) => (
@@ -878,22 +884,22 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                 </div>
 
                 <div className="pe-orders-draft-label">
-                  <Pill size={13} /> Post-Op Treatment Plan
+                  <Pill size={13} /> {t('surgeryEvaluation.postOpTreatmentPlanLabel')}
                 </div>
                 {treatments.length === 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>No treatments added yet.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>{t('surgeryEvaluation.noTreatmentsAddedYet')}</p>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {treatments.map((t) => (
-                    <div key={t.uid} className="pe-treatment-card">
+                  {treatments.map((tr) => (
+                    <div key={tr.uid} className="pe-treatment-card">
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <select
                           className="form-control"
                           style={{ flex: 1 }}
-                          value={t.type}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
+                          value={tr.type}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'type', e.target.value)}
                         >
-                          <option value="">Select treatment type…</option>
+                          <option value="">{t('surgeryEvaluation.selectTreatmentTypePlaceholder')}</option>
                           {treatmentOptions.map((opt) => (
                             <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
                           ))}
@@ -901,8 +907,8 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                         <button
                           type="button"
                           className="pe-treatment-remove"
-                          onClick={() => removeTreatmentEntry(t.uid)}
-                          title="Remove"
+                          onClick={() => removeTreatmentEntry(tr.uid)}
+                          title={t('surgeryEvaluation.removeTreatmentTooltip')}
                         >
                           <X size={16} />
                         </button>
@@ -911,24 +917,24 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                         <input
                           className="form-control"
                           style={{ flex: 1 }}
-                          placeholder="Duration (e.g. 6 weeks)"
-                          value={t.duration}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
+                          placeholder={t('surgeryEvaluation.durationPlaceholder')}
+                          value={tr.duration}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'duration', e.target.value)}
                         />
                         <input
                           className="form-control"
                           style={{ flex: 1 }}
                           type="date"
-                          value={t.followUpDate || ''}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
+                          value={tr.followUpDate || ''}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'followUpDate', e.target.value)}
                         />
                       </div>
                       <textarea
                         className="form-control"
                         rows={2}
-                        placeholder="Details / instructions"
-                        value={t.details}
-                        onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
+                        placeholder={t('surgeryEvaluation.detailsInstructionsPlaceholder')}
+                        value={tr.details}
+                        onChange={(e) => updateTreatmentEntry(tr.uid, 'details', e.target.value)}
                       />
                     </div>
                   ))}
@@ -939,17 +945,17 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                   style={{ marginTop: 8 }}
                   onClick={addTreatmentEntry}
                 >
-                  + Add Treatment
+                  {t('surgeryEvaluation.addTreatmentButton')}
                 </button>
               </div>
 
               <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
 
               <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
-                <ClipboardList size={13} /> Recorded Orders
+                <ClipboardList size={13} /> {t('surgeryEvaluation.orders.recordedOrdersHeading')}
               </div>
               {mainOrders.length === 0 ? (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded yet.</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('surgeryEvaluation.orders.noOrdersRecordedYet')}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                   {mainOrders.map((order) => (
@@ -957,12 +963,12 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
                         <span style={{ fontSize: 16 }}>{order.icon}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{t(`surgeryEvaluation.status.${order.status}`)}</span>
                         <button
                           type="button"
                           onClick={() => handleDeleteOrder(order)}
                           disabled={deletingOrderId === order.id}
-                          title="Remove order"
+                          title={t('surgeryEvaluation.removeOrderTooltip')}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             width: 22, height: 22, borderRadius: 6, border: 'none',
@@ -987,7 +993,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
                   <span style={{ fontSize: 16 }}>📅</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Follow-Up</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('surgeryEvaluation.followUpHeading')}</span>
                 </div>
                 {latestTreatment?.followUpDate ? (
                   <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -998,7 +1004,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                     <CalendarCheck size={22} style={{ color: 'var(--primary)', opacity: 0.7 }} />
                   </div>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No follow-up scheduled yet.</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('surgeryEvaluation.noFollowUpScheduled')}</p>
                 )}
               </div>
 
@@ -1012,32 +1018,32 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
             Quick Actions
         ══════════════════════════════════════════════════════════════ */}
         <div className="pe-quick-actions">
-          <span className="pe-qa-label">Quick Actions</span>
+          <span className="pe-qa-label">{t('surgeryEvaluation.quickActions.label')}</span>
           <div className="pe-qa-buttons">
             <button className="pe-qa-btn pe-qa-note" onClick={() => setShowNoteModal(true)}>
               <FilePlus size={18} />
-              <span>New Note</span>
+              <span>{t('surgeryEvaluation.quickActions.newNote')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-rx" onClick={() => setShowMedModal(true)}>
               <ClipboardList size={18} />
-              <span>Order Prescription</span>
+              <span>{t('surgeryEvaluation.quickActions.orderPrescription')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-print" onClick={() => setShowReview(true)}>
               <Printer size={18} />
-              <span>Review & Print</span>
+              <span>{t('surgeryEvaluation.review.title')}</span>
             </button>
             <button
               className="pe-qa-btn pe-qa-send"
               disabled={!latestEvaluation || sendingToPatient || latestEvaluation?.sentToPatient}
-              title={!latestEvaluation ? 'Complete an evaluation first' : undefined}
+              title={!latestEvaluation ? t('surgeryEvaluation.quickActions.completeEvaluationFirstTooltip') : undefined}
               onClick={() => latestEvaluation && handleSendToPatient(latestEvaluation.id)}
             >
               {latestEvaluation?.sentToPatient ? <Check size={18} /> : <Send size={18} />}
-              <span>{latestEvaluation?.sentToPatient ? 'Sent to Patient' : 'Send to Patient'}</span>
+              <span>{latestEvaluation?.sentToPatient ? t('surgeryEvaluation.quickActions.sentToPatient') : t('surgeryEvaluation.quickActions.sendToPatient')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-complete" onClick={handleSaveAll}>
               <UserCheck size={18} />
-              <span>Complete Visit</span>
+              <span>{t('surgeryEvaluation.quickActions.completeVisit')}</span>
             </button>
           </div>
         </div>
@@ -1062,28 +1068,28 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
 
       {/* ── Add Medication / Order Prescription modal ── */}
       {showMedModal && (
-        <MiniModal title="Order Prescription" onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
+        <MiniModal title={t('surgeryEvaluation.quickActions.orderPrescription')} onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
           <div className="form-group">
-            <label className="form-label">Medication Name</label>
-            <input className="form-control" placeholder="e.g. Diclofenac 75mg" value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} />
+            <label className="form-label">{t('surgeryEvaluation.medication.nameLabel')}</label>
+            <input className="form-control" placeholder={t('surgeryEvaluation.medication.namePlaceholder')} value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Dose</label>
-            <input className="form-control" placeholder="e.g. 1 tab twice daily" value={medForm.dose} onChange={(e) => setMedForm({ ...medForm, dose: e.target.value })} />
+            <label className="form-label">{t('surgeryEvaluation.medication.doseLabel')}</label>
+            <input className="form-control" placeholder={t('surgeryEvaluation.medication.dosePlaceholder')} value={medForm.dose} onChange={(e) => setMedForm({ ...medForm, dose: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Duration</label>
-            <input className="form-control" placeholder="e.g. 7 days" value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} />
+            <label className="form-label">{t('surgeryEvaluation.medication.durationLabel')}</label>
+            <input className="form-control" placeholder={t('surgeryEvaluation.medication.durationPlaceholder')} value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} />
           </div>
         </MiniModal>
       )}
 
       {/* ── New Note modal ── */}
       {showNoteModal && (
-        <MiniModal title="New Note" onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
+        <MiniModal title={t('surgeryEvaluation.quickActions.newNote')} onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
           <div className="form-group">
-            <label className="form-label">Note</label>
-            <textarea className="form-control" rows={5} placeholder="Add a quick note — appended to the Postoperative Plan section…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+            <label className="form-label">{t('surgeryEvaluation.quickNote.label')}</label>
+            <textarea className="form-control" rows={5} placeholder={t('surgeryEvaluation.quickNote.placeholder')} value={noteText} onChange={(e) => setNoteText(e.target.value)} />
           </div>
         </MiniModal>
       )}

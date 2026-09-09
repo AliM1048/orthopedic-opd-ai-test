@@ -1,0 +1,12 @@
+{
+  "pageTitle": "All Patients",
+  "patientRecordsCount": "{{count}} patient records",
+  "patientRecords": "Patient Records",
+  "searchPlaceholder": "Search by name, MRN, or body area…",
+  "noPatientsFound": "No patients found.",
+  "tableHeaderMrn": "MRN",
+  "tableHeaderBodyArea": "Body Area",
+  "tableHeaderAssessments": "Assessments",
+  "tableHeaderEvaluations": "Evaluations",
+  "ageYears": "{{age}}y"
+}

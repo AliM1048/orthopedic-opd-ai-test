@@ -1,5 +1,6 @@
 import { Check, AlertCircle, Send, ArrowLeft, BarChart2 } from 'lucide-react';
 import { calculateQuickDASH, calculateSectionScore } from '../../utils/scoring';
+import { useLanguage } from '../../hooks/useLanguage';
 
 function formatAnswer(question, value) {
   if (value === undefined || value === null || value === '') return null;
@@ -13,6 +14,7 @@ function formatAnswer(question, value) {
 }
 
 function SectionSummary({ section, answers }) {
+  const { t } = useLanguage();
   const allAnswered = section.questions.every(q => {
     if (!q.required) return true;
     const a = answers[q.id];
@@ -25,12 +27,12 @@ function SectionSummary({ section, answers }) {
     if (section.scoreCalculation === 'quickdash') {
       const score = calculateQuickDASH(answers, section.questions);
       if (score !== null) {
-        const severity = score < 25 ? 'Low' : score < 50 ? 'Moderate' : score < 75 ? 'High' : 'Severe';
+        const severity = score < 25 ? t('assessment.summary.severityLow') : score < 50 ? t('assessment.summary.severityModerate') : score < 75 ? t('assessment.summary.severityHigh') : t('assessment.summary.severitySevere');
         const color = score < 25 ? 'var(--success)' : score < 50 ? 'var(--warning)' : score < 75 ? 'var(--danger)' : 'color-mix(in srgb, var(--danger) 70%, black)';
         scoreDisplay = (
           <div className="smp-score" style={{ borderColor: color }}>
             <BarChart2 size={14} style={{ color }} />
-            <span style={{ color }}>QuickDASH: {score}/100 — {severity}</span>
+            <span style={{ color }}>{t('assessment.summary.quickDashScore', { score, severity })}</span>
           </div>
         );
       }
@@ -40,7 +42,7 @@ function SectionSummary({ section, answers }) {
         scoreDisplay = (
           <div className="smp-score">
             <BarChart2 size={14} />
-            <span>Score: {result.score}/{result.max}</span>
+            <span>{t('assessment.summary.score', { score: result.score, max: result.max })}</span>
           </div>
         );
       }
@@ -53,7 +55,7 @@ function SectionSummary({ section, answers }) {
         <div className="smp-section-title">{section.title}</div>
         <div className={`smp-section-status ${allAnswered ? 'smp-ok' : 'smp-warn'}`}>
           {allAnswered ? <Check size={13} /> : <AlertCircle size={13} />}
-          {allAnswered ? 'Complete' : 'Incomplete'}
+          {allAnswered ? t('assessment.summary.complete') : t('assessment.summary.incomplete')}
         </div>
       </div>
       {scoreDisplay}
@@ -64,7 +66,7 @@ function SectionSummary({ section, answers }) {
             <div key={q.id} className="smp-qa-item">
               <div className="smp-q-text">{q.text}</div>
               <div className={`smp-a-text ${!display ? 'smp-a-empty' : ''}`}>
-                {display || (q.required ? '⚠ Not answered' : '— Not provided')}
+                {display || (q.required ? t('assessment.summary.notAnswered') : t('assessment.summary.notProvided'))}
               </div>
             </div>
           );
@@ -75,6 +77,7 @@ function SectionSummary({ section, answers }) {
 }
 
 export default function SummaryPage({ config, answers, patient, isFollowUp, onBack, onSubmit, isSubmitting, submitError }) {
+  const { t } = useLanguage();
   const totalRequired = config.sections.flatMap(s => s.questions).filter(q => q.required).length;
   const answeredRequired = config.sections.flatMap(s => s.questions).filter(q => {
     if (!q.required) return false;
@@ -87,12 +90,12 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
     <div className="smp-wrapper">
       <div className="smp-header">
         <button className="btn btn-ghost btn-sm" onClick={onBack}>
-          <ArrowLeft size={16} /> Back to Assessment
+          <ArrowLeft size={16} /> {t('assessment.summary.backToAssessment')}
         </button>
-        <div className="smp-header-title">Review & Submit</div>
+        <div className="smp-header-title">{t('assessment.summary.reviewAndSubmit')}</div>
         <div className="smp-completion">
           <div className={`smp-completion-badge ${canSubmit ? 'smp-complete' : 'smp-incomplete'}`}>
-            {answeredRequired}/{totalRequired} required answered
+            {t('assessment.summary.requiredAnswered', { answered: answeredRequired, total: totalRequired })}
           </div>
         </div>
       </div>
@@ -100,14 +103,14 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
       {!canSubmit && (
         <div className="smp-warning">
           <AlertCircle size={16} />
-          Please complete all required questions before submitting.
+          {t('assessment.summary.completeRequiredWarning')}
         </div>
       )}
 
       {submitError && (
         <div className="smp-warning">
           <AlertCircle size={16} />
-          Couldn't save this assessment — check your connection and try again. Your answers are still here.
+          {t('assessment.summary.submitError')}
         </div>
       )}
 
@@ -118,11 +121,11 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
         <div>
           <div className="smp-patient-name">{patient?.name}</div>
           <div className="smp-patient-sub">
-            {patient?.mrn} · {isFollowUp ? 'Follow-Up' : 'Initial Visit'} · {patient?.bodyArea}
+            {patient?.mrn} · {isFollowUp ? t('assessment.summary.followUp') : t('assessment.summary.initialVisit')} · {patient?.bodyArea}
           </div>
         </div>
         <div className="smp-date">
-          Submitted: {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          {t('assessment.summary.submittedPrefix')} {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </div>
       </div>
 
@@ -134,7 +137,7 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
 
       <div className="smp-actions">
         <button className="btn btn-outline" onClick={onBack}>
-          <ArrowLeft size={16} /> Edit Answers
+          <ArrowLeft size={16} /> {t('assessment.summary.editAnswers')}
         </button>
         <button
           className="btn btn-primary btn-lg"
@@ -142,7 +145,7 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
           disabled={!canSubmit || isSubmitting}
         >
           <Send size={16} />
-          {isSubmitting ? 'Submitting…' : 'Submit Assessment'}
+          {isSubmitting ? t('assessment.summary.submitting') : t('assessment.summary.submitAssessment')}
         </button>
       </div>
     </div>

@@ -1,0 +1,20 @@
+{
+  "title": "مهام الكاتب",
+  "subtitle": "استبيانات مقاييس النتائج المُسندة من طبيب — سجّل إجابات المريض فقط، دون الحاجة إلى أخذ التاريخ المرضي",
+  "totalTasks": "إجمالي المهام",
+  "statusOverdue": "متأخرة",
+  "statusAssigned": "مُسندة",
+  "respondentPatient": "المريض",
+  "respondentParentCaregiver": "أحد الوالدين / مقدم الرعاية",
+  "searchPlaceholder": "البحث بالمريض أو رقم الملف الطبي…",
+  "emptyState": "لا توجد مهام مقاييس نتائج مُسندة حالياً.",
+  "colProm": "مقياس النتائج",
+  "colRespondent": "المُجيب",
+  "colAssigned": "تاريخ الإسناد",
+  "start": "بدء",
+  "decline": "رفض",
+  "declineDialogTitle": "رفض مهمة مقياس النتائج هذه؟",
+  "declineReasonPlaceholder": "السبب (اختياري)",
+  "taskDeclined": "تم رفض المهمة",
+  "updateFailed": "فشل التحديث"
+}

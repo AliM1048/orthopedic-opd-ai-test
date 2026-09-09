@@ -1,0 +1,16 @@
+{
+  "title": "الرسائل",
+  "subtitle": "محادثة ثنائية الاتجاه مع المرضى عبر تطبيق الجوال",
+  "searchPlaceholder": "البحث في جميع المرضى…",
+  "noPatientsFound": "لم يتم العثور على مرضى.",
+  "noMessagesYet": "لا توجد رسائل بعد",
+  "selectPatientPrompt": "اختر مريضاً من القائمة لعرض محادثة أو بدئها.",
+  "messageInputPlaceholder": "اكتب رسالة…",
+  "sendMessage": "إرسال الرسالة",
+  "youPrefix": "أنت: ",
+  "staffFallback": "الطاقم الطبي",
+  "justNow": "الآن",
+  "minutesAgo": "منذ {{mins}} د",
+  "hoursAgo": "منذ {{hours}} س",
+  "daysAgo": "منذ {{days}} يوم"
+}

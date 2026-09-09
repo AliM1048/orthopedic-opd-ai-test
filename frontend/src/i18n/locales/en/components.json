@@ -1,0 +1,121 @@
+{
+  "audioPlayer": {
+    "doctorVoiceNote": "Doctor Voice Note",
+    "noRecordingYet": "No recording yet"
+  },
+  "dictationModal": {
+    "close": "Close",
+    "title": "Visit Dictation",
+    "instructions": "Say “Diagnosis…”, then “Diagnostics…”, then “Treatment plan…” — click stop when done and it fills the chart automatically.",
+    "languageHint": "Speak in English, Arabic, or French — it’s detected automatically from what you say.",
+    "tapToStart": "Tap the mic to start recording",
+    "recordingStatus": "Recording the full visit… Click to stop",
+    "cancel": "Cancel",
+    "transcribing": "Transcribing & filling the chart…",
+    "liveLabel": "Live — what the mic is hearing",
+    "listening": "Listening…",
+    "tryAgain": "Try Again"
+  },
+  "promAssignment": {
+    "close": "Close",
+    "resultTitle": "PROM Assigned",
+    "shareInstructions": "Show this QR code or share the link with the patient — automated WhatsApp/SMS delivery isn't wired up yet (needs a messaging provider chosen separately). Status:",
+    "sentPending": "Sent to Patient — Pending",
+    "copied": "Copied",
+    "copy": "Copy",
+    "routedToClerk": "Routed to the clerk task queue. Status:",
+    "assignedToClerk": "Assigned to Clerk",
+    "deferredReasonPrefix": "Marked as deferred. Reason on file:",
+    "done": "Done",
+    "sendPatientFormTitle": "Send Patient Form",
+    "selectAssignTitle": "Select & Assign PROM",
+    "sendPatientFormDesc": "Choose the questionnaire topic. The patient will see it in the mobile app and complete it themselves.",
+    "selectAssignDesc": "No pre-visit questionnaire is on file for this patient. Choose the instrument and how it should get completed — you direct it, you do not answer for the patient.",
+    "promTypeLabel": "PROM Type",
+    "respondentLabel": "Respondent",
+    "patientOption": "Patient",
+    "parentCaregiverOption": "Parent / Caregiver",
+    "pediatricNote": "(pediatric)",
+    "completionMethodLabel": "Completion Method",
+    "methods": {
+      "self_completion": {
+        "label": "Patient Self-Completion",
+        "desc": "A link/QR code the patient fills in themselves — on their phone or a clinic tablet."
+      },
+      "clerk_assisted": {
+        "label": "Clerk-Assisted",
+        "desc": "Routed to the clerk task queue — they read the questions and record only the patient's answers."
+      },
+      "physician_assisted": {
+        "label": "Physician-Assisted Now",
+        "desc": "Run the questionnaire live — the patient answers, you record it."
+      },
+      "deferred": {
+        "label": "Defer / Not Applicable",
+        "desc": "Not completed this visit — a reason is kept on file."
+      }
+    },
+    "reasonForDeferringLabel": "Reason for Deferring",
+    "deferPlaceholder": "e.g. Patient declined today, will complete at next visit.",
+    "timingLabel": "Timing Relative to Exam",
+    "timings": {
+      "before_exam": "Before Exam",
+      "after_exam": "After Exam",
+      "after_intervention": "After Intervention"
+    },
+    "deferReasonRequiredError": "A reason is required to defer.",
+    "assignFailedError": "Failed to create the assignment. Please try again.",
+    "cancel": "Cancel",
+    "sending": "Sending…",
+    "startNow": "Start Now",
+    "sendFormButton": "Send Form",
+    "assignButton": "Assign PROM"
+  },
+  "promTrendChart": {
+    "loadingTrend": "Loading trend…",
+    "notEnoughHistory": "Not enough visit history yet — needs at least one scored assessment to plot.",
+    "changeFromBaseline": "Change from baseline",
+    "missing": "Missing",
+    "save": "Save",
+    "cancel": "Cancel",
+    "logNewInjury": "Log New Injury"
+  },
+  "printDoc": {
+    "insuranceCopyBadge": "INSURANCE COPY",
+    "hospitalName": "Al-Rasoul Al-Aazam Hospital",
+    "hospitalDept": "Orthopedic OPD",
+    "officialClinicalDocument": "Official Clinical Document",
+    "close": "Close",
+    "fieldPatient": "Patient",
+    "fieldMrn": "MRN",
+    "fieldDate": "Date",
+    "fieldAge": "Age",
+    "ageYears": "{{age}} yrs",
+    "generatedLabel": "Generated",
+    "attendingPhysician": "Attending Physician",
+    "printDocument": "Print Document",
+    "printInsuranceDocument": "Print Insurance Document"
+  },
+  "printTypeModal": {
+    "title": "Choose Document Type",
+    "subtitle": "Select which version of this document to print.",
+    "standardDocument": "Standard Document",
+    "insuranceDocument": "Insurance Document",
+    "cancel": "Cancel"
+  },
+  "followUpSchedule": {
+    "title": "Follow-Up Call Schedule",
+    "description": "Months after this patient’s first evaluation that a PROM follow-up call gets scheduled.",
+    "useClinicDefault": "Use clinic default ({{months}} months)",
+    "customForPatient": "Custom for this patient",
+    "monthsLabel": "Months (comma-separated)",
+    "monthsPlaceholder": "e.g. 3, 6, 9",
+    "saveNote": "Saving regenerates this patient’s not-yet-completed calls from their first evaluation date — already-completed calls are left alone.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "enterIntervalError": "Enter at least one interval, e.g. 3, 6, 9",
+    "scheduleUpdated": "Schedule updated",
+    "failedToSave": "Failed to save"
+  }
+}

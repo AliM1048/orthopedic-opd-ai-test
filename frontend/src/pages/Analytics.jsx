@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Users, ClipboardCheck, Stethoscope, TrendingUp } from 'lucide-react';
 import { useLookup } from '../hooks/useLookupData';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../hooks/useLanguage';
 
 // Validated categorical ramp (dataviz skill reference palette) — adjacent
 // pairs clear CVD ΔE >= 8 and normal-vision ΔE >= 15 in both modes. Bars are
@@ -93,6 +94,7 @@ function VBar({ cols, unit = '' }) {
 }
 
 function ChartCard({ title, subtitle, empty, children }) {
+  const { t } = useLanguage();
   return (
     <div className="card an-chart-card">
       <div className="card-header">
@@ -104,7 +106,7 @@ function ChartCard({ title, subtitle, empty, children }) {
       {empty ? (
         <div className="empty-state">
           <div className="empty-state-icon">📊</div>
-          <p>Not enough data yet.</p>
+          <p>{t('analytics.notEnoughData')}</p>
         </div>
       ) : children}
     </div>
@@ -114,6 +116,7 @@ function ChartCard({ title, subtitle, empty, children }) {
 export default function Analytics({ patients }) {
   const { statusConfig } = useLookup();
   const { theme } = useTheme();
+  const { t } = useLanguage();
 
   const stats = useMemo(() => ({
     total: patients.length,
@@ -223,8 +226,8 @@ export default function Analytics({ patients }) {
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Analytics</h1>
-          <p>Clinic overview and clinical outcome trends across all patients</p>
+          <h1>{t('analytics.title')}</h1>
+          <p>{t('analytics.subtitle')}</p>
         </div>
       </div>
 
@@ -234,57 +237,57 @@ export default function Analytics({ patients }) {
             <div className="stat-icon blue"><Users size={24} /></div>
             <div>
               <div className="stat-value">{stats.total}</div>
-              <div className="stat-label">Total Patients</div>
+              <div className="stat-label">{t('analytics.totalPatients')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon purple"><ClipboardCheck size={24} /></div>
             <div>
               <div className="stat-value">{stats.assessed}</div>
-              <div className="stat-label">Nurse Assessments Done</div>
+              <div className="stat-label">{t('analytics.nurseAssessmentsDone')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon green"><Stethoscope size={24} /></div>
             <div>
               <div className="stat-value">{stats.evaluated}</div>
-              <div className="stat-label">Doctor Evaluations Done</div>
+              <div className="stat-label">{t('analytics.doctorEvaluationsDone')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon yellow"><TrendingUp size={24} /></div>
             <div>
               <div className="stat-value">{avgPromOverall !== null ? `${avgPromOverall}%` : '—'}</div>
-              <div className="stat-label">Avg. PROM Score</div>
+              <div className="stat-label">{t('analytics.avgPromScore')}</div>
             </div>
           </div>
         </div>
 
-        <h2 className="an-section-title">Patient &amp; Clinic Overview</h2>
+        <h2 className="an-section-title">{t('analytics.patientClinicOverview')}</h2>
         <div className="an-chart-grid">
-          <ChartCard title="Status breakdown" subtitle="Where every patient sits in the visit workflow" empty={!statusRows.length}>
+          <ChartCard title={t('analytics.statusBreakdown')} subtitle={t('analytics.statusBreakdownSubtitle')} empty={!statusRows.length}>
             <HBar rows={statusRows} />
           </ChartCard>
-          <ChartCard title="Body area distribution" subtitle="Cases by anatomical region" empty={!bodyAreaRows.length}>
+          <ChartCard title={t('analytics.bodyAreaDistribution')} subtitle={t('analytics.bodyAreaDistributionSubtitle')} empty={!bodyAreaRows.length}>
             <HBar rows={bodyAreaRows} />
           </ChartCard>
-          <ChartCard title="Visit volume" subtitle="Appointments per day (most recent)" empty={!visitVolumeCols.length}>
+          <ChartCard title={t('analytics.visitVolume')} subtitle={t('analytics.visitVolumeSubtitle')} empty={!visitVolumeCols.length}>
             <VBar cols={visitVolumeCols} />
           </ChartCard>
         </div>
 
-        <h2 className="an-section-title">Clinical Outcome Trends</h2>
+        <h2 className="an-section-title">{t('analytics.clinicalOutcomeTrends')}</h2>
         <div className="an-chart-grid">
-          <ChartCard title="Avg. PROM score by body area" subtitle="Higher = better function on the 0–100 scale" empty={!avgPromByAreaCols.length}>
+          <ChartCard title={t('analytics.avgPromByBodyArea')} subtitle={t('analytics.avgPromByBodyAreaSubtitle')} empty={!avgPromByAreaCols.length}>
             <VBar cols={avgPromByAreaCols} unit="%" />
           </ChartCard>
-          <ChartCard title="Pain score distribution" subtitle="Self-reported pain, 0 (none) to 10 (worst)" empty={!painDistributionCols.length}>
+          <ChartCard title={t('analytics.painScoreDistribution')} subtitle={t('analytics.painScoreDistributionSubtitle')} empty={!painDistributionCols.length}>
             <VBar cols={painDistributionCols} />
           </ChartCard>
-          <ChartCard title="Top diagnoses" subtitle="Most frequent physician diagnoses" empty={!diagnosisRows.length}>
+          <ChartCard title={t('analytics.topDiagnoses')} subtitle={t('analytics.topDiagnosesSubtitle')} empty={!diagnosisRows.length}>
             <HBar rows={diagnosisRows} />
           </ChartCard>
-          <ChartCard title="Top treatments" subtitle="Most frequently ordered treatment types" empty={!treatmentRows.length}>
+          <ChartCard title={t('analytics.topTreatments')} subtitle={t('analytics.topTreatmentsSubtitle')} empty={!treatmentRows.length}>
             <HBar rows={treatmentRows} />
           </ChartCard>
         </div>

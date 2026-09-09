@@ -4,6 +4,7 @@ import { Activity, CheckCircle2, AlertCircle } from 'lucide-react';
 import api from '../api';
 import { computeFinalScore } from '../utils/scoring';
 import QuestionRenderer from '../components/assessment/QuestionRenderer';
+import { useLanguage } from '../hooks/useLanguage';
 
 /** Public, no-login page opened from the QR code / link a doctor generates
  * in "Select & Assign PROM" (patient self-completion). Deliberately kept
@@ -11,6 +12,7 @@ import QuestionRenderer from '../components/assessment/QuestionRenderer';
  * no sidebar, nothing but the questionnaire itself. See
  * backend/routers/prom_public.py for the two endpoints this calls. */
 export default function PromPublicFill() {
+  const { t } = useLanguage();
   const { token } = useParams();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [answers, setAnswers] = useState({});
@@ -43,7 +45,7 @@ export default function PromPublicFill() {
     if (!current?.required) return true;
     const a = answers[current.id];
     const empty = a === undefined || a === null || a === '' || (Array.isArray(a) && a.length === 0);
-    if (empty) { setErrors((prev) => ({ ...prev, [current.id]: 'Please answer this question.' })); return false; }
+    if (empty) { setErrors((prev) => ({ ...prev, [current.id]: t('promPublicFill.validationRequired') })); return false; }
     return true;
   };
 
@@ -72,7 +74,7 @@ export default function PromPublicFill() {
   if (state.loading) {
     return (
       <div className="prom-public-page">
-        <div className="prom-public-card"><p className="text-muted">Loading questionnaire…</p></div>
+        <div className="prom-public-card"><p className="text-muted">{t('promPublicFill.loadingQuestionnaire')}</p></div>
       </div>
     );
   }
@@ -82,8 +84,8 @@ export default function PromPublicFill() {
       <div className="prom-public-page">
         <div className="prom-public-card prom-public-status">
           <AlertCircle size={40} color="var(--danger)" />
-          <h2>Link Not Found</h2>
-          <p className="text-muted">This link isn&rsquo;t valid. Please contact the clinic for a new one.</p>
+          <h2>{t('promPublicFill.linkNotFoundTitle')}</h2>
+          <p className="text-muted">{t('promPublicFill.linkNotFoundBody')}</p>
         </div>
       </div>
     );
@@ -94,8 +96,8 @@ export default function PromPublicFill() {
       <div className="prom-public-page">
         <div className="prom-public-card prom-public-status">
           <CheckCircle2 size={40} color="var(--success)" />
-          <h2>Thank You</h2>
-          <p className="text-muted">Your answers have been recorded and sent to your care team.</p>
+          <h2>{t('promPublicFill.thankYouTitle')}</h2>
+          <p className="text-muted">{t('promPublicFill.thankYouBody')}</p>
         </div>
       </div>
     );
@@ -105,9 +107,9 @@ export default function PromPublicFill() {
     <div className="prom-public-page">
       <div className="prom-public-card">
         <div className="prom-public-header">
-          <div className="prom-public-brand"><Activity size={18} /> OPD AI Unit</div>
-          <h2>Hi {state.data.patientFirstName}, a quick check-in</h2>
-          <p className="text-muted">{state.data.promName || state.data.config.title} — answer based on how you&rsquo;ve felt this past week.</p>
+          <div className="prom-public-brand"><Activity size={18} /> {t('common.appName')}</div>
+          <h2>{t('promPublicFill.greeting', { name: state.data.patientFirstName })}</h2>
+          <p className="text-muted">{t('promPublicFill.answerInstructions', { promName: state.data.promName || state.data.config.title })}</p>
         </div>
 
         <div className="asmh-progress-bar" style={{ margin: '4px 0 18px' }}>
@@ -129,15 +131,15 @@ export default function PromPublicFill() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
           <button className="btn btn-outline" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
-            Back
+            {t('common.back')}
           </button>
           <button className="btn btn-primary" onClick={handleNext} disabled={submitting}>
-            {submitting ? 'Submitting…' : index === total - 1 ? 'Submit' : 'Next'}
+            {submitting ? t('promPublicFill.submitting') : index === total - 1 ? t('common.submit') : t('common.next')}
           </button>
         </div>
 
         {state.error === 'submit_failed' && (
-          <p style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 10 }}>Something went wrong submitting your answers — please try again.</p>
+          <p style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 10 }}>{t('promPublicFill.submitFailed')}</p>
         )}
       </div>
     </div>
