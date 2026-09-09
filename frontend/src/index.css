@@ -139,6 +139,15 @@ input, textarea, select { font-family: inherit; outline: none; }
 
 .main-content {
   flex: 1;
+  /* A flex item's automatic min-width is "auto" (its content's natural
+     size), not 0 — so however well-contained an inner overflow-x:auto
+     region is, .main-content itself (a flex item of the row-direction
+     .app-shell) still refuses to shrink below its widest descendant's
+     content width, stretching the whole page (and everything in it,
+     including unrelated siblings like the stat cards) wide along with it.
+     This is the actual fix for that; the inner overflow:auto containers
+     handle their own scrolling correctly once this stops fighting them. */
+  min-width: 0;
   margin-left: var(--sidebar-w);
   min-height: 100vh;
   display: flex;
