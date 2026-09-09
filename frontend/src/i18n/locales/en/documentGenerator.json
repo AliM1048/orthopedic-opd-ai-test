@@ -1,0 +1,23 @@
+{
+  "title": "Generate Document",
+  "subtitle": "Print a signable order or request — not saved to the patient's record",
+  "change": "Change",
+  "searchPlaceholder": "Search by name or MRN…",
+  "documentType": "Document Type",
+  "diagnosticRequest": "Diagnostic Request",
+  "treatmentOrder": "Treatment Order",
+  "clinicalIndicationLabel": "Clinical Indication / Notes (optional)",
+  "reasonPlaceholder": "Reason for the request…",
+  "duration": "Duration",
+  "durationPlaceholder": "e.g. 6 weeks",
+  "followUpDateLabel": "Follow-Up Date (optional)",
+  "detailsInstructions": "Details / Instructions",
+  "generateDocumentButton": "Generate Document",
+  "diagnosticRequestTitle": "Diagnostic Request — {{name}}",
+  "treatmentOrderTitle": "{{name}} Order",
+  "examination": "Examination",
+  "clinicalIndication": "Clinical Indication",
+  "treatment": "Treatment",
+  "details": "Details",
+  "followUpDate": "Follow-Up Date"
+}

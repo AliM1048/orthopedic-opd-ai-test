@@ -2,19 +2,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, MessageCircle, Send } from 'lucide-react';
 import api from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 
 const LIST_POLL_MS = 20000;
 const THREAD_POLL_MS = 5000;
 
-function timeAgo(iso) {
+function timeAgo(iso, t) {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('messages.justNow');
+  if (mins < 60) return t('messages.minutesAgo', { mins });
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('messages.hoursAgo', { hours });
   const days = Math.round(hours / 24);
-  return `${days}d ago`;
+  return t('messages.daysAgo', { days });
 }
 
 function initials(name) {
@@ -26,6 +27,7 @@ function initials(name) {
 // this polls: the conversation list lightly (new chats appearing), and the
 // open thread more often (feels responsive while actually watching it).
 export default function Messages({ patients = [] }) {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const preselectId = searchParams.get('patient');
 
@@ -103,8 +105,8 @@ export default function Messages({ patients = [] }) {
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Messages</h1>
-          <p>Two-way chat with patients via the mobile app</p>
+          <h1>{t('messages.title')}</h1>
+          <p>{t('messages.subtitle')}</p>
         </div>
       </div>
 
@@ -114,13 +116,13 @@ export default function Messages({ patients = [] }) {
           <div className="card ps-list-col">
             <div className="search-bar" style={{ marginBottom: 12 }}>
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search all patients…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder={t('messages.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
 
             {filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><MessageCircle size={32} /></div>
-                <p>No patients found.</p>
+                <p>{t('messages.noPatientsFound')}</p>
               </div>
             ) : (
               <div className="ps-patient-list">
@@ -143,10 +145,10 @@ export default function Messages({ patients = [] }) {
                           {needsReply && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />}
                         </div>
                         <div className="text-muted" style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c ? `${c.lastSenderType === 'staff' ? 'You: ' : ''}${c.lastMessageText}` : 'No messages yet'}
+                          {c ? `${c.lastSenderType === 'staff' ? t('messages.youPrefix') : ''}${c.lastMessageText}` : t('messages.noMessagesYet')}
                         </div>
                       </div>
-                      {c ? <div className="text-muted" style={{ fontSize: 10, flexShrink: 0, alignSelf: 'flex-start' }}>{timeAgo(c.lastMessageAt)}</div> : null}
+                      {c ? <div className="text-muted" style={{ fontSize: 10, flexShrink: 0, alignSelf: 'flex-start' }}>{timeAgo(c.lastMessageAt, t)}</div> : null}
                     </button>
                   );
                 })}
@@ -159,7 +161,7 @@ export default function Messages({ patients = [] }) {
             {!selected ? (
               <div className="card empty-state" style={{ padding: 64 }}>
                 <div className="empty-state-icon"><MessageCircle size={40} /></div>
-                <p>Select a patient from the list to view or start a conversation.</p>
+                <p>{t('messages.selectPatientPrompt')}</p>
               </div>
             ) : (
               <div className="card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', padding: 0, overflow: 'hidden' }}>
@@ -194,7 +196,7 @@ export default function Messages({ patients = [] }) {
                         fontSize: 10, marginTop: 3,
                         color: m.senderType === 'staff' ? 'rgba(255,255,255,0.75)' : 'var(--text-muted)',
                       }}>
-                        {m.senderType === 'staff' ? (m.senderName || 'Staff') : selected.patientName} · {timeAgo(m.createdAt)}
+                        {m.senderType === 'staff' ? (m.senderName || t('messages.staffFallback')) : selected.patientName} · {timeAgo(m.createdAt, t)}
                       </div>
                     </div>
                   ))}
@@ -205,12 +207,12 @@ export default function Messages({ patients = [] }) {
                   <input
                     className="form-control"
                     style={{ flex: 1 }}
-                    placeholder="Type a message…"
+                    placeholder={t('messages.messageInputPlaceholder')}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   />
-                  <button className="btn btn-primary" onClick={handleSend} disabled={!draft.trim() || sending} title="Send" aria-label="Send message">
+                  <button className="btn btn-primary" onClick={handleSend} disabled={!draft.trim() || sending} title={t('common.send')} aria-label={t('messages.sendMessage')}>
                     <Send size={16} />
                   </button>
                 </div>

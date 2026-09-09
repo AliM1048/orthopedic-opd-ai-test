@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Mic, Square, X, RotateCcw, Sparkles, Globe2 } from 'lucide-react';
+import { useLanguage } from '../hooks/useLanguage';
 
 const LANGUAGE_LABELS = { en: 'English', ar: 'العربية', fr: 'Français' };
 
@@ -98,6 +99,7 @@ export default function DictationRecordingModal({
   onRetry,
   onClose,
 }) {
+  const { t } = useLanguage();
   if (!open) return null;
 
   const showError = error && !isRecording && !isProcessing;
@@ -108,18 +110,18 @@ export default function DictationRecordingModal({
       <div className="modal dictation-modal">
         <div className="dictation-modal-header" style={{ position: 'relative' }}>
           {(showError || idle) && (
-            <button type="button" className="dictation-modal-close" onClick={onClose} title="Close">
+            <button type="button" className="dictation-modal-close" onClick={onClose} title={t('components.dictationModal.close')}>
               <X size={16} />
             </button>
           )}
 
           <div className="dictation-modal-brand">
             <span className="dictation-modal-mark"><Mic size={16} /></span>
-            <h3>Visit Dictation</h3>
+            <h3>{t('components.dictationModal.title')}</h3>
           </div>
           <p>
-            Say &ldquo;Diagnosis&hellip;&rdquo;, then &ldquo;Diagnostics&hellip;&rdquo;, then &ldquo;Treatment plan&hellip;&rdquo; — click stop when done and it fills the chart automatically.
-            {idle && ' Speak in English, Arabic, or French — it’s detected automatically from what you say.'}
+            {t('components.dictationModal.instructions')}
+            {idle && ` ${t('components.dictationModal.languageHint')}`}
           </p>
 
           {!showError && (
@@ -141,14 +143,14 @@ export default function DictationRecordingModal({
               </button>
 
               {idle && (
-                <div className="record-status-medical">Tap the mic to start recording</div>
+                <div className="record-status-medical">{t('components.dictationModal.tapToStart')}</div>
               )}
 
               {isRecording && (
                 <>
                   <div className="record-timer-medical">{formatTimer(elapsedSeconds)}</div>
                   <div className="record-status-medical">
-                    Recording the full visit… Click to stop
+                    {t('components.dictationModal.recordingStatus')}
                     {detectedLanguage && (
                       <span className="dictation-lang-badge">
                         <Globe2 size={11} /> {LANGUAGE_LABELS[detectedLanguage] || detectedLanguage}
@@ -159,7 +161,7 @@ export default function DictationRecordingModal({
                     <LiveWaveform analyserRef={analyserRef} active={isRecording} />
                   </div>
                   <button type="button" className="dictation-cancel-btn" onClick={onCancel}>
-                    <X size={13} /> Cancel
+                    <X size={13} /> {t('components.dictationModal.cancel')}
                   </button>
                 </>
               )}
@@ -170,10 +172,10 @@ export default function DictationRecordingModal({
                     <span className="dictation-processing-dot" />
                     <span className="dictation-processing-dot" />
                     <span className="dictation-processing-dot" />
-                    <span style={{ marginLeft: 8 }}>Transcribing &amp; filling the chart&hellip;</span>
+                    <span style={{ marginLeft: 8 }}>{t('components.dictationModal.transcribing')}</span>
                   </div>
                   <button type="button" className="dictation-cancel-btn" onClick={onCancel}>
-                    <X size={13} /> Cancel
+                    <X size={13} /> {t('components.dictationModal.cancel')}
                   </button>
                 </>
               )}
@@ -181,9 +183,9 @@ export default function DictationRecordingModal({
               {isRecording && (
                 <div className="transcript-result">
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Sparkles size={12} /> Live — what the mic is hearing
+                    <Sparkles size={12} /> {t('components.dictationModal.liveLabel')}
                   </div>
-                  {liveCaption || <span style={{ opacity: 0.5 }}>Listening…</span>}
+                  {liveCaption || <span style={{ opacity: 0.5 }}>{t('components.dictationModal.listening')}</span>}
                 </div>
               )}
             </>
@@ -196,9 +198,9 @@ export default function DictationRecordingModal({
               ⚠️ {error}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
+              <button type="button" className="btn btn-outline" onClick={onClose}>{t('components.dictationModal.cancel')}</button>
               <button type="button" className="btn btn-primary" onClick={onRetry}>
-                <RotateCcw size={16} /> Try Again
+                <RotateCcw size={16} /> {t('components.dictationModal.tryAgain')}
               </button>
             </div>
           </div>

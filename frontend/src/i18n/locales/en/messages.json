@@ -1,0 +1,16 @@
+{
+  "title": "Messages",
+  "subtitle": "Two-way chat with patients via the mobile app",
+  "searchPlaceholder": "Search all patients…",
+  "noPatientsFound": "No patients found.",
+  "noMessagesYet": "No messages yet",
+  "selectPatientPrompt": "Select a patient from the list to view or start a conversation.",
+  "messageInputPlaceholder": "Type a message…",
+  "sendMessage": "Send message",
+  "youPrefix": "You: ",
+  "staffFallback": "Staff",
+  "justNow": "just now",
+  "minutesAgo": "{{mins}}m ago",
+  "hoursAgo": "{{hours}}h ago",
+  "daysAgo": "{{days}}d ago"
+}

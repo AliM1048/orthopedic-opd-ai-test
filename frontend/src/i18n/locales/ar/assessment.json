@@ -1,0 +1,105 @@
+{
+  "page": {
+    "genericTitle": "التقييم",
+    "noPatientMessage": "لم يتم اختيار مريض. عد إلى لوحة التحكم أولاً.",
+    "goToDashboard": "الذهاب إلى لوحة التحكم",
+    "titleFollowUp": "تقييم المتابعة",
+    "titlePreVisit": "تقييم ما قبل الزيارة",
+    "loadingQuestions": "جارٍ تحميل أسئلة التقييم…",
+    "draftSaved": "تم حفظ المسودة",
+    "questionProgress": "السؤال {{current}} من {{total}}",
+    "defaultComplaint": "ألم في {{region}}"
+  },
+  "submitted": {
+    "completedTitle": "تم إكمال التقييم",
+    "title": "تم إرسال التقييم",
+    "prefixFollowUp": "تقييم المتابعة الخاص بـ",
+    "prefixPreVisit": "تقييم ما قبل الزيارة الخاص بـ",
+    "hasBeenSaved": "تم حفظه.",
+    "viewProfile": "عرض الملف الشخصي",
+    "dashboard": "لوحة التحكم"
+  },
+  "question": {
+    "requiredError": "هذا السؤال مطلوب.",
+    "number": "السؤال {{current}}",
+    "of": "من {{total}}"
+  },
+  "header": {
+    "defaultTitle": "تقييم PROM",
+    "complete": "مكتمل",
+    "questionsAnswered": "تمت الإجابة عن {{answered}} من {{total}} سؤال"
+  },
+  "navigation": {
+    "previous": "السابق",
+    "saving": "جارٍ الحفظ…",
+    "saveDraft": "حفظ المسودة",
+    "answerRequired": "أجب عن الأسئلة المطلوبة",
+    "reviewSubmit": "المراجعة والإرسال",
+    "nextSection": "القسم التالي"
+  },
+  "sidebar": {
+    "sectionsTitle": "الأقسام"
+  },
+  "dropdown": {
+    "selectOption": "اختر خيارًا…"
+  },
+  "numeric": {
+    "noPain": "لا يوجد ألم",
+    "worstPain": "أسوأ ألم",
+    "selectedPrefix": "المحدد:",
+    "selectedSuffix": "/10"
+  },
+  "patientCard": {
+    "statusPendingCall": "بانتظار الاتصال",
+    "statusAssessed": "تم التقييم",
+    "statusFollowUp": "متابعة",
+    "statusCompleted": "مكتمل"
+  },
+  "regionPicker": {
+    "title": "اختر المنطقة التشريحية",
+    "subtitle": "اختر منطقة الجسم لـ {{name}} — سيتم تحميل استبيان PROM المطابق تلقائيًا.",
+    "thisPatient": "هذا المريض",
+    "loadingRegions": "جارٍ تحميل المناطق…",
+    "loadingEllipsis": "جارٍ التحميل…",
+    "continue": "متابعة"
+  },
+  "sectionStatus": {
+    "meta": "{{answered}}/{{count}} سؤال"
+  },
+  "summary": {
+    "severityLow": "منخفضة",
+    "severityModerate": "متوسطة",
+    "severityHigh": "مرتفعة",
+    "severitySevere": "شديدة",
+    "quickDashScore": "QuickDASH: {{score}}/100 — {{severity}}",
+    "score": "الدرجة: {{score}}/{{max}}",
+    "complete": "مكتمل",
+    "incomplete": "غير مكتمل",
+    "notAnswered": "⚠ لم تتم الإجابة",
+    "notProvided": "— غير متوفر",
+    "backToAssessment": "العودة إلى التقييم",
+    "reviewAndSubmit": "المراجعة والإرسال",
+    "requiredAnswered": "{{answered}}/{{total}} من المطلوب تمت الإجابة عنه",
+    "completeRequiredWarning": "يرجى إكمال جميع الأسئلة المطلوبة قبل الإرسال.",
+    "submitError": "تعذّر حفظ هذا التقييم — تحقق من اتصالك وحاول مرة أخرى. إجاباتك ما زالت محفوظة هنا.",
+    "followUp": "المتابعة",
+    "initialVisit": "الزيارة الأولى",
+    "submittedPrefix": "تم الإرسال:",
+    "editAnswers": "تعديل الإجابات",
+    "submitting": "جارٍ الإرسال…",
+    "submitAssessment": "إرسال التقييم"
+  },
+  "visitCard": {
+    "visitInformation": "معلومات الزيارة",
+    "visitType": "نوع الزيارة",
+    "followUp": "المتابعة",
+    "initialVisit": "الزيارة الأولى",
+    "bodyArea": "منطقة الجسم",
+    "date": "التاريخ",
+    "time": "الوقت",
+    "chiefComplaint": "الشكوى الرئيسية",
+    "edit": "تعديل",
+    "complaintPlaceholder": "صف الشكوى الرئيسية…",
+    "notSpecified": "غير محدد"
+  }
+}

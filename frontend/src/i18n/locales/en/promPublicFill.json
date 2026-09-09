@@ -1,0 +1,12 @@
+{
+  "loadingQuestionnaire": "Loading questionnaire…",
+  "linkNotFoundTitle": "Link Not Found",
+  "linkNotFoundBody": "This link isn't valid. Please contact the clinic for a new one.",
+  "thankYouTitle": "Thank You",
+  "thankYouBody": "Your answers have been recorded and sent to your care team.",
+  "greeting": "Hi {{name}}, a quick check-in",
+  "answerInstructions": "{{promName}} — answer based on how you've felt this past week.",
+  "validationRequired": "Please answer this question.",
+  "submitting": "Submitting…",
+  "submitFailed": "Something went wrong submitting your answers — please try again."
+}

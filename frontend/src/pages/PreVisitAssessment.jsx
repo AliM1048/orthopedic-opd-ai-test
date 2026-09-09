@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import api from '../api';
 import { computeFinalScore } from '../utils/scoring';
 import { useAssessmentConfig } from '../hooks/useLookupData';
+import { useLanguage } from '../hooks/useLanguage';
 import PatientSummaryCard from '../components/assessment/PatientSummaryCard';
 import VisitSummaryCard from '../components/assessment/VisitSummaryCard';
 import AssessmentHeader from '../components/assessment/AssessmentHeader';
@@ -33,6 +34,7 @@ function countAnswered(section, answers) {
 }
 
 export default function PreVisitAssessment({ patients, user, onAddAssessment, onUpdateStatus, onUpdateBodyArea }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
@@ -79,7 +81,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
       ? onUpdateBodyArea(patientId, region)
       : Promise.resolve();
     return Promise.resolve(persist).then(() => {
-      setChiefComplaint((c) => c || `${region} pain`);
+      setChiefComplaint((c) => c || t('assessment.page.defaultComplaint', { region }));
       setRegionConfirmed(true);
     });
   };
@@ -116,7 +118,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
       const a = answers[question.id];
       const isEmpty = a === undefined || a === null || a === '' || (Array.isArray(a) && a.length === 0);
       if (isEmpty) {
-        setErrors(prev => ({ ...prev, [question.id]: 'This question is required.' }));
+        setErrors(prev => ({ ...prev, [question.id]: t('assessment.question.requiredError') }));
         return false;
       }
     }
@@ -233,15 +235,15 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
             <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
               <ArrowLeft size={18} />
             </button>
-            <h1>Assessment</h1>
+            <h1>{t('assessment.page.genericTitle')}</h1>
           </div>
         </div>
         <div className="page-body">
           <div className="empty-state">
             <div className="empty-state-icon">📋</div>
-            <p>No patient selected. Return to the dashboard first.</p>
+            <p>{t('assessment.page.noPatientMessage')}</p>
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>
-              Go to Dashboard
+              {t('assessment.page.goToDashboard')}
             </button>
           </div>
         </div>
@@ -259,7 +261,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
               <ArrowLeft size={18} />
             </button>
             <div>
-              <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
+              <h1>{isFollowUp ? t('assessment.page.titleFollowUp') : t('assessment.page.titlePreVisit')}</h1>
               <p>{patient.name} · {patient.mrn}</p>
             </div>
           </div>
@@ -278,13 +280,13 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
             <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
               <ArrowLeft size={18} />
             </button>
-            <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
+            <h1>{isFollowUp ? t('assessment.page.titleFollowUp') : t('assessment.page.titlePreVisit')}</h1>
           </div>
         </div>
         <div className="page-body">
           <div className="empty-state">
             <div className="empty-state-icon">📋</div>
-            <p>Loading assessment questions…</p>
+            <p>{t('assessment.page.loadingQuestions')}</p>
           </div>
         </div>
       </>
@@ -296,23 +298,23 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
     return (
       <>
         <div className="topbar">
-          <div className="topbar-left"><h1>Assessment Completed</h1></div>
+          <div className="topbar-left"><h1>{t('assessment.submitted.completedTitle')}</h1></div>
         </div>
         <div className="page-body">
           <div className="card" style={{ textAlign: 'center', padding: '64px 48px', maxWidth: 560, margin: '0 auto' }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
               <CheckCircle2 size={40} color="var(--primary)" />
             </div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Assessment Submitted</h2>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t('assessment.submitted.title')}</h2>
             <p className="text-muted" style={{ marginBottom: 24 }}>
-              {isFollowUp ? 'Follow-up' : 'Pre-visit'} assessment for <strong>{patient.name}</strong> has been saved.
+              {isFollowUp ? t('assessment.submitted.prefixFollowUp') : t('assessment.submitted.prefixPreVisit')} <strong>{patient.name}</strong> {t('assessment.submitted.hasBeenSaved')}
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>
-                View Profile
+                {t('assessment.submitted.viewProfile')}
               </button>
               <button className="btn btn-outline" onClick={() => navigate('/')}>
-                Dashboard
+                {t('assessment.submitted.dashboard')}
               </button>
             </div>
           </div>
@@ -333,14 +335,14 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1>{isFollowUp ? 'Follow-Up' : 'Pre-Visit'} Assessment</h1>
+            <h1>{isFollowUp ? t('assessment.page.titleFollowUp') : t('assessment.page.titlePreVisit')}</h1>
             <p>{patient.name} · {patient.mrn}</p>
           </div>
         </div>
         {saveFlash && (
           <div className="topbar-right">
             <div className="save-flash">
-              <CheckCircle2 size={14} /> Draft saved
+              <CheckCircle2 size={14} /> {t('assessment.page.draftSaved')}
             </div>
           </div>
         )}
@@ -400,7 +402,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
                     )}
                   </div>
                   <div className="intake-section-progress">
-                    Question {currentQuestionIndex + 1} of {totalQuestions}
+                    {t('assessment.page.questionProgress', { current: currentQuestionIndex + 1, total: totalQuestions })}
                   </div>
                 </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import api from '../../api';
+import { useLanguage } from '../../hooks/useLanguage';
 
 const successToast = Swal.mixin({
   toast: true, position: 'top-end', showConfirmButton: false, timer: 1800, timerProgressBar: true,
@@ -18,6 +19,7 @@ function parseIntervals(text) {
  * overrides the clinic-wide default (see backend/routers/followups.py) and
  * regenerates their not-yet-completed calls immediately. */
 export default function FollowUpScheduleModal({ patient, onClose, onSaved }) {
+  const { t } = useLanguage();
   const [globalIntervals, setGlobalIntervals] = useState([3, 6, 9]);
   const [input, setInput] = useState('');
   const [useCustom, setUseCustom] = useState(!!patient.followUpIntervalsMonths?.length);
@@ -36,49 +38,49 @@ export default function FollowUpScheduleModal({ patient, onClose, onSaved }) {
   const handleSave = () => {
     const intervalsMonths = useCustom ? parseIntervals(input) : null;
     if (useCustom && !intervalsMonths.length) {
-      notifyError('Enter at least one interval, e.g. 3, 6, 9');
+      notifyError(t('components.followUpSchedule.enterIntervalError'));
       return;
     }
     setSaving(true);
     api.patch(`/api/patients/${patient.id}/followup-settings`, { intervalsMonths })
-      .then(() => { notifySuccess('Schedule updated'); onSaved(); })
-      .catch(() => notifyError('Failed to save'))
+      .then(() => { notifySuccess(t('components.followUpSchedule.scheduleUpdated')); onSaved(); })
+      .catch(() => notifyError(t('components.followUpSchedule.failedToSave')))
       .finally(() => setSaving(false));
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-        <h3>Follow-Up Call Schedule</h3>
+        <h3>{t('components.followUpSchedule.title')}</h3>
         <p className="text-muted" style={{ fontSize: 13, marginBottom: 14 }}>
-          Months after this patient&rsquo;s first evaluation that a PROM follow-up call gets scheduled.
+          {t('components.followUpSchedule.description')}
         </p>
 
         <div className="form-group" style={{ display: 'flex', gap: 16 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             <input type="radio" checked={!useCustom} onChange={() => { setUseCustom(false); setInput(globalIntervals.join(', ')); }} />
-            Use clinic default ({globalIntervals.join(', ')} months)
+            {t('components.followUpSchedule.useClinicDefault', { months: globalIntervals.join(', ') })}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             <input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} />
-            Custom for this patient
+            {t('components.followUpSchedule.customForPatient')}
           </label>
         </div>
 
         {useCustom && (
           <div className="form-group">
-            <label className="form-label">Months (comma-separated)</label>
-            <input className="form-control" placeholder="e.g. 3, 6, 9" value={input} onChange={(e) => setInput(e.target.value)} />
+            <label className="form-label">{t('components.followUpSchedule.monthsLabel')}</label>
+            <input className="form-control" placeholder={t('components.followUpSchedule.monthsPlaceholder')} value={input} onChange={(e) => setInput(e.target.value)} />
           </div>
         )}
 
         <p className="text-muted" style={{ fontSize: 12 }}>
-          Saving regenerates this patient&rsquo;s not-yet-completed calls from their first evaluation date — already-completed calls are left alone.
+          {t('components.followUpSchedule.saveNote')}
         </p>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+          <button className="btn btn-outline" onClick={onClose}>{t('components.followUpSchedule.cancel')}</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? t('components.followUpSchedule.saving') : t('components.followUpSchedule.save')}</button>
         </div>
       </div>
     </div>

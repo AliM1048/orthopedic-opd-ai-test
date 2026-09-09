@@ -4,6 +4,7 @@ import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, Phon
 import Swal from 'sweetalert2';
 import StatusBadge from '../components/common/StatusBadge';
 import api from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 
 // Top-center, fading in/out rather than the library's default slide-and-pop —
 // see the .opd-toast* rules in index.css for the actual look.
@@ -23,6 +24,7 @@ const notifyToast = Swal.mixin({
 });
 
 export default function NurseDashboard({ patients, onUpdateStatus, createPatient }) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
@@ -78,8 +80,8 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
       {/* Top Bar */}
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Nurse Dashboard</h1>
-          <p>Today's appointments · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <h1>{t('nurseDashboard.pageTitle')}</h1>
+          <p>{t('nurseDashboard.todaysAppointments')} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </div>
 
@@ -90,28 +92,28 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
             <div className="stat-icon blue"><Users size={24} /></div>
             <div>
               <div className="stat-value">{stats.total}</div>
-              <div className="stat-label">Total Patients</div>
+              <div className="stat-label">{t('nurseDashboard.statTotalPatients')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon yellow"><Clock size={24} /></div>
             <div>
               <div className="stat-value">{stats.pending}</div>
-              <div className="stat-label">Pending Call</div>
+              <div className="stat-label">{t('nurseDashboard.statPendingCall')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon green"><CheckCircle size={24} /></div>
             <div>
               <div className="stat-value">{stats.completed}</div>
-              <div className="stat-label">Completed</div>
+              <div className="stat-label">{t('nurseDashboard.statCompleted')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon purple"><AlertTriangle size={24} /></div>
             <div>
               <div className="stat-value">{stats.followUp}</div>
-              <div className="stat-label">Follow-Up</div>
+              <div className="stat-label">{t('nurseDashboard.statFollowUp')}</div>
             </div>
           </div>
         </div>
@@ -127,9 +129,9 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
               <div>
                 <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <PhoneCall size={15} style={{ color: 'var(--danger)' }} />
-                  Pre-Visit Calls Due
+                  {t('nurseDashboard.preVisitCallsDue')}
                 </div>
-                <div className="card-subtitle">{dueCalls.length} patient{dueCalls.length !== 1 ? 's' : ''} need a pre-visit or follow-up PROM call soon — call whoever hasn't self-completed it via the app</div>
+                <div className="card-subtitle">{t('nurseDashboard.preVisitSubtitle', { count: dueCalls.length, plural: dueCalls.length !== 1 ? 's' : '' })}</div>
               </div>
               {/* <button className="btn btn-outline btn-sm" onClick={() => navigate('/followups')}>
                 View All <ArrowRight size={14} />
@@ -144,14 +146,14 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {call.intervalMonths ? `${call.intervalMonths}-month check-in` : 'Initial pre-visit questionnaire'} · {call.intervalMonths ? 'scheduled' : 'appointment'} {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}
+                      {call.intervalMonths ? t('nurseDashboard.monthsCheckIn', { months: call.intervalMonths }) : t('nurseDashboard.initialPreVisitQuestionnaire')} · {call.intervalMonths ? t('nurseDashboard.scheduledLabel') : t('nurseDashboard.appointmentLabel')} {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}
                     </div>
                   </div>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => navigate(`/assessment?patient=${call.patient_id}${call.intervalMonths ? '&type=followup' : ''}`)}
                   >
-                    Start Call
+                    {t('nurseDashboard.startCall')}
                   </button>
                 </div>
               ))}
@@ -163,16 +165,16 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">Scheduled Patients</div>
-              <div className="card-subtitle">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</div>
+              <div className="card-title">{t('nurseDashboard.scheduledPatients')}</div>
+              <div className="card-subtitle">{t('nurseDashboard.patientsFound', { count: filtered.length, plural: filtered.length !== 1 ? 's' : '' })}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn btn-outline" onClick={() => navigate('/patients')}>View All Records</button>
-              <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Patient</button>
+              <button className="btn btn-outline" onClick={() => navigate('/patients')}>{t('nurseDashboard.viewAllRecords')}</button>
+              <button className="btn btn-primary" onClick={() => setShowAdd(true)}>{t('nurseDashboard.addPatient')}</button>
               <div className="search-bar">
               <Search size={16} color="var(--text-muted)" />
               <input
-                placeholder="Search patients…"
+                placeholder={t('nurseDashboard.searchPatientsPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -183,79 +185,79 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
           {showAdd && (
             <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
               <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <h3>Add New Patient</h3>
+                <h3>{t('nurseDashboard.addNewPatient')}</h3>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">Name</label>
-                    <input className="form-control" placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldName')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderFullName')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">MRN</label>
-                    <input className="form-control" placeholder="Medical record #" value={form.mrn} onChange={(e) => setForm({ ...form, mrn: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.mrn')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderMrn')} value={form.mrn} onChange={(e) => setForm({ ...form, mrn: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Age</label>
-                    <input className="form-control" placeholder="Age" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: Number(e.target.value) })} />
+                    <label className="form-label">{t('nurseDashboard.fieldAge')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderAge')} type="number" value={form.age} onChange={(e) => setForm({ ...form, age: Number(e.target.value) })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Gender</label>
-                    <input className="form-control" placeholder="Gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldGender')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderGender')} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Date of Birth</label>
+                    <label className="form-label">{t('nurseDashboard.fieldDob')}</label>
                     <input className="form-control" type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Body Area</label>
-                    <input className="form-control" placeholder="Body area" value={form.bodyArea} onChange={(e) => setForm({ ...form, bodyArea: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.bodyArea')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderBodyArea')} value={form.bodyArea} onChange={(e) => setForm({ ...form, bodyArea: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Appointment Date</label>
+                    <label className="form-label">{t('nurseDashboard.fieldAppointmentDate')}</label>
                     <input className="form-control" type="date" value={form.appointmentDate} onChange={(e) => setForm({ ...form, appointmentDate: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Avatar Color</label>
-                    <input className="form-control" placeholder="#hex color" value={form.avatar} onChange={(e) => setForm({ ...form, avatar: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldAvatarColor')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderAvatarColor')} value={form.avatar} onChange={(e) => setForm({ ...form, avatar: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Appointment Time</label>
+                    <label className="form-label">{t('nurseDashboard.fieldAppointmentTime')}</label>
                     <input className="form-control" type="time" value={form.appointmentTime} onChange={(e) => setForm({ ...form, appointmentTime: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Phone</label>
-                    <input className="form-control" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldPhone')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderPhone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Email</label>
-                    <input className="form-control" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldEmail')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderEmail')} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Address</label>
-                    <input className="form-control" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldAddress')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderAddress')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Blood Type</label>
-                    <input className="form-control" placeholder="Blood type" value={form.bloodType} onChange={(e) => setForm({ ...form, bloodType: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldBloodType')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderBloodType')} value={form.bloodType} onChange={(e) => setForm({ ...form, bloodType: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Allergies</label>
-                    <input className="form-control" placeholder="Allergies" value={form.allergies} onChange={(e) => setForm({ ...form, allergies: e.target.value })} />
+                    <label className="form-label">{t('nurseDashboard.fieldAllergies')}</label>
+                    <input className="form-control" placeholder={t('nurseDashboard.placeholderAllergies')} value={form.allergies} onChange={(e) => setForm({ ...form, allergies: e.target.value })} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-                  <button className="btn btn-outline" onClick={() => setShowAdd(false)}>Cancel</button>
+                  <button className="btn btn-outline" onClick={() => setShowAdd(false)}>{t('common.cancel')}</button>
                   <button className="btn btn-primary" onClick={async () => {
                     try {
                       // ensure minimal required fields
-                      if (!form.name || !form.mrn || !form.dob || !form.appointmentDate) return alert('Please provide Name, MRN, DOB, and appointment date');
+                      if (!form.name || !form.mrn || !form.dob || !form.appointmentDate) return alert(t('nurseDashboard.missingFieldsAlert'));
                       await createPatient(form);
                       setShowAdd(false);
                     } catch (e) {
                       console.error(e);
-                      const msg = e?.response?.data?.detail || e?.response?.data || e?.message || 'Failed to create patient';
+                      const msg = e?.response?.data?.detail || e?.response?.data || e?.message || t('nurseDashboard.createPatientFailed');
                       alert(msg);
                     }
-                  }}>Create Patient</button>
+                  }}>{t('nurseDashboard.createPatient')}</button>
                 </div>
               </div>
             </div>
@@ -268,7 +270,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                 className={`filter-chip ${filter === f ? 'active' : ''}`}
                 onClick={() => setFilter(f)}
               >
-                {f === 'all' ? 'All' : f === 'assessment-completed' ? 'Assessed' : f === 'follow-up' ? 'Follow-Up' : f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? t('nurseDashboard.filterAll') : f === 'assessment-completed' ? t('nurseDashboard.filterAssessed') : f === 'follow-up' ? t('nurseDashboard.statFollowUp') : f === 'pending' ? t('nurseDashboard.filterPending') : t('nurseDashboard.statCompleted')}
               </button>
             ))}
           </div>
@@ -276,18 +278,18 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
           {filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <p>No patients match your filter.</p>
+              <p>{t('nurseDashboard.noPatientsMatchFilter')}</p>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Patient</th>
-                  <th>MRN</th>
-                  <th>Appointment</th>
-                  <th>Body Area</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{t('common.patient')}</th>
+                  <th>{t('nurseDashboard.mrn')}</th>
+                  <th>{t('nurseDashboard.tableHeaderAppointment')}</th>
+                  <th>{t('nurseDashboard.bodyArea')}</th>
+                  <th>{t('common.status')}</th>
+                  <th>{t('nurseDashboard.tableHeaderAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,7 +302,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                         </div>
                         <div>
                           <div className="fw-600">{p.name}</div>
-                          <div className="text-muted">{p.age}y · {p.gender}</div>
+                          <div className="text-muted">{t('nurseDashboard.ageYears', { age: p.age })} · {p.gender}</div>
                         </div>
                       </div>
                     </td>
@@ -319,7 +321,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                           className="btn btn-primary btn-sm"
                           onClick={(e) => { e.stopPropagation(); navigate(`/assessment?patient=${p.id}`); }}
                         >
-                          <Phone size={14} /> Start Call
+                          <Phone size={14} /> {t('nurseDashboard.startCall')}
                         </button>
                       )}
                       {p.status === 'follow-up' && (
@@ -327,7 +329,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                           className="btn btn-outline btn-sm"
                           onClick={(e) => { e.stopPropagation(); navigate(`/assessment?patient=${p.id}&type=followup`); }}
                         >
-                          Follow-Up
+                          {t('nurseDashboard.statFollowUp')}
                         </button>
                       )}
                       {(p.status === 'assessment-completed' || p.status === 'completed') && (
@@ -335,7 +337,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                           className="btn btn-ghost btn-sm"
                           onClick={(e) => { e.stopPropagation(); navigate(`/patient/${p.id}`); }}
                         >
-                          View
+                          {t('nurseDashboard.viewAction')}
                         </button>
                       )}
                     </td>

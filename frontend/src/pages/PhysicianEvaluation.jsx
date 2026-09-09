@@ -6,6 +6,7 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          AlertTriangle, Clock3, BrainCircuit } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api, { withAuthToken } from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import { getOdiNdiInterpretation } from '../utils/scoring';
@@ -93,6 +94,17 @@ const WORKFLOW_STEPS = [
   { id: 'evaluation', label: 'Doctor Evaluation', icon: '🩺' },
   { id: 'discharge',  label: 'Discharge',         icon: '✅' },
 ];
+
+// Maps each workflow step's id to its physicianEvaluation.workflow.* translation
+// key — WORKFLOW_STEPS.label stays plain English (used only as a fallback
+// identifier), the translated text used for display is looked up separately.
+const WORKFLOW_STEP_KEYS = {
+  'check-in':   'checkIn',
+  'pre-visit':  'preVisitCall',
+  'assessment': 'nurseAssessment',
+  'evaluation': 'doctorEvaluation',
+  'discharge':  'discharge',
+};
 
 function getActiveStepIndex(patient) {
   if (!patient) return 0;
@@ -186,10 +198,11 @@ function SCard({ title, icon: Icon, children, style = {} }) {
 
 /* ── Imaging status badge ───────────────────────────────────────────────── */
 function StatusBadge({ status }) {
+  const { t } = useLanguage();
   const cfg = {
-    completed: { label: 'Done',    color: '#059669' },
-    pending:   { label: 'Pending', color: '#d97706' },
-    ordered:   { label: 'Ordered', color: '#6366f1' },
+    completed: { label: t('physicianEvaluation.common.done'),    color: '#059669' },
+    pending:   { label: t('physicianEvaluation.common.pending'), color: '#d97706' },
+    ordered:   { label: t('physicianEvaluation.common.ordered'), color: '#6366f1' },
   }[status] || { label: status, color: '#7a9a9e' };
   return (
     <span style={{
@@ -201,7 +214,8 @@ function StatusBadge({ status }) {
 }
 
 /* ── Small modal wrapper (shares .modal-backdrop / .modal / .form-grid) ──── */
-function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children }) {
+function MiniModal({ title, onClose, onSubmit, submitLabel, children }) {
+  const { t } = useLanguage();
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
@@ -210,8 +224,8 @@ function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children })
           {children}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={onSubmit}>{submitLabel}</button>
+          <button className="btn btn-outline" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={onSubmit}>{submitLabel || t('common.save')}</button>
         </div>
       </div>
     </div>
@@ -234,25 +248,25 @@ function iconForName(name, options) {
  * treatments records instead of fabricated demo content — necessarily less
  * detailed than a hand-written demo order (no invented MRI sequence
  * protocols etc.), since only fields that actually exist in the DB are used. */
-function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
+function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, translate) {
   const treatmentOrders = (patient.treatments || []).map((t) => ({
     id: t.id,
     kind: 'treatment',
     icon: iconForName(t.type, treatmentOptions),
-    title: `${t.type} Order`,
+    title: translate('physicianEvaluation.orders.treatmentOrderTitle', { type: t.type }),
     status: t.status,
     statusColor: ORDER_STATUS_COLORS[t.status] || '#7a9a9e',
     summary: t.details || t.type,
-    details: `Duration: ${t.duration}`,
+    details: translate('physicianEvaluation.orders.durationValue', { duration: t.duration }),
     note: null,
-    printTitle: `${t.type} Order`,
+    printTitle: translate('physicianEvaluation.orders.treatmentOrderTitle', { type: t.type }),
     printBody: [
-      ['Treatment', t.type],
-      ['Details', t.details || '—'],
-      ['Duration', t.duration],
-      ['Physician', t.physician],
-      ['Date', t.date],
-      ...(t.followUpDate ? [['Follow-Up Date', t.followUpDate]] : []),
+      [translate('physicianEvaluation.common.treatment'), t.type],
+      [translate('physicianEvaluation.common.details'), t.details || '—'],
+      [translate('physicianEvaluation.common.duration'), t.duration],
+      [translate('common.physician'), t.physician],
+      [translate('common.date'), t.date],
+      ...(t.followUpDate ? [[translate('physicianEvaluation.common.followUpDate'), t.followUpDate]] : []),
     ],
   }));
 
@@ -260,18 +274,18 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
     id: d.id,
     kind: 'diagnostic',
     icon: iconForName(d.type, diagnosticTests),
-    title: `${d.type} Request`,
+    title: translate('physicianEvaluation.orders.diagnosticRequestTitle', { type: d.type }),
     status: d.status,
     statusColor: ORDER_STATUS_COLORS[d.status] || '#7a9a9e',
     summary: d.type,
-    details: d.result || 'Pending results',
+    details: d.result || translate('physicianEvaluation.orders.pendingResults'),
     note: null,
-    printTitle: `Diagnostic Request — ${d.type}`,
+    printTitle: translate('physicianEvaluation.orders.diagnosticRequestPrintTitle', { type: d.type }),
     printBody: [
-      ['Examination', d.type],
-      ['Date', d.date],
-      ['Status', d.status],
-      ['Result', d.result || 'Pending'],
+      [translate('physicianEvaluation.common.examination'), d.type],
+      [translate('common.date'), d.date],
+      [translate('common.status'), d.status],
+      [translate('physicianEvaluation.common.result'), d.result || translate('physicianEvaluation.common.pending')],
     ],
   }));
 
@@ -279,12 +293,13 @@ function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
 }
 
 function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, latestAssessment, promName, scoreDirection, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
+  const { t } = useLanguage();
   const [printOrder, setPrintOrder] = React.useState(null);
   const [showPrintTypeModal, setShowPrintTypeModal] = React.useState(false);
   const [printDocType, setPrintDocType] = React.useState(null);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const evaluation = (patient?.evaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
-  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, t);
 
   // Printing is blocking in mainstream browsers — window.print() only returns
   // once the print dialog closes — so resetting printDocType right after the
@@ -301,23 +316,23 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
       {/* Insurance flag — placeholder until the real insurance layout is provided */}
       {printDocType === 'insurance' && (
         <div style={{ background: '#fef3c7', color: '#92400e', textAlign: 'center', padding: '6px 12px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
-          🏷 INSURANCE COPY
+          🏷 {t('physicianEvaluation.reviewPrint.insuranceCopy')}
         </div>
       )}
       {/* Top bar */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ArrowLeft size={18} /> Back to Evaluation
+            <ArrowLeft size={18} /> {t('physicianEvaluation.reviewPrint.backToEvaluation')}
           </button>
           <div>
-            <h1>Review & Print</h1>
+            <h1>{t('physicianEvaluation.reviewPrint.title')}</h1>
             <p>{patient?.name} · {patient?.mrn}</p>
           </div>
         </div>
         <div className="topbar-right">
           <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            🖨 Print Full Summary
+            🖨 {t('physicianEvaluation.reviewPrint.printFullSummary')}
           </button>
         </div>
       </div>
@@ -334,16 +349,16 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{patient?.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{patient?.mrn} · {patient?.age} yrs · {patient?.bodyArea}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                <div><span style={{ fontWeight: 600 }}>Diagnosis:</span> {evaluation?.diagnosis || '—'}</div>
-                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Physician:</span> {physicianName}</div>
-                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Date:</span> {today}</div>
+                <div><span style={{ fontWeight: 600 }}>{t('physicianEvaluation.reviewPrint.diagnosisColon')}</span> {evaluation?.diagnosis || '—'}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>{t('physicianEvaluation.reviewPrint.physicianColon')}</span> {physicianName}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>{t('physicianEvaluation.reviewPrint.dateColon')}</span> {today}</div>
               </div>
             </div>
           </div>
 
           {/* Pain NRS */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>Pain Score (NRS)</div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>{t('physicianEvaluation.common.painScoreNrs')}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <span style={{ fontSize: 40, fontWeight: 900, color: painColor, lineHeight: 1 }}>{painNRS === null ? '—' : painNRS}</span>
               <span style={{ fontSize: 18, color: 'var(--text-muted)', fontWeight: 600 }}>/10</span>
@@ -356,22 +371,22 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 
           {/* Pre-Visit PROM */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 2 }}>Pre-Visit PROM</div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 2 }}>{t('physicianEvaluation.reviewPrint.preVisitPromLabel')}</div>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginBottom: 10 }}>{promName}</div>
             {!latestAssessment ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>No pre-visit assessment completed yet.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>{t('physicianEvaluation.reviewPrint.noPrevisitAssessment')}</p>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Raw Score</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('physicianEvaluation.common.rawScore')}</span>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
                 </div>
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Final Score</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{t('physicianEvaluation.common.finalScore')}</span>
                   <span style={{ color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>{finalScore === null ? '—' : finalScore}/100</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                  {scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function'}
+                  {scoreDirection === 'lower_better' ? t('physicianEvaluation.common.higherMoreDisability') : t('physicianEvaluation.common.higherBetterFunction')}
                 </div>
               </>
             )}
@@ -407,7 +422,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           {/* Extracted Orders (list) */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <ClipboardList size={13} /> Extracted Orders
+              <ClipboardList size={13} /> {t('physicianEvaluation.reviewPrint.extractedOrders')}
             </div>
             <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {orders.map((order) => (
@@ -427,7 +442,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                       onClick={() => setPrintOrder(order)}
                       style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
                     >
-                      🖨 Review & Print
+                      🖨 {t('physicianEvaluation.reviewPrint.title')}
                     </button>
                   </div>
                 </div>
@@ -450,14 +465,14 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Al-Rasoul Al-Aazam Hospital</div>
               </div>
             </div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD — Clinical Summary</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>Doctor's Orders Summary</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('physicianEvaluation.reviewPrint.orthopedicOpdClinicalSummary')}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{t('physicianEvaluation.reviewPrint.doctorsOrdersSummary')}</div>
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{patient?.name} · {today}</div>
           </div>
 
           {/* Patient strip */}
           <div style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '10px 24px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {[['MRN', patient?.mrn], ['Age', patient?.age ? `${patient.age} yrs` : '—'], ['Diagnosis', evaluation?.diagnosis || '—']].map(([l, v]) => (
+            {[[t('physicianEvaluation.common.mrn'), patient?.mrn], [t('physicianEvaluation.reviewPrint.age'), patient?.age ? t('physicianEvaluation.common.ageYrs', { age: patient.age }) : '—'], [t('physicianEvaluation.reviewPrint.diagnosis'), evaluation?.diagnosis || '—']].map(([l, v]) => (
               <div key={l}>
                 <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{l}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{v}</div>
@@ -470,10 +485,10 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Order</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Details</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Status</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Print</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.reviewPrint.tableOrder')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.common.details')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('common.status')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('common.print')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -493,7 +508,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                       <button
                         onClick={() => setPrintOrder(order)}
                         style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#64748b', fontWeight: 600 }}
-                        title={`Print ${order.title}`}
+                        title={t('physicianEvaluation.reviewPrint.printOrderTitle', { title: order.title })}
                       >
                         🖨
                       </button>
@@ -508,14 +523,14 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           <div style={{ margin: '0 24px 20px', borderTop: '1px solid #e2e8f0', paddingTop: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div style={{ fontSize: 10, color: '#94a3b8' }}>
-                <div>Date: {today}</div>
-                <div style={{ marginTop: 3 }}>Orthopedic OPD — Official Clinical Document</div>
-                <div style={{ marginTop: 3, fontWeight: 600 }}>This document is computer-generated.</div>
+                <div>{t('physicianEvaluation.reviewPrint.dateColon')} {today}</div>
+                <div style={{ marginTop: 3 }}>{t('physicianEvaluation.reviewPrint.orthopedicOpdOfficial')}</div>
+                <div style={{ marginTop: 3, fontWeight: 600 }}>{t('physicianEvaluation.reviewPrint.computerGenerated')}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ width: 140, borderBottom: '2px solid #334155', marginBottom: 4 }} />
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{physicianName}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>Attending Physician</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>{t('physicianEvaluation.reviewPrint.attendingPhysician')}</div>
               </div>
             </div>
           </div>
@@ -523,7 +538,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           {/* Print full doc button */}
           <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', gap: 8 }}>
             <button onClick={() => setShowPrintTypeModal(true)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              🖨 Print Full Document
+              🖨 {t('physicianEvaluation.reviewPrint.printFullDocument')}
             </button>
           </div>
         </div>
@@ -552,10 +567,11 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onCreateEncounter, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent, onUploadDocument, onDeleteDocument }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('patient');
   const patient   = patients.find((p) => p.id === patientId);
-  const physicianName = user?.name || 'Physician';
+  const physicianName = user?.name || t('common.physician');
   const latestAssessment = patient ? latestByDate(patient.assessments) : null;
 
   const [soap, setSoap]                       = useState(EMPTY_SOAP);
@@ -630,7 +646,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
   useEffect(() => {
     if (!patientId) return;
-    api.get('/api/ai/status').then((res) => setAiStatus(res.data)).catch(() => setAiStatus({ available: false, message: 'AI assistant is unavailable.' }));
+    api.get('/api/ai/status').then((res) => setAiStatus(res.data)).catch(() => setAiStatus({ available: false, message: t('physicianEvaluation.aiAssistant.unavailable') }));
   }, [patientId]);
 
   const requestAiRecommendation = () => {
@@ -638,7 +654,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     setAiLoading(true);
     api.post(`/api/ai/patients/${patientId}/recommendation`, null, { params: { encounter_id: encounterId || undefined } })
       .then((res) => setAiRecommendation(res.data))
-      .catch(() => setAiRecommendation({ available: false, warnings: ['The assistant could not generate a recommendation.'] }))
+      .catch(() => setAiRecommendation({ available: false, warnings: [t('physicianEvaluation.aiAssistant.recommendationFailed')] }))
       .finally(() => setAiLoading(false));
   };
 
@@ -846,7 +862,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       await Promise.all(pendingWrites);
       setSaved(true);
     } catch {
-      notifyError('Some changes failed to save — please try again');
+      notifyError(t('physicianEvaluation.toasts.saveAllFailed'));
     }
   };
 
@@ -859,8 +875,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       id: uid(), type: 'Medication', date: todayIso(), physician: physicianName, encounter_id: activeEncounterId,
       duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
     }))
-      .then(() => notifySuccess('Prescription saved'))
-      .catch(() => notifyError('Failed to save prescription'));
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.prescriptionSaved')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.prescriptionSaveFailed')));
     setMedForm({ name: '', dose: '', duration: '' });
     setShowMedModal(false);
   };
@@ -879,8 +895,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       escalation: outcomeForm.escalation.trim() || null,
       clinicianNote: outcomeForm.clinicianNote.trim() || null,
     })
-      .then(() => notifySuccess('Treatment outcome saved'))
-      .catch(() => notifyError('Failed to save treatment outcome'));
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.outcomeSaved')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.outcomeSaveFailed')));
     setShowOutcomeModal(false);
   };
 
@@ -910,8 +926,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       return;
     }
     Promise.resolve(promise)
-      .then(() => notifySuccess('Note saved'))
-      .catch(() => notifyError('Failed to save note'));
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.noteSaved')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.noteSaveFailed')));
     setNoteText('');
     setShowNoteModal(false);
   };
@@ -920,8 +936,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     if (!onMarkEvaluationSent || sendingToPatient) return;
     setSendingToPatient(true);
     Promise.resolve(onMarkEvaluationSent(patientId, evaluationId))
-      .then(() => notifySuccess('Sent to patient'))
-      .catch(() => notifyError('Failed to send to patient'))
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.sentToPatient')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.sendToPatientFailed')))
       .finally(() => setSendingToPatient(false));
   };
 
@@ -933,28 +949,28 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     if (!file || !currentEvaluationId || !onUploadDocument) return;
     setUploadingDoc(true);
     Promise.resolve(onUploadDocument(patientId, currentEvaluationId, file, physicianName))
-      .then(() => notifySuccess('Document uploaded'))
-      .catch(() => notifyError('Failed to upload document'))
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.documentUploaded')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.documentUploadFailed')))
       .finally(() => setUploadingDoc(false));
   };
 
   const handleDeleteDocument = (documentId) => {
     if (!onDeleteDocument || !currentEvaluationId) return;
     Promise.resolve(onDeleteDocument(patientId, currentEvaluationId, documentId))
-      .then(() => notifySuccess('Document removed'))
-      .catch(() => notifyError('Failed to remove document'));
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.documentRemoved')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.documentRemoveFailed')));
   };
 
   const handleDeleteOrder = async (order) => {
     if (deletingOrderId) return;
     const confirmed = await Swal.fire({
       icon: 'warning',
-      title: `Remove ${order.title}?`,
-      text: 'This order will be permanently removed from the patient record.',
+      title: t('physicianEvaluation.toasts.removeOrderTitle', { title: order.title }),
+      text: t('physicianEvaluation.toasts.removeOrderText'),
       showCancelButton: true,
-      confirmButtonText: 'Remove',
+      confirmButtonText: t('physicianEvaluation.common.remove'),
       confirmButtonColor: 'var(--danger)',
-      cancelButtonText: 'Cancel',
+      cancelButtonText: t('common.cancel'),
     }).then((r) => r.isConfirmed);
     if (!confirmed) return;
 
@@ -962,20 +978,20 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     if (!handler) return;
     setDeletingOrderId(order.id);
     Promise.resolve(handler(patientId, order.id))
-      .then(() => notifySuccess('Order removed'))
-      .catch(() => notifyError('Failed to remove order'))
+      .then(() => notifySuccess(t('physicianEvaluation.toasts.orderRemoved')))
+      .catch(() => notifyError(t('physicianEvaluation.toasts.orderRemoveFailed')))
       .finally(() => setDeletingOrderId(null));
   };
 
   /* ── Empty / saved states ── */
   if (!patient) return (
     <>
-      <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
+      <div className="topbar"><div className="topbar-left"><h1>{t('physicianEvaluation.main.title')}</h1></div></div>
       <div className="page-body">
         <div className="empty-state">
           <div className="empty-state-icon">🩺</div>
-          <p>No patient selected.</p>
-          <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Dashboard</button>
+          <p>{t('physicianEvaluation.main.noPatientSelected')}</p>
+          <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>{t('physicianEvaluation.main.dashboard')}</button>
         </div>
       </div>
     </>
@@ -983,15 +999,15 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
   if (saved) return (
     <>
-      <div className="topbar"><div className="topbar-left"><h1>Visit Recorded</h1></div></div>
+      <div className="topbar"><div className="topbar-left"><h1>{t('physicianEvaluation.main.visitRecordedTitle')}</h1></div></div>
       <div className="page-body">
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Visit Recorded</h2>
-          <p className="text-muted mb-4">Evaluation saved for {patient.name}.</p>
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t('physicianEvaluation.main.visitRecordedTitle')}</h2>
+          <p className="text-muted mb-4">{t('physicianEvaluation.main.evaluationSavedFor', { name: patient.name })}</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
-            <button className="btn btn-outline"  onClick={() => navigate('/')}>Dashboard</button>
+            <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>{t('physicianEvaluation.main.viewProfile')}</button>
+            <button className="btn btn-outline"  onClick={() => navigate('/')}>{t('physicianEvaluation.main.dashboard')}</button>
           </div>
         </div>
       </div>
@@ -1000,11 +1016,11 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
   if (!assessmentConfig) return (
     <>
-      <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
+      <div className="topbar"><div className="topbar-left"><h1>{t('physicianEvaluation.main.title')}</h1></div></div>
       <div className="page-body">
         <div className="empty-state">
           <div className="empty-state-icon">🩺</div>
-          <p>Loading assessment data…</p>
+          <p>{t('physicianEvaluation.main.loadingAssessmentData')}</p>
         </div>
       </div>
     </>
@@ -1021,7 +1037,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   const sortedDiagnostics = [...(patient.diagnostics || [])].sort((a, b) => b.date.localeCompare(a.date));
   const medications        = (patient.treatments || []).filter((t) => t.type === 'Medication').sort((a, b) => b.date.localeCompare(a.date));
 
-  const chiefComplaint = latestAssessment?.chiefComplaint || 'Not recorded yet.';
+  const chiefComplaint = latestAssessment?.chiefComplaint || t('physicianEvaluation.common.notRecordedYet');
 
   const answers = latestAssessment?.answers || {};
   const promName = assessmentConfig?.promName || assessmentConfig?.title || 'PROM';
@@ -1033,7 +1049,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   // with disability-index language like "Crippled".
   const disabilityInterpretation = latestAssessment?.interpretation
     || (scoreDirection === 'lower_better' ? getOdiNdiInterpretation(finalScore) : null);
-  const directionCaption = scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function';
+  const directionCaption = scoreDirection === 'lower_better' ? t('physicianEvaluation.common.higherMoreDisability') : t('physicianEvaluation.common.higherBetterFunction');
 
   // Pain NRS score (0-10) — real only, straight from the shared pain_scale
   // intake item; null when there's genuinely no pain data recorded (no
@@ -1044,7 +1060,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   }
 
   const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#dc2626' : painNRS > 3 ? '#d97706' : '#059669';
-  const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
+  const painLabel = painNRS === null ? t('physicianEvaluation.common.notRecorded') : painNRS > 6 ? t('physicianEvaluation.pain.severePain') : painNRS > 3 ? t('physicianEvaluation.pain.moderatePain') : t('physicianEvaluation.pain.mildLowPain');
 
   // Prefer the just-recorded dictation (playable immediately, before the
   // doctor hits "Confirm & Save All") over the last persisted evaluation's
@@ -1058,7 +1074,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
     : '—';
   const visitTime = patient.appointmentTime || '—';
 
-  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions, t);
 
   if (showReview) {
     return (
@@ -1096,7 +1112,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
           <div>
-            <h1>Physician Evaluation</h1>
+            <h1>{t('physicianEvaluation.main.title')}</h1>
             <p>{patient.name} · {patient.mrn}</p>
           </div>
         </div>
@@ -1118,17 +1134,17 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
             <div className="pe-patient-info">
               <div className="pe-info-row pe-name-row">
                 <span className="pe-patient-name">{patient.name}</span>
-                <span className="pe-patient-age">{patient.age} yrs</span>
+                <span className="pe-patient-age">{t('physicianEvaluation.common.ageYrs', { age: patient.age })}</span>
               </div>
               <div className="pe-info-row">
-                <span className="pe-info-label">MRN</span>
+                <span className="pe-info-label">{t('physicianEvaluation.patientCard.mrn')}</span>
                 <span className="pe-info-value">{patient.mrn}</span>
                 <span className="pe-dot">·</span>
-                <span className="pe-info-label">Visit</span>
+                <span className="pe-info-label">{t('physicianEvaluation.patientCard.visit')}</span>
                 <span className="pe-info-value">{visitDateStr} at {visitTime}</span>
               </div>
               <div className="pe-info-row pe-tags-row">
-                <TagPill label={isNew ? '🆕 New Patient' : '🔄 Returning'} color={isNew ? '#0369a1' : '#059669'} />
+                <TagPill label={isNew ? `🆕 ${t('physicianEvaluation.patientCard.newPatient')}` : `🔄 ${t('physicianEvaluation.patientCard.returning')}`} color={isNew ? '#0369a1' : '#059669'} />
                 {patient.bodyArea && <TagPill label={`📍 ${patient.bodyArea}`} color="#d97706" />}
               </div>
             </div>
@@ -1146,7 +1162,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                     <div className={`pe-step-node ${isDone ? 'pe-step--done' : isCurrent ? 'pe-step--current' : 'pe-step--pending'}`}>
                       {isDone ? '✓' : step.icon}
                     </div>
-                    <div className={`pe-step-label ${isCurrent ? 'pe-step-label--current' : ''}`}>{step.label}</div>
+                    <div className={`pe-step-label ${isCurrent ? 'pe-step-label--current' : ''}`}>{t(`physicianEvaluation.workflow.${WORKFLOW_STEP_KEYS[step.id]}`)}</div>
                   </div>
                 );
               })}
@@ -1164,26 +1180,26 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
           <div className="pe-col pe-col-left">
 
             {/* Card 1 — Chief Complaint */}
-            <SCard title="Chief Complaint" icon={Stethoscope}>
+            <SCard title={t('physicianEvaluation.cards.chiefComplaint')} icon={Stethoscope}>
               <p className="pe-complaint-text">{chiefComplaint}</p>
             </SCard>
 
             {/* Card 2 — Pre-Visit PROM */}
-            <SCard title={`Pre-Visit PROM — ${promName}`} icon={FlaskConical}>
+            <SCard title={t('physicianEvaluation.cards.preVisitPromTitle', { promName })} icon={FlaskConical}>
               {!latestAssessment ? (
                 promAssignmentActive ? (
                   <div className="prom-alert-banner" style={{ background: 'var(--info-light)', color: 'var(--info-dark)', borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)' }}>
                     <Clock3 size={16} />
                     <span>
-                      PROM assigned — {latestPromAssignment.status === 'assigned_to_clerk' ? 'Assigned to Clerk' : latestPromAssignment.status === 'overdue' ? 'Overdue' : 'Sent to Patient (Pending)'}
+                      {t('physicianEvaluation.prom.assignedPrefix')}{latestPromAssignment.status === 'assigned_to_clerk' ? t('physicianEvaluation.prom.assignedToClerk') : latestPromAssignment.status === 'overdue' ? t('physicianEvaluation.prom.overdue') : t('physicianEvaluation.prom.sentPending')}
                     </span>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowPromAssignModal(true)}>Reassign</button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowPromAssignModal(true)}>{t('physicianEvaluation.prom.reassign')}</button>
                   </div>
                 ) : (
                   <div className="prom-alert-banner">
                     <AlertTriangle size={16} />
-                    <span>PROM Not Completed</span>
-                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowPromAssignModal(true)}>Select &amp; Assign PROM</button>
+                    <span>{t('physicianEvaluation.prom.notCompleted')}</span>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowPromAssignModal(true)}>{t('physicianEvaluation.prom.selectAssignProm')}</button>
                   </div>
                 )
               ) : (
@@ -1191,11 +1207,11 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                   <ScoreRing score={finalScore} size={96} stroke={9} direction={scoreDirection} />
                   <div className="pe-prom-list">
                     <div className="pe-prom-row">
-                      <span className="pe-prom-label">Raw Score</span>
+                      <span className="pe-prom-label">{t('physicianEvaluation.common.rawScore')}</span>
                       <span className="pe-prom-val" style={{ color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
                     </div>
                     <div className="pe-prom-total">
-                      <span>Final Score</span>
+                      <span>{t('physicianEvaluation.common.finalScore')}</span>
                       <span style={{ fontWeight: 800, color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>
                         {finalScore === null ? '—' : finalScore} / 100
                       </span>
@@ -1203,7 +1219,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{directionCaption}</div>
                     {disabilityInterpretation && (
                       <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Disability Severity</div>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{t('physicianEvaluation.prom.disabilitySeverity')}</div>
                         <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{disabilityInterpretation.label}</div>
                       </div>
                     )}
@@ -1213,14 +1229,14 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
             </SCard>
 
             {/* Card 3 — Pain Score (NRS) */}
-            <SCard title="Pain Score (NRS)" icon={Zap}>
+            <SCard title={t('physicianEvaluation.common.painScoreNrs')} icon={Zap}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1, color: painColor }}>
                     {painNRS === null ? '—' : painNRS} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>/ 10</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>
-                    Numeric Rating Scale
+                    {t('physicianEvaluation.pain.numericRatingScale')}
                   </div>
                 </div>
                 <span style={{
@@ -1254,15 +1270,15 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
-                <span>0 (No Pain)</span>
-                <span>3 (Mild)</span>
-                <span>6 (Moderate)</span>
-                <span>10 (Severe)</span>
+                <span>{t('physicianEvaluation.pain.scale0')}</span>
+                <span>{t('physicianEvaluation.pain.scale3')}</span>
+                <span>{t('physicianEvaluation.pain.scale6')}</span>
+                <span>{t('physicianEvaluation.pain.scale10')}</span>
               </div>
             </SCard>
 
             {/* Card 4 — PROM Trend */}
-            <SCard title={`PROM Trend — ${promName}`} icon={TrendingUp}>
+            <SCard title={t('physicianEvaluation.cards.promTrendTitle', { promName })} icon={TrendingUp}>
               <PromTrendChart patientId={patientId} scoreDirection={scoreDirection} />
             </SCard>
 
@@ -1295,25 +1311,25 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                 {isRecording && (
                   <div className="pe-soap-live-caption">
                     <Mic size={12} />
-                    <span>{liveCaption || 'Listening…'}</span>
+                    <span>{liveCaption || t('physicianEvaluation.dictation.listening')}</span>
                   </div>
                 )}
                 {dictation?.text && (
                   <div className="pe-note-section pe-soap-transcript">
-                    <h4 className="pe-note-h4"><FileText size={13} /> Raw Transcript</h4>
+                    <h4 className="pe-note-h4"><FileText size={13} /> {t('physicianEvaluation.dictation.rawTranscript')}</h4>
                     <p style={{ fontStyle: 'italic' }}>{dictation.text}</p>
                     <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Check this against what was actually said — the sections below are the AI's structured, grammar-corrected read of it, and can be edited before you click Complete Visit.
+                      {t('physicianEvaluation.dictation.transcriptHint')}
                     </p>
                   </div>
                 )}
-                {SOAP_SECTIONS.map(({ id, label, icon: Icon, rows, placeholder }) => (
+                {SOAP_SECTIONS.map(({ id, icon: Icon, rows }) => (
                   <div className="pe-note-section pe-soap-section" key={id}>
-                    <h4 className="pe-note-h4"><Icon size={13} /> {label}</h4>
+                    <h4 className="pe-note-h4"><Icon size={13} /> {t(`physicianEvaluation.soap.${id}Label`)}</h4>
                     <textarea
                       className="form-control pe-soap-textarea"
                       rows={rows}
-                      placeholder={placeholder}
+                      placeholder={t(`physicianEvaluation.soap.${id}Placeholder`)}
                       value={soap[id]}
                       onChange={(e) => updateSoap(id, e.target.value)}
                     />
@@ -1327,7 +1343,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                   onClick={isRecording ? stopRecording : handleStartDictation}
                 >
                   <Mic size={20} />
-                  {isRecording ? 'Stop Recording' : 'Start Recording'}
+                  {isRecording ? t('physicianEvaluation.dictation.stopRecording') : t('physicianEvaluation.dictation.startRecording')}
                 </button>
               </div>
 
@@ -1337,14 +1353,14 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
           {/* ── RIGHT COLUMN ─────────────────────────────────────────── */}
           <div className="pe-col pe-col-right">
 
-            <SCard title="AI Clinical Assistant" icon={BrainCircuit}>
+            <SCard title={t('physicianEvaluation.aiAssistant.title')} icon={BrainCircuit}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, margin: 0 }}>
-                  Decision support only. Suggestions never prescribe or place orders automatically.
+                  {t('physicianEvaluation.aiAssistant.decisionSupportOnly')}
                 </p>
                 {!aiStatus?.available && !aiRecommendation?.available ? (
                   <div style={{ padding: 10, borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 12 }}>
-                    {aiStatus?.message || 'Checking for a validated treatment model…'}
+                    {aiStatus?.message || t('physicianEvaluation.aiAssistant.checkingModel')}
                   </div>
                 ) : null}
                 <button
@@ -1353,7 +1369,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                   onClick={requestAiRecommendation}
                   disabled={aiLoading || !aiStatus?.available}
                 >
-                  <BrainCircuit size={14} /> {aiLoading ? 'Analyzing…' : 'Generate suggestions'}
+                  <BrainCircuit size={14} /> {aiLoading ? t('physicianEvaluation.aiAssistant.analyzing') : t('physicianEvaluation.aiAssistant.generateSuggestions')}
                 </button>
                 {aiRecommendation?.available && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1364,29 +1380,40 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                       </div>
                     ))}
                     {aiRecommendation.warnings?.map((warning) => <p key={warning} style={{ color: 'var(--warning-dark)', fontSize: 11, margin: 0 }}><AlertTriangle size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{warning}</p>)}
-                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Model: {aiRecommendation.modelVersion}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{t('physicianEvaluation.aiAssistant.modelLabel')} {aiRecommendation.modelVersion}</span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
-                      <button type="button" className="btn btn-primary btn-sm" onClick={() => recordAiFeedback('accepted')} disabled={!!aiFeedback}>Accept</button>
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('edited')} disabled={!!aiFeedback}>Edit in treatment plan</button>
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('rejected')} disabled={!!aiFeedback}>Reject</button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => recordAiFeedback('insufficient')} disabled={!!aiFeedback}>Not enough information</button>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => recordAiFeedback('accepted')} disabled={!!aiFeedback}>{t('common.accept')}</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('edited')} disabled={!!aiFeedback}>{t('physicianEvaluation.aiAssistant.editInTreatmentPlan')}</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('rejected')} disabled={!!aiFeedback}>{t('common.reject')}</button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => recordAiFeedback('insufficient')} disabled={!!aiFeedback}>{t('physicianEvaluation.aiAssistant.notEnoughInfo')}</button>
                     </div>
-                    {aiFeedback && aiFeedback !== 'error' && <span style={{ color: 'var(--success)', fontSize: 11 }}>Feedback recorded: {aiFeedback}.</span>}
-                    {aiFeedback === 'error' && <span style={{ color: 'var(--danger)', fontSize: 11 }}>Feedback could not be recorded.</span>}
+                    {aiFeedback && aiFeedback !== 'error' && (
+                      <span style={{ color: 'var(--success)', fontSize: 11 }}>
+                        {t('physicianEvaluation.aiAssistant.feedbackRecorded', {
+                          label: {
+                            accepted: t('common.accept'),
+                            edited: t('physicianEvaluation.aiAssistant.editInTreatmentPlan'),
+                            rejected: t('common.reject'),
+                            insufficient: t('physicianEvaluation.aiAssistant.notEnoughInfo'),
+                          }[aiFeedback],
+                        })}
+                      </span>
+                    )}
+                    {aiFeedback === 'error' && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{t('physicianEvaluation.aiAssistant.feedbackError')}</span>}
                   </div>
                 )}
               </div>
             </SCard>
 
             {/* ─── Card: Orders & Documents ─────────────────────────── */}
-            <SCard title="Orders & Documents" icon={ClipboardList} style={{ flex: 1 }}>
+            <SCard title={t('physicianEvaluation.ordersDocs.title')} icon={ClipboardList} style={{ flex: 1 }}>
 
               {/* ── Draft orders for this visit — dictation-filled or added
                   manually, editable right up until Complete Visit persists
                   them below as Diagnostic/Treatment records. ── */}
               <div className="pe-orders-draft">
                 <div className="pe-orders-draft-label">
-                  <FlaskConical size={13} /> Diagnostic Tests
+                  <FlaskConical size={13} /> {t('physicianEvaluation.ordersDocs.diagnosticTests')}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
                   {diagnosticTests.map((t) => (
@@ -1414,22 +1441,22 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                 </div>
 
                 <div className="pe-orders-draft-label">
-                  <Pill size={13} /> Treatment Plan
+                  <Pill size={13} /> {t('physicianEvaluation.ordersDocs.treatmentPlan')}
                 </div>
                 {treatments.length === 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>No treatments added yet.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>{t('physicianEvaluation.ordersDocs.noTreatmentsAdded')}</p>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {treatments.map((t) => (
-                    <div key={t.uid} className="pe-treatment-card">
+                  {treatments.map((tr) => (
+                    <div key={tr.uid} className="pe-treatment-card">
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <select
                           className="form-control"
                           style={{ flex: 1 }}
-                          value={t.type}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
+                          value={tr.type}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'type', e.target.value)}
                         >
-                          <option value="">Select treatment type…</option>
+                          <option value="">{t('physicianEvaluation.ordersDocs.selectTreatmentType')}</option>
                           {treatmentOptions.map((opt) => (
                             <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
                           ))}
@@ -1437,8 +1464,8 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         <button
                           type="button"
                           className="pe-treatment-remove"
-                          onClick={() => removeTreatmentEntry(t.uid)}
-                          title="Remove"
+                          onClick={() => removeTreatmentEntry(tr.uid)}
+                          title={t('physicianEvaluation.common.remove')}
                         >
                           <X size={16} />
                         </button>
@@ -1447,24 +1474,24 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         <input
                           className="form-control"
                           style={{ flex: 1 }}
-                          placeholder="Duration (e.g. 6 weeks)"
-                          value={t.duration}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
+                          placeholder={t('physicianEvaluation.ordersDocs.durationPlaceholder')}
+                          value={tr.duration}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'duration', e.target.value)}
                         />
                         <input
                           className="form-control"
                           style={{ flex: 1 }}
                           type="date"
-                          value={t.followUpDate || ''}
-                          onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
+                          value={tr.followUpDate || ''}
+                          onChange={(e) => updateTreatmentEntry(tr.uid, 'followUpDate', e.target.value)}
                         />
                       </div>
                       <textarea
                         className="form-control"
                         rows={2}
-                        placeholder="Details / instructions"
-                        value={t.details}
-                        onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
+                        placeholder={t('physicianEvaluation.ordersDocs.detailsPlaceholder')}
+                        value={tr.details}
+                        onChange={(e) => updateTreatmentEntry(tr.uid, 'details', e.target.value)}
                       />
                     </div>
                   ))}
@@ -1475,17 +1502,17 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                   style={{ marginTop: 8 }}
                   onClick={addTreatmentEntry}
                 >
-                  + Add Treatment
+                  {t('physicianEvaluation.ordersDocs.addTreatment')}
                 </button>
               </div>
 
               <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
 
               <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
-                <ClipboardList size={13} /> Recorded Orders
+                <ClipboardList size={13} /> {t('physicianEvaluation.ordersDocs.recordedOrders')}
               </div>
               {mainOrders.length === 0 ? (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded yet.</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('physicianEvaluation.ordersDocs.noOrdersRecorded')}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                   {mainOrders.map((order) => (
@@ -1498,7 +1525,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                           type="button"
                           onClick={() => handleDeleteOrder(order)}
                           disabled={deletingOrderId === order.id}
-                          title="Remove order"
+                          title={t('physicianEvaluation.ordersDocs.removeOrderTooltip')}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             width: 22, height: 22, borderRadius: 6, border: 'none',
@@ -1521,14 +1548,14 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
               {/* ── Attached Documents (MRI scans, reports, etc.) ── */}
               <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
-                <FileText size={13} /> Attached Documents
+                <FileText size={13} /> {t('physicianEvaluation.ordersDocs.attachedDocuments')}
               </div>
               {!currentEvaluationId ? (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Save the evaluation (Complete Visit) before attaching documents.</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('physicianEvaluation.ordersDocs.saveBeforeAttaching')}</p>
               ) : (
                 <>
                   {currentEvaluationDocuments.length === 0 ? (
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>No documents attached yet.</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{t('physicianEvaluation.ordersDocs.noDocumentsAttached')}</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                       {currentEvaluationDocuments.map((doc) => (
@@ -1545,7 +1572,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                           <button
                             type="button"
                             onClick={() => handleDeleteDocument(doc.id)}
-                            title="Remove document"
+                            title={t('physicianEvaluation.ordersDocs.removeDocumentTooltip')}
                             style={{
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               width: 22, height: 22, borderRadius: 6, border: 'none',
@@ -1559,7 +1586,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                     </div>
                   )}
                   <label className="btn btn-outline btn-sm" style={{ display: 'inline-flex', cursor: uploadingDoc ? 'not-allowed' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
-                    {uploadingDoc ? 'Uploading…' : '+ Attach Document (JPG/PNG/PDF)'}
+                    {uploadingDoc ? t('physicianEvaluation.ordersDocs.uploading') : t('physicianEvaluation.ordersDocs.attachDocument')}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,application/pdf"
@@ -1577,7 +1604,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
                   <span style={{ fontSize: 16 }}>📅</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Follow-Up</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('physicianEvaluation.ordersDocs.followUp')}</span>
                 </div>
                 {latestTreatment?.followUpDate ? (
                   <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1588,7 +1615,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                     <CalendarCheck size={22} style={{ color: 'var(--primary)', opacity: 0.7 }} />
                   </div>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No follow-up scheduled yet.</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('physicianEvaluation.ordersDocs.noFollowUpScheduled')}</p>
                 )}
               </div>
 
@@ -1602,36 +1629,36 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
             SECTION 3 — Quick Actions
         ══════════════════════════════════════════════════════════════ */}
         <div className="pe-quick-actions">
-          <span className="pe-qa-label">Quick Actions</span>
+          <span className="pe-qa-label">{t('physicianEvaluation.quickActions.label')}</span>
           <div className="pe-qa-buttons">
             <button className="pe-qa-btn pe-qa-note" onClick={() => setShowNoteModal(true)}>
               <FilePlus size={18} />
-              <span>New Note</span>
+              <span>{t('physicianEvaluation.quickActions.newNote')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-rx" onClick={() => setShowMedModal(true)}>
               <ClipboardList size={18} />
-              <span>Order Prescription</span>
+              <span>{t('physicianEvaluation.quickActions.orderPrescription')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-note" onClick={() => setShowOutcomeModal(true)}>
               <TrendingUp size={18} />
-              <span>Record Outcome</span>
+              <span>{t('physicianEvaluation.quickActions.recordOutcome')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-print" onClick={() => setShowReview(true)}>
               <Printer size={18} />
-              <span>Review & Print</span>
+              <span>{t('physicianEvaluation.quickActions.reviewPrint')}</span>
             </button>
             <button
               className="pe-qa-btn pe-qa-send"
               disabled={!latestEvaluation || sendingToPatient || latestEvaluation?.sentToPatient}
-              title={!latestEvaluation ? 'Complete an evaluation first' : undefined}
+              title={!latestEvaluation ? t('physicianEvaluation.quickActions.completeEvaluationFirst') : undefined}
               onClick={() => latestEvaluation && handleSendToPatient(latestEvaluation.id)}
             >
               {latestEvaluation?.sentToPatient ? <Check size={18} /> : <Send size={18} />}
-              <span>{latestEvaluation?.sentToPatient ? 'Sent to Patient' : 'Send to Patient'}</span>
+              <span>{latestEvaluation?.sentToPatient ? t('physicianEvaluation.quickActions.sentToPatient') : t('physicianEvaluation.quickActions.sendToPatient')}</span>
             </button>
             <button className="pe-qa-btn pe-qa-complete" onClick={handleSaveAll}>
               <UserCheck size={18} />
-              <span>Complete Visit</span>
+              <span>{t('physicianEvaluation.quickActions.completeVisit')}</span>
             </button>
           </div>
         </div>
@@ -1665,74 +1692,74 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
 
       {/* ── Add Medication / Order Prescription modal ── */}
       {showMedModal && (
-        <MiniModal title="Order Prescription" onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
+        <MiniModal title={t('physicianEvaluation.modals.orderPrescriptionTitle')} onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
           <div className="form-group">
-            <label className="form-label">Medication Name</label>
-            <input className="form-control" placeholder="e.g. Diclofenac 75mg" value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.medicationName')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.medicationNamePlaceholder')} value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Dose</label>
-            <input className="form-control" placeholder="e.g. 1 tab twice daily" value={medForm.dose} onChange={(e) => setMedForm({ ...medForm, dose: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.dose')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.dosePlaceholder')} value={medForm.dose} onChange={(e) => setMedForm({ ...medForm, dose: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Duration</label>
-            <input className="form-control" placeholder="e.g. 7 days" value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.common.duration')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.durationPlaceholderRx')} value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} />
           </div>
         </MiniModal>
       )}
 
       {/* ── New Note modal ── */}
       {showNoteModal && (
-        <MiniModal title="New Note" onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
+        <MiniModal title={t('physicianEvaluation.modals.newNoteTitle')} onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
           <div className="form-group">
-            <label className="form-label">Note</label>
-            <textarea className="form-control" rows={5} placeholder="Add a quick note — appended to the Plan section…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+            <label className="form-label">{t('physicianEvaluation.modals.noteLabel')}</label>
+            <textarea className="form-control" rows={5} placeholder={t('physicianEvaluation.modals.notePlaceholder')} value={noteText} onChange={(e) => setNoteText(e.target.value)} />
           </div>
         </MiniModal>
       )}
 
       {showOutcomeModal && (
-        <MiniModal title="Record Treatment Outcome" onClose={() => setShowOutcomeModal(false)} onSubmit={handleSaveOutcome}>
+        <MiniModal title={t('physicianEvaluation.modals.recordTreatmentOutcomeTitle')} onClose={() => setShowOutcomeModal(false)} onSubmit={handleSaveOutcome}>
           <p className="text-muted" style={{ fontSize: 12, marginTop: 0 }}>
-            Record the patient response after treatment. This supports longitudinal research and does not change the original treatment order.
+            {t('physicianEvaluation.modals.outcomeDescription')}
           </p>
           <div className="form-group">
-            <label className="form-label">Treatment</label>
-            <input className="form-control" value={latestTreatment ? `${latestTreatment.type}${latestTreatment.details ? ` — ${latestTreatment.details}` : ''}` : 'No treatment selected'} readOnly />
+            <label className="form-label">{t('physicianEvaluation.common.treatment')}</label>
+            <input className="form-control" value={latestTreatment ? `${latestTreatment.type}${latestTreatment.details ? ` — ${latestTreatment.details}` : ''}` : t('physicianEvaluation.modals.noTreatmentSelected')} readOnly />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Outcome date</label>
+              <label className="form-label">{t('physicianEvaluation.modals.outcomeDate')}</label>
               <input className="form-control" type="date" value={outcomeForm.outcomeDate} onChange={(e) => setOutcomeForm({ ...outcomeForm, outcomeDate: e.target.value })} />
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Follow-up score</label>
-              <input className="form-control" type="number" min="0" step="0.1" placeholder="Optional" value={outcomeForm.followupScore} onChange={(e) => setOutcomeForm({ ...outcomeForm, followupScore: e.target.value })} />
+              <label className="form-label">{t('physicianEvaluation.modals.followupScore')}</label>
+              <input className="form-control" type="number" min="0" step="0.1" placeholder={t('common.optional')} value={outcomeForm.followupScore} onChange={(e) => setOutcomeForm({ ...outcomeForm, followupScore: e.target.value })} />
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Patient response</label>
+            <label className="form-label">{t('physicianEvaluation.modals.patientResponse')}</label>
             <select className="form-control" value={outcomeForm.response} onChange={(e) => setOutcomeForm({ ...outcomeForm, response: e.target.value })}>
-              <option value="improved">Improved</option>
-              <option value="unchanged">Unchanged</option>
-              <option value="worse">Worse</option>
+              <option value="improved">{t('physicianEvaluation.modals.improved')}</option>
+              <option value="unchanged">{t('physicianEvaluation.modals.unchanged')}</option>
+              <option value="worse">{t('physicianEvaluation.modals.worse')}</option>
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Adherence</label>
-            <input className="form-control" placeholder="e.g. Completed physiotherapy as planned" value={outcomeForm.adherence} onChange={(e) => setOutcomeForm({ ...outcomeForm, adherence: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.adherence')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.adherencePlaceholder')} value={outcomeForm.adherence} onChange={(e) => setOutcomeForm({ ...outcomeForm, adherence: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Adverse events</label>
-            <input className="form-control" placeholder="None, or describe" value={outcomeForm.adverseEvents} onChange={(e) => setOutcomeForm({ ...outcomeForm, adverseEvents: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.adverseEvents')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.adverseEventsPlaceholder')} value={outcomeForm.adverseEvents} onChange={(e) => setOutcomeForm({ ...outcomeForm, adverseEvents: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Escalation</label>
-            <input className="form-control" placeholder="e.g. Referred for MRI or surgery review" value={outcomeForm.escalation} onChange={(e) => setOutcomeForm({ ...outcomeForm, escalation: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.escalation')}</label>
+            <input className="form-control" placeholder={t('physicianEvaluation.modals.escalationPlaceholder')} value={outcomeForm.escalation} onChange={(e) => setOutcomeForm({ ...outcomeForm, escalation: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Clinical note</label>
-            <textarea className="form-control" rows={3} placeholder="Additional follow-up context" value={outcomeForm.clinicianNote} onChange={(e) => setOutcomeForm({ ...outcomeForm, clinicianNote: e.target.value })} />
+            <label className="form-label">{t('physicianEvaluation.modals.clinicalNote')}</label>
+            <textarea className="form-control" rows={3} placeholder={t('physicianEvaluation.modals.clinicalNotePlaceholder')} value={outcomeForm.clinicianNote} onChange={(e) => setOutcomeForm({ ...outcomeForm, clinicianNote: e.target.value })} />
           </div>
         </MiniModal>
       )}

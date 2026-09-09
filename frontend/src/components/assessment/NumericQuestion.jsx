@@ -1,6 +1,8 @@
 import { Minus, Plus } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function NumericQuestion({ question, value, onChange, error }) {
+  const { t } = useLanguage();
   const min = question.min ?? 0;
   const max = question.max ?? 100;
   const step = question.step ?? 1;
@@ -33,11 +35,11 @@ export default function NumericQuestion({ question, value, onChange, error }) {
             ))}
           </div>
           <div className="nq-scale-labels">
-            <span>No Pain</span>
-            <span>Worst Pain</span>
+            <span>{t('assessment.numeric.noPain')}</span>
+            <span>{t('assessment.numeric.worstPain')}</span>
           </div>
           <div className="nq-current">
-            Selected: <strong>{current}</strong>/10
+            {t('assessment.numeric.selectedPrefix')} <strong>{current}</strong>{t('assessment.numeric.selectedSuffix')}
           </div>
         </>
       ) : (

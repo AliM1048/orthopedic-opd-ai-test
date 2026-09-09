@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Search, PlayCircle, XCircle, Users2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 
 const successToast = Swal.mixin({
   toast: true, position: 'top-end', showConfirmButton: false, timer: 1800, timerProgressBar: true,
@@ -11,12 +12,12 @@ const successToast = Swal.mixin({
 const notifySuccess = (title) => successToast.fire({ icon: 'success', title });
 const notifyError = (title) => successToast.fire({ icon: 'error', title, timer: 3000 });
 
-const STATUS_META = {
-  assigned_to_clerk: { label: 'Assigned', badgeClass: 'badge-completed' },
-  overdue:           { label: 'Overdue',  badgeClass: 'badge-danger' },
+const STATUS_META_KEYS = {
+  assigned_to_clerk: { labelKey: 'clerkTasks.statusAssigned', badgeClass: 'badge-completed' },
+  overdue:           { labelKey: 'clerkTasks.statusOverdue',  badgeClass: 'badge-danger' },
 };
 
-const RESPONDENT_LABEL = { patient: 'Patient', parent_caregiver: 'Parent / Caregiver' };
+const RESPONDENT_LABEL_KEYS = { patient: 'clerkTasks.respondentPatient', parent_caregiver: 'clerkTasks.respondentParentCaregiver' };
 
 // Clerk-assisted PROM queue — the clerk records only the patient's answers
 // (no history re-taken) via the exact same question flow the nurse uses for
@@ -24,6 +25,7 @@ const RESPONDENT_LABEL = { patient: 'Patient', parent_caregiver: 'Parent / Careg
 // backend/routers/prom_assignments.py for the full workflow this closes out.
 export default function ClerkTasks() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -56,17 +58,17 @@ export default function ClerkTasks() {
   const handleDecline = async (task) => {
     const { value: reason } = await Swal.fire({
       icon: 'warning',
-      title: 'Decline this PROM task?',
+      title: t('clerkTasks.declineDialogTitle'),
       input: 'text',
-      inputPlaceholder: 'Reason (optional)',
+      inputPlaceholder: t('clerkTasks.declineReasonPlaceholder'),
       showCancelButton: true,
-      confirmButtonText: 'Decline',
+      confirmButtonText: t('clerkTasks.decline'),
       confirmButtonColor: 'var(--danger)',
     });
     if (reason === undefined) return; // cancelled
     api.patch(`/api/prom-assignments/${task.id}`, { status: 'declined', deferReason: reason || null })
-      .then(() => { notifySuccess('Task declined'); reload(); })
-      .catch(() => notifyError('Failed to update'));
+      .then(() => { notifySuccess(t('clerkTasks.taskDeclined')); reload(); })
+      .catch(() => notifyError(t('clerkTasks.updateFailed')));
   };
 
   const handleStart = (task) => {
@@ -77,8 +79,8 @@ export default function ClerkTasks() {
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <h1>Clerk Tasks</h1>
-          <p>PROM questionnaires assigned by a physician — record the patient&rsquo;s answers only, no history needed</p>
+          <h1>{t('clerkTasks.title')}</h1>
+          <p>{t('clerkTasks.subtitle')}</p>
         </div>
       </div>
 
@@ -86,11 +88,11 @@ export default function ClerkTasks() {
         <div className="stat-grid">
           <div className="stat-card">
             <div className="stat-icon blue"><ClipboardList size={20} /></div>
-            <div><div className="stat-value">{tasks.length}</div><div className="stat-label">Total Tasks</div></div>
+            <div><div className="stat-value">{tasks.length}</div><div className="stat-label">{t('clerkTasks.totalTasks')}</div></div>
           </div>
           <div className="stat-card">
             <div className="stat-icon red"><Users2 size={20} /></div>
-            <div><div className="stat-value">{tasks.filter((t) => t.status === 'overdue').length}</div><div className="stat-label">Overdue</div></div>
+            <div><div className="stat-value">{tasks.filter((task) => task.status === 'overdue').length}</div><div className="stat-label">{t('clerkTasks.statusOverdue')}</div></div>
           </div>
         </div>
 
@@ -98,33 +100,34 @@ export default function ClerkTasks() {
           <div className="filters-row">
             <div className="search-bar">
               <Search size={16} color="var(--text-muted)" />
-              <input placeholder="Search by patient or MRN…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder={t('clerkTasks.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
 
           {loading ? (
-            <p className="text-muted">Loading…</p>
+            <p className="text-muted">{t('common.loading')}</p>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <p>No PROM tasks assigned right now.</p>
+              <p>{t('clerkTasks.emptyState')}</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Patient</th>
-                    <th>PROM</th>
-                    <th>Respondent</th>
-                    <th>Assigned</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>{t('common.patient')}</th>
+                    <th>{t('clerkTasks.colProm')}</th>
+                    <th>{t('clerkTasks.colRespondent')}</th>
+                    <th>{t('clerkTasks.colAssigned')}</th>
+                    <th>{t('common.status')}</th>
+                    <th>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((task) => {
-                    const meta = STATUS_META[task.status] || { label: task.status, badgeClass: 'badge-pending' };
+                    const metaKeys = STATUS_META_KEYS[task.status];
+                    const meta = metaKeys ? { label: t(metaKeys.labelKey), badgeClass: metaKeys.badgeClass } : { label: task.status, badgeClass: 'badge-pending' };
                     return (
                       <tr key={task.id}>
                         <td>
@@ -139,16 +142,16 @@ export default function ClerkTasks() {
                           </div>
                         </td>
                         <td>{task.bodyArea}{task.promName ? ` — ${task.promName}` : ''}</td>
-                        <td>{RESPONDENT_LABEL[task.respondentType] || task.respondentType}</td>
+                        <td>{RESPONDENT_LABEL_KEYS[task.respondentType] ? t(RESPONDENT_LABEL_KEYS[task.respondentType]) : task.respondentType}</td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{task.assignedAt ? task.assignedAt.slice(0, 10) : '—'}</td>
                         <td><span className={`badge ${meta.badgeClass}`}><span className="badge-dot" />{meta.label}</span></td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button type="button" className="btn btn-primary btn-sm" onClick={() => handleStart(task)}>
-                              <PlayCircle size={13} /> Start
+                              <PlayCircle size={13} /> {t('clerkTasks.start')}
                             </button>
                             <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDecline(task)}>
-                              <XCircle size={13} /> Decline
+                              <XCircle size={13} /> {t('clerkTasks.decline')}
                             </button>
                           </div>
                         </td>

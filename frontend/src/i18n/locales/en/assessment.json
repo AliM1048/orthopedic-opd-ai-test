@@ -1,0 +1,105 @@
+{
+  "page": {
+    "genericTitle": "Assessment",
+    "noPatientMessage": "No patient selected. Return to the dashboard first.",
+    "goToDashboard": "Go to Dashboard",
+    "titleFollowUp": "Follow-Up Assessment",
+    "titlePreVisit": "Pre-Visit Assessment",
+    "loadingQuestions": "Loading assessment questions…",
+    "draftSaved": "Draft saved",
+    "questionProgress": "Question {{current}} of {{total}}",
+    "defaultComplaint": "{{region}} pain"
+  },
+  "submitted": {
+    "completedTitle": "Assessment Completed",
+    "title": "Assessment Submitted",
+    "prefixFollowUp": "Follow-up assessment for",
+    "prefixPreVisit": "Pre-visit assessment for",
+    "hasBeenSaved": "has been saved.",
+    "viewProfile": "View Profile",
+    "dashboard": "Dashboard"
+  },
+  "question": {
+    "requiredError": "This question is required.",
+    "number": "Question {{current}}",
+    "of": "of {{total}}"
+  },
+  "header": {
+    "defaultTitle": "PROM Intake",
+    "complete": "Complete",
+    "questionsAnswered": "{{answered}} of {{total}} questions answered"
+  },
+  "navigation": {
+    "previous": "Previous",
+    "saving": "Saving…",
+    "saveDraft": "Save Draft",
+    "answerRequired": "Answer required questions",
+    "reviewSubmit": "Review & Submit",
+    "nextSection": "Next Section"
+  },
+  "sidebar": {
+    "sectionsTitle": "Sections"
+  },
+  "dropdown": {
+    "selectOption": "Select an option…"
+  },
+  "numeric": {
+    "noPain": "No Pain",
+    "worstPain": "Worst Pain",
+    "selectedPrefix": "Selected:",
+    "selectedSuffix": "/10"
+  },
+  "patientCard": {
+    "statusPendingCall": "Pending Call",
+    "statusAssessed": "Assessed",
+    "statusFollowUp": "Follow-Up",
+    "statusCompleted": "Completed"
+  },
+  "regionPicker": {
+    "title": "Select Anatomical Region",
+    "subtitle": "Choose the body area for {{name}} — the matching PROM questionnaire will load automatically.",
+    "thisPatient": "this patient",
+    "loadingRegions": "Loading regions…",
+    "loadingEllipsis": "Loading…",
+    "continue": "Continue"
+  },
+  "sectionStatus": {
+    "meta": "{{answered}}/{{count}} questions"
+  },
+  "summary": {
+    "severityLow": "Low",
+    "severityModerate": "Moderate",
+    "severityHigh": "High",
+    "severitySevere": "Severe",
+    "quickDashScore": "QuickDASH: {{score}}/100 — {{severity}}",
+    "score": "Score: {{score}}/{{max}}",
+    "complete": "Complete",
+    "incomplete": "Incomplete",
+    "notAnswered": "⚠ Not answered",
+    "notProvided": "— Not provided",
+    "backToAssessment": "Back to Assessment",
+    "reviewAndSubmit": "Review & Submit",
+    "requiredAnswered": "{{answered}}/{{total}} required answered",
+    "completeRequiredWarning": "Please complete all required questions before submitting.",
+    "submitError": "Couldn't save this assessment — check your connection and try again. Your answers are still here.",
+    "followUp": "Follow-Up",
+    "initialVisit": "Initial Visit",
+    "submittedPrefix": "Submitted:",
+    "editAnswers": "Edit Answers",
+    "submitting": "Submitting…",
+    "submitAssessment": "Submit Assessment"
+  },
+  "visitCard": {
+    "visitInformation": "Visit Information",
+    "visitType": "Visit Type",
+    "followUp": "Follow-Up",
+    "initialVisit": "Initial Visit",
+    "bodyArea": "Body Area",
+    "date": "Date",
+    "time": "Time",
+    "chiefComplaint": "Chief Complaint",
+    "edit": "Edit",
+    "complaintPlaceholder": "Describe chief complaint…",
+    "notSpecified": "Not specified"
+  }
+}

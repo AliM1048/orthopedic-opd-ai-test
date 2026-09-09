@@ -1,0 +1,8 @@
+{
+  "title": "Surgeries",
+  "subtitle": "Patients with a scheduled or upcoming surgery",
+  "emptyState": "No scheduled surgeries.",
+  "mrn": "MRN",
+  "surgeryDate": "Surgery Date",
+  "details": "Details"
+}

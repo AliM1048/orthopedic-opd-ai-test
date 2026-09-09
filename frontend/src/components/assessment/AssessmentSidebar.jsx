@@ -1,4 +1,5 @@
 import SectionStatusItem from './SectionStatusItem';
+import { useLanguage } from '../../hooks/useLanguage';
 
 function getSectionStatus(section, answers) {
   const required = section.questions.filter(q => q.required);
@@ -25,9 +26,10 @@ function countAnswered(section, answers) {
 }
 
 export default function AssessmentSidebar({ sections, currentSectionId, answers, onSelectSection }) {
+  const { t } = useLanguage();
   return (
     <div className="asb-panel">
-      <div className="asb-title">Sections</div>
+      <div className="asb-title">{t('assessment.sidebar.sectionsTitle')}</div>
       <div className="asb-list">
         {sections.map((section) => {
           const status = getSectionStatus(section, answers);

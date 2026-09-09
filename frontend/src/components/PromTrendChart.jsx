@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Scissors, Syringe, Activity as ActivityIcon, AlertTriangle } from 'lucide-react';
 import api from '../api';
+import { useLanguage } from '../hooks/useLanguage';
 
 const EVENT_META = {
   surgery:        { icon: Scissors,     color: 'var(--danger)' },
@@ -22,6 +23,7 @@ const PAD_B = 26;
  * assessment close enough to it renders as "Missing" — see
  * backend/routers/prom_trend.py, which never fabricates a value. */
 export default function PromTrendChart({ patientId, scoreDirection: fallbackDirection }) {
+  const { t } = useLanguage();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddInjury, setShowAddInjury] = useState(false);
@@ -43,14 +45,14 @@ export default function PromTrendChart({ patientId, scoreDirection: fallbackDire
       .catch(() => {});
   };
 
-  if (loading) return <p className="pe-empty-note">Loading trend…</p>;
+  if (loading) return <p className="pe-empty-note">{t('components.promTrendChart.loadingTrend')}</p>;
 
   const points = data?.points || [];
   const known = points.filter((p) => p.score !== null);
   if (known.length === 0) {
     return (
       <div>
-        <p className="pe-empty-note">Not enough visit history yet — needs at least one scored assessment to plot.</p>
+        <p className="pe-empty-note">{t('components.promTrendChart.notEnoughHistory')}</p>
       </div>
     );
   }
@@ -73,7 +75,7 @@ export default function PromTrendChart({ patientId, scoreDirection: fallbackDire
     <div>
       {improvement !== null && improvement !== undefined && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Change from baseline</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('components.promTrendChart.changeFromBaseline')}</span>
           <span style={{
             fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
             background: improving ? 'var(--success-light)' : 'var(--danger-light)',
@@ -116,7 +118,7 @@ export default function PromTrendChart({ patientId, scoreDirection: fallbackDire
                   <circle cx={x} cy={CHART_H - PAD_B - 4} r="2.5" fill="var(--border-dark)" />
                 )}
                 <text x={x} y={CHART_H + 16} fontSize="9.5" fill="var(--text-muted)" textAnchor="middle">{p.label}</text>
-                {p.score === null && <text x={x} y={CHART_H + 27} fontSize="8.5" fill="var(--text-muted)" textAnchor="middle" fontStyle="italic">Missing</text>}
+                {p.score === null && <text x={x} y={CHART_H + 27} fontSize="8.5" fill="var(--text-muted)" textAnchor="middle" fontStyle="italic">{t('components.promTrendChart.missing')}</text>}
               </g>
             );
           })}
@@ -141,12 +143,12 @@ export default function PromTrendChart({ patientId, scoreDirection: fallbackDire
         {showAddInjury ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="date" className="form-control" style={{ maxWidth: 160, padding: '5px 8px', fontSize: 12 }} value={injuryDate} onChange={(e) => setInjuryDate(e.target.value)} />
-            <button className="btn btn-primary btn-sm" onClick={handleAddInjury} disabled={!injuryDate}>Save</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowAddInjury(false)}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={handleAddInjury} disabled={!injuryDate}>{t('components.promTrendChart.save')}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAddInjury(false)}>{t('components.promTrendChart.cancel')}</button>
           </div>
         ) : (
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowAddInjury(true)}>
-            <Plus size={13} /> Log New Injury
+            <Plus size={13} /> {t('components.promTrendChart.logNewInjury')}
           </button>
         )}
       </div>

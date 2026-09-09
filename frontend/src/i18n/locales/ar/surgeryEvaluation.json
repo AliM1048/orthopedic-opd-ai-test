@@ -1,0 +1,130 @@
+{
+  "title": "تقييم الجراحة",
+  "noPatientSelected": "لم يتم اختيار مريض.",
+  "backToSurgeries": "العودة إلى الجراحات",
+  "allergiesLabel": "الحساسية",
+  "noAllergiesOnFile": "لا يوجد على الملف",
+  "ordersFollowUpHeading": "الطلبات والمتابعة",
+  "postOpDiagnosticTestsLabel": "الفحوصات التشخيصية بعد الجراحة",
+  "postOpTreatmentPlanLabel": "خطة العلاج بعد الجراحة",
+  "noTreatmentsAddedYet": "لم تتم إضافة أي علاجات بعد.",
+  "selectTreatmentTypePlaceholder": "اختر نوع العلاج…",
+  "removeTreatmentTooltip": "إزالة",
+  "removeOrderTooltip": "إزالة الطلب",
+  "durationPlaceholder": "المدة (مثال: 6 أسابيع)",
+  "detailsInstructionsPlaceholder": "التفاصيل / التعليمات",
+  "addTreatmentButton": "+ إضافة علاج",
+  "followUpHeading": "المتابعة",
+  "noFollowUpScheduled": "لا توجد متابعة مجدولة بعد.",
+
+  "patientStrip": {
+    "genderAgeBadge": "{{gender}} · {{age}} سنة",
+    "mrnBodyBloodLine": "رقم الملف {{mrn}} · {{bodyArea}} · فصيلة الدم {{bloodType}}"
+  },
+
+  "soap": {
+    "procedurePerformedLabel": "الإجراء المُنفَّذ",
+    "procedurePerformedPlaceholder": "مثال: إصلاح الغضروف الهلالي بالمنظار، الركبة اليمنى.",
+    "findingsLabel": "النتائج",
+    "findingsPlaceholder": "النتائج أثناء العملية — حالة الأنسجة، مدى الضرر، إلخ.",
+    "postoperativePlanLabel": "خطة ما بعد العملية",
+    "postoperativePlanPlaceholder": "خطة التعافي — إدارة الألم، حالة تحمّل الوزن، إعادة التأهيل، المتابعة…"
+  },
+
+  "dictation": {
+    "listeningPlaceholder": "جارٍ الاستماع…",
+    "rawTranscriptHeading": "النص المُفرَّغ الأصلي",
+    "transcriptHelpText": "راجع هذا النص مقارنةً بما قيل فعليًا — الأقسام أدناه هي القراءة المنظَّمة والمصححة نحويًا التي أعدّها الذكاء الاصطناعي، ويمكن تعديلها قبل النقر على إتمام الزيارة.",
+    "stopRecording": "إيقاف التسجيل",
+    "startRecording": "بدء التسجيل"
+  },
+
+  "orders": {
+    "treatmentOrderTitle": "طلب {{type}}",
+    "diagnosticRequestTitle": "طلب {{type}}",
+    "diagnosticRequestPrintTitle": "طلب فحص تشخيصي — {{type}}",
+    "durationSummary": "المدة: {{duration}}",
+    "pendingResultsText": "بانتظار النتائج",
+    "pendingText": "قيد الانتظار",
+    "orderedByLabel": "طلب بواسطة",
+    "treatmentLabel": "العلاج",
+    "detailsLabel": "التفاصيل",
+    "durationFieldLabel": "المدة",
+    "followUpDateLabel": "تاريخ المتابعة",
+    "examinationLabel": "الفحص",
+    "resultLabel": "النتيجة",
+    "sectionTitle": "الطلبات",
+    "noOrdersRecorded": "لا توجد طلبات مسجَّلة.",
+    "noOrdersRecordedYet": "لا توجد طلبات مسجَّلة بعد.",
+    "recordedOrdersHeading": "الطلبات المسجَّلة",
+    "colOrder": "الطلب",
+    "colDetails": "التفاصيل",
+    "printOrderTooltip": "طباعة {{title}}",
+    "removeConfirmTitle": "إزالة {{title}}؟",
+    "removeConfirmText": "سيتم حذف هذا الطلب نهائيًا من سجل المريض.",
+    "removeConfirmButton": "إزالة"
+  },
+
+  "status": {
+    "pending": "قيد الانتظار",
+    "active": "نشط",
+    "completed": "مكتمل",
+    "scheduled": "مجدول"
+  },
+
+  "review": {
+    "backToEvaluation": "العودة إلى التقييم",
+    "title": "المراجعة والطباعة",
+    "printFullSummary": "طباعة الملخص الكامل",
+    "insuranceCopy": "نسخة التأمين",
+    "operativeNoteHeader": "العيادات الخارجية لجراحة العظام — ملاحظة العملية الجراحية",
+    "procedureLabel": "الإجراء:",
+    "surgeonLabel": "الجرّاح:",
+    "dateColonLabel": "التاريخ:",
+    "footerOrgLine": "العيادات الخارجية لجراحة العظام — وثيقة سريرية رسمية",
+    "footerComputerGenerated": "هذه الوثيقة مُعدَّة آليًا بواسطة الحاسوب.",
+    "attendingSurgeon": "الجرّاح المعالج"
+  },
+
+  "savedState": {
+    "title": "تم تسجيل ملاحظة العملية",
+    "message": "تم حفظ تقييم الجراحة لـ {{name}}.",
+    "viewProfile": "عرض الملف الشخصي"
+  },
+
+  "quickActions": {
+    "label": "إجراءات سريعة",
+    "newNote": "ملاحظة جديدة",
+    "orderPrescription": "طلب وصفة طبية",
+    "completeEvaluationFirstTooltip": "أكمل تقييمًا أولاً",
+    "sentToPatient": "تم الإرسال إلى المريض",
+    "sendToPatient": "إرسال إلى المريض",
+    "completeVisit": "إتمام الزيارة"
+  },
+
+  "medication": {
+    "nameLabel": "اسم الدواء",
+    "namePlaceholder": "مثال: ديكلوفيناك 75 ملغ",
+    "doseLabel": "الجرعة",
+    "dosePlaceholder": "مثال: قرص واحد مرتين يوميًا",
+    "durationLabel": "المدة",
+    "durationPlaceholder": "مثال: 7 أيام"
+  },
+
+  "quickNote": {
+    "label": "ملاحظة",
+    "placeholder": "أضف ملاحظة سريعة — تُضاف إلى قسم خطة ما بعد العملية…"
+  },
+
+  "toast": {
+    "saveAllFailed": "فشل حفظ بعض التغييرات — يُرجى المحاولة مرة أخرى",
+    "prescriptionSaved": "تم حفظ الوصفة الطبية",
+    "prescriptionSaveFailed": "فشل حفظ الوصفة الطبية",
+    "noteSaved": "تم حفظ الملاحظة",
+    "noteSaveFailed": "فشل حفظ الملاحظة",
+    "sentToPatient": "تم الإرسال إلى المريض",
+    "sendToPatientFailed": "فشل الإرسال إلى المريض",
+    "orderRemoved": "تمت إزالة الطلب",
+    "orderRemoveFailed": "فشلت إزالة الطلب"
+  }
+}

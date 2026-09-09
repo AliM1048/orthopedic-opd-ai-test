@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import { useLookup } from '../../hooks/useLookupData';
+import { useLanguage } from '../../hooks/useLanguage';
 
 export default function RegionPicker({ patient, onConfirm }) {
+  const { t } = useLanguage();
   const { bodyAreas, loaded } = useLookup();
   const [selected, setSelected] = useState(null);
   const [confirming, setConfirming] = useState(false);
@@ -27,12 +29,12 @@ export default function RegionPicker({ patient, onConfirm }) {
     <div className="page-body">
       <div className="rp-wrapper">
         <div className="rp-header">
-          <h2>Select Anatomical Region</h2>
-          <p>Choose the body area for {patient?.name || 'this patient'} — the matching PROM questionnaire will load automatically.</p>
+          <h2>{t('assessment.regionPicker.title')}</h2>
+          <p>{t('assessment.regionPicker.subtitle', { name: patient?.name || t('assessment.regionPicker.thisPatient') })}</p>
         </div>
 
         {!loaded ? (
-          <div className="empty-state"><p>Loading regions…</p></div>
+          <div className="empty-state"><p>{t('assessment.regionPicker.loadingRegions')}</p></div>
         ) : (
           <div className="rp-grid">
             {bodyAreas.map((r) => {
@@ -60,7 +62,7 @@ export default function RegionPicker({ patient, onConfirm }) {
             disabled={!selected || confirming}
             onClick={handleConfirm}
           >
-            {confirming ? 'Loading…' : 'Continue'} <ArrowRight size={16} />
+            {confirming ? t('assessment.regionPicker.loadingEllipsis') : t('assessment.regionPicker.continue')} <ArrowRight size={16} />
           </button>
         </div>
       </div>

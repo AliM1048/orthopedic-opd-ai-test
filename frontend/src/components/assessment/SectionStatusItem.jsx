@@ -1,4 +1,5 @@
 import { Check, Circle, Clock, Minus } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 const STATUS_META = {
   completed:   { label: 'Completed',   icon: Check,   cls: 'sis-completed'  },
@@ -8,6 +9,7 @@ const STATUS_META = {
 };
 
 export default function SectionStatusItem({ section, status, isActive, questionCount, answeredCount, onClick }) {
+  const { t } = useLanguage();
   const meta = STATUS_META[status] || STATUS_META['not-started'];
   const Icon = meta.icon;
 
@@ -22,7 +24,7 @@ export default function SectionStatusItem({ section, status, isActive, questionC
       <div className="sis-content">
         <div className="sis-title">{section.title}</div>
         <div className="sis-meta">
-          {answeredCount}/{questionCount} questions
+          {t('assessment.sectionStatus.meta', { answered: answeredCount, count: questionCount })}
         </div>
       </div>
       {isActive && <div className="sis-active-dot" />}
