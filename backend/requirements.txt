@@ -3,6 +3,11 @@ uvicorn[standard]
 openai
 python-multipart
 python-dotenv
+# Python 3.13+ removed the stdlib `audioop` module (PEP 594) that pydub
+# depends on for decoding — this backport restores it. Without it, importing
+# pydub crashes the whole app at startup on any Python >= 3.13 (e.g. Render's
+# current default runtime).
+audioop-lts; python_version >= "3.13"
 pydub
 sqlalchemy
 psycopg2-binary
