@@ -597,6 +597,12 @@ input, textarea, select { font-family: inherit; outline: none; }
 }
 .data-table tbody tr:hover { background: var(--primary-light); }
 
+/* Wrap a .data-table in this to make it horizontally scrollable on narrow
+   screens without touching the table's own layout/appearance at all — the
+   table renders exactly as it always has, this just gives it a scrollable
+   box to sit in when it's wider than the screen. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 /* ── Buttons ── */
 .btn {
   display: inline-flex;
@@ -3578,14 +3584,6 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   .card { padding: 16px; }
   .card-header > div:first-child { min-width: 0; }
   .card-header .search-bar { flex-basis: 100%; }
-  /* Scrollable, not squished: display:block turns the <table> itself into a
-     scrollable box, while its thead/tbody/tr/td children keep their normal
-     table-part display roles (inherited, left unset here) so columns stay
-     aligned as one grid — forcing those to their own display:table (as this
-     rule used to) makes each thead/tbody/tr an independent table with no
-     shared column grid, which is what was rendering rows on top of each
-     other instead of scrolling. */
-  .data-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .modal { max-width: calc(100vw - 32px); }
   .modal-backdrop { padding: 16px; }
   .form-grid { grid-template-columns: 1fr !important; }

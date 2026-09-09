@@ -47,6 +47,7 @@ export default function AllPatients({ patients }) {
               <p>{t('allPatients.noPatientsFound')}</p>
             </div>
           ) : (
+            <div className="table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -81,6 +82,7 @@ export default function AllPatients({ patients }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

@@ -112,7 +112,7 @@ export default function ClerkTasks() {
               <p>{t('clerkTasks.emptyState')}</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
