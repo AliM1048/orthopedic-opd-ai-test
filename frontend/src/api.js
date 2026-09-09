@@ -1,10 +1,15 @@
 import axios from 'axios';
 
-// VITE_API_BASE_URL lets this be overridden when the page is loaded from a
-// different device than the one running the dev server — e.g. embedded in
+// VITE_API_BASE_URL lets this be overridden per environment — set it in
+// frontend/.env.production (or the host's env var config, e.g. Vercel/Netlify)
+// to point at the deployed backend (e.g. https://orthopedic-opd-ai-test-backend.onrender.com),
+// and leave it unset locally to fall back to localhost. Also covers loading
+// the page from a different device than the dev server — e.g. embedded in
 // the mobile app's WebView on a phone, where "localhost" would otherwise
-// mean the phone itself, not the dev machine.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// mean the phone itself, not the dev machine. Exported so every other file
+// that needs the backend origin (not just axios calls) uses the same value
+// instead of hardcoding it separately.
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE,

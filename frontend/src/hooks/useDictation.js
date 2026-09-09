@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import axios from 'axios';
-
-const API_BASE = 'http://localhost:8000';
+import { API_BASE } from '../api';
 
 // One-take dictation: records a single clip, then sends it to /dictate which
 // transcribes it and returns AI-structured fields ready to pre-fill the form.
