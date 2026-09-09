@@ -137,20 +137,21 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                 View All <ArrowRight size={14} />
               </button> */}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
               {dueCalls.slice(0, 4).map((call) => (
-                <div key={call.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                  <div className="patient-avatar" style={{ background: call.patientAvatar, width: 32, height: 32, fontSize: 12 }}>
+                <div key={call.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', width: 'max-content', minWidth: '100%' }}>
+                  <div className="patient-avatar" style={{ background: call.patientAvatar, width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>
                     {call.patientName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {call.intervalMonths ? t('nurseDashboard.monthsCheckIn', { months: call.intervalMonths }) : t('nurseDashboard.initialPreVisitQuestionnaire')} · {call.intervalMonths ? t('nurseDashboard.scheduledLabel') : t('nurseDashboard.appointmentLabel')} {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}
                     </div>
                   </div>
                   <button
                     className="btn btn-primary btn-sm"
+                    style={{ flexShrink: 0 }}
                     onClick={() => navigate(`/assessment?patient=${call.patient_id}${call.intervalMonths ? '&type=followup' : ''}`)}
                   >
                     {t('nurseDashboard.startCall')}
