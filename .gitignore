@@ -33,3 +33,7 @@ Thumbs.db
 # Logs
 *.log
 
+# Research model artifacts and local exports
+backend/model_artifacts/
+backend/research_exports/
+

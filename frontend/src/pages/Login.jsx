@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Activity, Sun, Moon } from 'lucide-react';
 import api from '../api';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../hooks/useLanguage';
+import LanguageSwitcher from '../components/common/LanguageSwitcher';
 
 export default function Login({ onLogin }) {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('nurse.sara@ortho.com');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
@@ -21,7 +24,7 @@ export default function Login({ onLogin }) {
       localStorage.setItem('user', JSON.stringify(user));
       if (onLogin) onLogin(access_token, user);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      setError(err.response?.data?.detail || t('login.loginFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -29,40 +32,43 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-page">
-      <button
-        type="button"
-        className="login-theme-toggle"
-        onClick={toggleTheme}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+      <div className="login-header-actions">
+        <LanguageSwitcher className="login-theme-toggle" />
+        <button
+          type="button"
+          className="login-theme-toggle"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? t('common.switchToLightMode') : t('common.switchToDarkMode')}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
       <div className="login-card">
         <div className="login-logo">
           <div className="login-logo-icon"><Activity size={24} /></div>
           <div>
-            <h1>OPD AI Unit</h1>
-            <p>Patient Management System</p>
+            <h1>{t('common.appName')}</h1>
+            <p>{t('login.systemName')}</p>
           </div>
         </div>
 
-        <h2 className="login-title">Welcome Back</h2>
-        <p className="login-sub">Sign in to access the orthopedic patient management system.</p>
+        <h2 className="login-title">{t('login.welcomeBack')}</h2>
+        <p className="login-sub">{t('login.subtitle')}</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Username</label>
+            <label className="form-label">{t('login.username')}</label>
             <input
               className="form-control"
               type="text"
-              placeholder="User"
+              placeholder={t('login.usernamePlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Password</label>
+            <label className="form-label">{t('login.password')}</label>
             <input
               className="form-control"
               type="password"
@@ -79,12 +85,12 @@ export default function Login({ onLogin }) {
           )}
 
           <button type="submit" className="btn btn-primary btn-lg w-full" style={{ justifyContent: 'center', marginTop: 8 }} disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign In'}
+            {submitting ? t('login.signingIn') : t('login.signIn')}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 20 }}>
-          Demo credentials are pre-filled — just sign in.
+          {t('login.demoCredentials')}
         </p>
       </div>
     </div>

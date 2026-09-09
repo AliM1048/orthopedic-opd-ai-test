@@ -1,0 +1,12 @@
+{
+  "systemName": "Patient Management System",
+  "welcomeBack": "Welcome Back",
+  "subtitle": "Sign in to access the orthopedic patient management system.",
+  "username": "Username",
+  "usernamePlaceholder": "User",
+  "password": "Password",
+  "signIn": "Sign In",
+  "signingIn": "Signing in…",
+  "loginFailed": "Login failed. Please check your credentials.",
+  "demoCredentials": "Demo credentials are pre-filled — just sign in."
+}

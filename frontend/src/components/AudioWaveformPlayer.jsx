@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Mic } from 'lucide-react';
+import { withAuthToken } from '../api';
 
 const BUCKET_COUNT = 100;
 
@@ -14,7 +15,7 @@ async function decodeAudio(audioUrl) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContextClass();
   try {
-    const response = await fetch(audioUrl);
+    const response = await fetch(withAuthToken(audioUrl));
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     const channelData = audioBuffer.getChannelData(0);
@@ -160,7 +161,7 @@ export default function AudioWaveformPlayer({
       {audioUrl && (
         <audio
           ref={audioRef}
-          src={audioUrl}
+          src={withAuthToken(audioUrl)}
           // Without this, the browser's cache treats this element's own GET
           // for the file as a plain (non-CORS) request — then decodeAudio()'s
           // fetch() of that same URL below gets served that cached response

@@ -3,9 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
          Zap, TrendingUp, Activity, FileText, Trash2, History, Search, ListChecks,
-         AlertTriangle, Clock3 } from 'lucide-react';
+         AlertTriangle, Clock3, BrainCircuit } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../api';
+import api, { withAuthToken } from '../api';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
 import { getOdiNdiInterpretation } from '../utils/scoring';
@@ -549,7 +549,7 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */
-export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent, onUploadDocument, onDeleteDocument }) {
+export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onCreateEncounter, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent, onUploadDocument, onDeleteDocument }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -570,15 +570,22 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   // inserting their own row, so one encounter doesn't fragment into several
   // partial evaluations (one with no diagnosis, one with no notes, etc.).
   const [currentEvaluationId, setCurrentEvaluationId] = useState(null);
+  const [encounterId, setEncounterId] = useState(null);
 
   /* ── Quick-action modal state ── */
   const [showMedModal, setShowMedModal] = useState(false);
   const [medForm, setMedForm] = useState({ name: '', dose: '', duration: '' });
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+  const [outcomeForm, setOutcomeForm] = useState({ response: 'improved', outcomeDate: todayIso(), followupScore: '', adherence: '', adverseEvents: '', escalation: '', clinicianNote: '' });
   const [sendingToPatient, setSendingToPatient] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState(null);
 
   // Seed the SOAP note from the most recent saved evaluation once per
   // patient, so reopening an existing evaluation is editable too — not just
@@ -620,6 +627,31 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
       .then((res) => setPromAssignments(res.data))
       .catch(() => setPromAssignments([]));
   }, [patientId]);
+
+  useEffect(() => {
+    if (!patientId) return;
+    api.get('/api/ai/status').then((res) => setAiStatus(res.data)).catch(() => setAiStatus({ available: false, message: 'AI assistant is unavailable.' }));
+  }, [patientId]);
+
+  const requestAiRecommendation = () => {
+    if (!patientId || aiLoading) return;
+    setAiLoading(true);
+    api.post(`/api/ai/patients/${patientId}/recommendation`, null, { params: { encounter_id: encounterId || undefined } })
+      .then((res) => setAiRecommendation(res.data))
+      .catch(() => setAiRecommendation({ available: false, warnings: ['The assistant could not generate a recommendation.'] }))
+      .finally(() => setAiLoading(false));
+  };
+
+  const recordAiFeedback = (action) => {
+    if (!aiRecommendation?.suggestionId) return;
+    const topTreatment = aiRecommendation.suggestions?.[0]?.treatment || null;
+    api.post(`/api/model-suggestions/${aiRecommendation.suggestionId}/feedback`, {
+      action,
+      finalTreatment: action === 'accepted' ? topTreatment : null,
+    })
+      .then(() => setAiFeedback(action))
+      .catch(() => setAiFeedback('error'));
+  };
 
   const latestPromAssignment = promAssignments[0] || null;
   const promAssignmentActive = latestPromAssignment && ['sent_pending', 'assigned_to_clerk', 'overdue'].includes(latestPromAssignment.status);
@@ -754,51 +786,102 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
   // aborts under the hood.
   const handleCancelDictation = () => { cancelRecording(); setShowDictationModal(false); setError(null); };
 
-  const handleSaveAll = () => {
+  // Every clinical record written for this visit (evaluation, diagnostic,
+  // treatment, outcome) must carry the same encounter_id so it shows up in
+  // the research export — see docs/research-steps.md Step 4. The backend
+  // dedupes create-encounter calls by patient+date+status=="open", so
+  // calling this more than once in a session just returns the same row.
+  const ensureEncounter = async () => {
+    if (encounterId) return encounterId;
+    if (!onCreateEncounter) return null;
+    const encounter = await onCreateEncounter(patientId, {
+      encounterDate: patient.appointmentDate || todayIso(),
+      encounterType: isNew ? 'initial' : 'follow_up',
+      bodyArea: patient.bodyArea,
+      previsitSource: latestAssessment?.completedBy || null,
+    });
+    setEncounterId(encounter.id);
+    return encounter.id;
+  };
+
+  const handleSaveAll = async () => {
     const { diagnosis, notes } = deriveLegacyFields(soap);
     if (!diagnosis && !notes) return;
+    const activeEncounterId = await ensureEncounter();
     const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
+
+    // Collect every write instead of firing them off unawaited — a failed
+    // diagnostic/treatment save used to vanish silently (visible only in this
+    // session's optimistic state, gone on refresh) while the UI still
+    // reported success. Now the whole visit save fails loudly instead.
+    const pendingWrites = [];
+
     if (currentEvaluationId && onUpdateEvaluation) {
-      onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap });
+      pendingWrites.push(onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap }));
     } else if (onAddEvaluation) {
       const newId = `ev${Date.now()}`;
-      onAddEvaluation(patientId, {
-        id: newId, date: todayIso(),
+      pendingWrites.push(Promise.resolve(onAddEvaluation(patientId, {
+        id: newId, date: todayIso(), encounter_id: activeEncounterId,
         physician: physicianName, notes, diagnosis, audioUrl, soapNote: soap,
-      });
-      setCurrentEvaluationId(newId);
+      })).then(() => setCurrentEvaluationId(newId)));
     }
     selectedTests.forEach((testId) => {
       const test = diagnosticTests.find((t) => t.id === testId);
-      if (test && onAddDiagnostic) onAddDiagnostic(patientId, {
-        id: `d${Date.now()}-${testId}`, type: test.name,
+      if (test && onAddDiagnostic) pendingWrites.push(onAddDiagnostic(patientId, {
+        id: `d${Date.now()}-${testId}`, encounter_id: activeEncounterId, type: test.name,
         date: todayIso(), status: 'pending', result: null,
-      });
+      }));
     });
     treatments.filter((t) => t.type).forEach((t) => {
       const opt = treatmentOptions.find((o) => o.id === t.type);
-      if (opt && onAddTreatment) onAddTreatment(patientId, {
-        id: `tr${Date.now()}-${t.type}`, type: opt.name,
+      if (opt && onAddTreatment) pendingWrites.push(onAddTreatment(patientId, {
+        id: `tr${Date.now()}-${t.type}`, encounter_id: activeEncounterId, type: opt.name,
         date: todayIso(), physician: physicianName,
         duration: t.duration || 'TBD', details: t.details?.trim() || '',
         followUpDate: t.followUpDate || null, status: 'active',
-      });
+      }));
     });
-    setSaved(true);
+
+    try {
+      await Promise.all(pendingWrites);
+      setSaved(true);
+    } catch {
+      notifyError('Some changes failed to save — please try again');
+    }
   };
 
   /* ── Quick-action handlers ── */
-  const handleSaveMedication = () => {
+  const handleSaveMedication = async () => {
     if (!medForm.name.trim() || !onAddTreatment) return;
     const details = medForm.dose.trim() ? `${medForm.name.trim()} — ${medForm.dose.trim()}` : medForm.name.trim();
+    const activeEncounterId = await ensureEncounter();
     Promise.resolve(onAddTreatment(patientId, {
-      id: uid(), type: 'Medication', date: todayIso(), physician: physicianName,
+      id: uid(), type: 'Medication', date: todayIso(), physician: physicianName, encounter_id: activeEncounterId,
       duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
     }))
       .then(() => notifySuccess('Prescription saved'))
       .catch(() => notifyError('Failed to save prescription'));
     setMedForm({ name: '', dose: '', duration: '' });
     setShowMedModal(false);
+  };
+
+  const handleSaveOutcome = async () => {
+    if (!outcomeForm.outcomeDate) return;
+    const activeEncounterId = await ensureEncounter();
+    api.post(`/api/patients/${patientId}/treatment-outcomes`, {
+      treatment_id: latestTreatment?.id || null,
+      encounter_id: activeEncounterId,
+      outcomeDate: outcomeForm.outcomeDate,
+      followupScore: outcomeForm.followupScore === '' ? null : Number(outcomeForm.followupScore),
+      response: outcomeForm.response,
+      adherence: outcomeForm.adherence.trim() || null,
+      adverseEvents: outcomeForm.adverseEvents.trim() || null,
+      escalation: outcomeForm.escalation.trim() || null,
+      clinicianNote: outcomeForm.clinicianNote.trim() || null,
+    })
+      .then(() => notifySuccess('Treatment outcome saved'))
+      .catch(() => notifyError('Failed to save treatment outcome'));
+    setShowOutcomeModal(false);
   };
 
   const handleSaveNote = () => {
@@ -1254,6 +1337,47 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
           {/* ── RIGHT COLUMN ─────────────────────────────────────────── */}
           <div className="pe-col pe-col-right">
 
+            <SCard title="AI Clinical Assistant" icon={BrainCircuit}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+                  Decision support only. Suggestions never prescribe or place orders automatically.
+                </p>
+                {!aiStatus?.available && !aiRecommendation?.available ? (
+                  <div style={{ padding: 10, borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 12 }}>
+                    {aiStatus?.message || 'Checking for a validated treatment model…'}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={requestAiRecommendation}
+                  disabled={aiLoading || !aiStatus?.available}
+                >
+                  <BrainCircuit size={14} /> {aiLoading ? 'Analyzing…' : 'Generate suggestions'}
+                </button>
+                {aiRecommendation?.available && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {aiRecommendation.suggestions?.map((item) => (
+                      <div key={item.treatment} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 'var(--radius)', background: 'var(--primary-light)' }}>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{item.treatment}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)' }}>{Math.round(item.confidence * 100)}%</span>
+                      </div>
+                    ))}
+                    {aiRecommendation.warnings?.map((warning) => <p key={warning} style={{ color: 'var(--warning-dark)', fontSize: 11, margin: 0 }}><AlertTriangle size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{warning}</p>)}
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Model: {aiRecommendation.modelVersion}</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => recordAiFeedback('accepted')} disabled={!!aiFeedback}>Accept</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('edited')} disabled={!!aiFeedback}>Edit in treatment plan</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('rejected')} disabled={!!aiFeedback}>Reject</button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => recordAiFeedback('insufficient')} disabled={!!aiFeedback}>Not enough information</button>
+                    </div>
+                    {aiFeedback && aiFeedback !== 'error' && <span style={{ color: 'var(--success)', fontSize: 11 }}>Feedback recorded: {aiFeedback}.</span>}
+                    {aiFeedback === 'error' && <span style={{ color: 'var(--danger)', fontSize: 11 }}>Feedback could not be recorded.</span>}
+                  </div>
+                )}
+              </div>
+            </SCard>
+
             {/* ─── Card: Orders & Documents ─────────────────────────── */}
             <SCard title="Orders & Documents" icon={ClipboardList} style={{ flex: 1 }}>
 
@@ -1411,7 +1535,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '8px 12px' }}>
                           <FileText size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                           <a
-                            href={`${API_BASE}/documents/${doc.filename}`}
+                            href={withAuthToken(`${API_BASE}/documents/${doc.filename}`)}
                             target="_blank"
                             rel="noreferrer"
                             style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -1488,6 +1612,10 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
               <ClipboardList size={18} />
               <span>Order Prescription</span>
             </button>
+            <button className="pe-qa-btn pe-qa-note" onClick={() => setShowOutcomeModal(true)}>
+              <TrendingUp size={18} />
+              <span>Record Outcome</span>
+            </button>
             <button className="pe-qa-btn pe-qa-print" onClick={() => setShowReview(true)}>
               <Printer size={18} />
               <span>Review & Print</span>
@@ -1559,6 +1687,52 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
           <div className="form-group">
             <label className="form-label">Note</label>
             <textarea className="form-control" rows={5} placeholder="Add a quick note — appended to the Plan section…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+          </div>
+        </MiniModal>
+      )}
+
+      {showOutcomeModal && (
+        <MiniModal title="Record Treatment Outcome" onClose={() => setShowOutcomeModal(false)} onSubmit={handleSaveOutcome}>
+          <p className="text-muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Record the patient response after treatment. This supports longitudinal research and does not change the original treatment order.
+          </p>
+          <div className="form-group">
+            <label className="form-label">Treatment</label>
+            <input className="form-control" value={latestTreatment ? `${latestTreatment.type}${latestTreatment.details ? ` — ${latestTreatment.details}` : ''}` : 'No treatment selected'} readOnly />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Outcome date</label>
+              <input className="form-control" type="date" value={outcomeForm.outcomeDate} onChange={(e) => setOutcomeForm({ ...outcomeForm, outcomeDate: e.target.value })} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Follow-up score</label>
+              <input className="form-control" type="number" min="0" step="0.1" placeholder="Optional" value={outcomeForm.followupScore} onChange={(e) => setOutcomeForm({ ...outcomeForm, followupScore: e.target.value })} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Patient response</label>
+            <select className="form-control" value={outcomeForm.response} onChange={(e) => setOutcomeForm({ ...outcomeForm, response: e.target.value })}>
+              <option value="improved">Improved</option>
+              <option value="unchanged">Unchanged</option>
+              <option value="worse">Worse</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Adherence</label>
+            <input className="form-control" placeholder="e.g. Completed physiotherapy as planned" value={outcomeForm.adherence} onChange={(e) => setOutcomeForm({ ...outcomeForm, adherence: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Adverse events</label>
+            <input className="form-control" placeholder="None, or describe" value={outcomeForm.adverseEvents} onChange={(e) => setOutcomeForm({ ...outcomeForm, adverseEvents: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Escalation</label>
+            <input className="form-control" placeholder="e.g. Referred for MRI or surgery review" value={outcomeForm.escalation} onChange={(e) => setOutcomeForm({ ...outcomeForm, escalation: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Clinical note</label>
+            <textarea className="form-control" rows={3} placeholder="Additional follow-up context" value={outcomeForm.clinicianNote} onChange={(e) => setOutcomeForm({ ...outcomeForm, clinicianNote: e.target.value })} />
           </div>
         </MiniModal>
       )}

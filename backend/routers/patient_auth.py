@@ -34,23 +34,35 @@ def _normalize_phone(phone: str) -> str:
     return re.sub(r"\D", "", phone or "")
 
 
-def _find_patient_by_phone(phone: str, db: Session) -> Patient | None:
+def _find_patients_by_phone(phone: str, db: Session) -> list[Patient]:
     """Patient.phone is stored with clinic-entered formatting (spaces,
     country code, etc.), so match on the trailing digits rather than an
-    exact string compare."""
+    exact string compare. Returns every match — a shared household/family
+    phone number can legitimately belong to more than one patient record,
+    and the caller must not silently guess which one to log in as."""
     digits = _normalize_phone(phone)
     if len(digits) < 7:
-        return None
+        return []
     suffix = digits[-9:]
-    for patient in db.query(Patient).all():
-        if _normalize_phone(patient.phone).endswith(suffix):
-            return patient
-    return None
+    return [p for p in db.query(Patient).all() if _normalize_phone(p.phone).endswith(suffix)]
+
+
+def _find_patient_by_phone(phone: str, db: Session) -> Patient | None:
+    matches = _find_patients_by_phone(phone, db)
+    if len(matches) != 1:
+        return None
+    return matches[0]
 
 
 @router.post("/request-otp", response_model=PatientRequestOtpResponse)
 def request_otp(body: PatientRequestOtp, db: Session = Depends(get_db)):
-    patient = _find_patient_by_phone(body.phone, db)
+    matches = _find_patients_by_phone(body.phone, db)
+    if len(matches) > 1:
+        # Refuse rather than guess which patient this phone belongs to — a
+        # shared family/household number must not risk logging one patient
+        # into a different patient's medical record.
+        raise HTTPException(status_code=409, detail="This phone number is linked to more than one patient record. Please contact the clinic to verify your identity.")
+    patient = matches[0] if matches else None
     if not patient:
         print(f"No patient found with this phone number: {body.phone}")
         raise HTTPException(status_code=404, detail="No patient found with this phone number")
@@ -112,7 +124,7 @@ def verify_otp(body: PatientVerifyOtp, db: Session = Depends(get_db)):
     return PatientLoginResponse(
         access_token=token,
         patient=PatientAuthProfile(
-            id=patient.id, name=patient.name, mrn=patient.mrn,
+            id=patient.id, name=patient.name or patient.mrn, mrn=patient.mrn,
             bodyArea=patient.bodyArea, phone=patient.phone,
         ),
     )

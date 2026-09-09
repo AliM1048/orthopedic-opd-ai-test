@@ -66,7 +66,7 @@ export function useDictation({ patientId, noteType = 'physician', onResult, onEr
       formData.append('language', detectedLanguageRef.current || '');
 
       const res = await axios.post(`${API_BASE}/transcribe/preview`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       if (res.data?.text) setLiveCaption(res.data.text);
       if (!detectedLanguageRef.current && res.data?.language) {
@@ -192,7 +192,7 @@ export function useDictation({ patientId, noteType = 'physician', onResult, onEr
       formData.append('language', detectedLanguageRef.current || '');
 
       const res = await axios.post(`${API_BASE}/dictate`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${localStorage.getItem('token')}` },
         signal: controller.signal,
       });
 

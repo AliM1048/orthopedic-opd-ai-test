@@ -6,7 +6,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     age = Column(Integer, nullable=False)
     gender = Column(String, nullable=False)
     dob = Column(String, nullable=False)
@@ -24,6 +24,23 @@ class Patient(Base):
     # Per-patient override of the clinic-wide PROM follow-up call schedule
     # (see FollowUpSettings.intervalsMonths) — null means "use the default".
     followUpIntervalsMonths = Column(JSON, nullable=True)
+
+
+class Encounter(Base):
+    """One clinical visit boundary used to join pre-visit data, decisions,
+    orders, treatments, and later outcomes for longitudinal analysis."""
+    __tablename__ = "encounters"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=True)
+    encounterDate = Column(String, nullable=False)
+    encounterType = Column(String, nullable=False, default="initial")
+    bodyArea = Column(String, nullable=True)
+    previsitSource = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="open")
+    createdAt = Column(String, nullable=False)
+    updatedAt = Column(String, nullable=False)
 
 
 class Assessment(Base):
@@ -44,6 +61,7 @@ class Assessment(Base):
     finalScore = Column(Float, nullable=True)
     interpretation = Column(JSON, nullable=True)
     promCode = Column(String, nullable=True)
+    encounter_id = Column(String, nullable=True, index=True)
 
 
 class Evaluation(Base):
@@ -62,6 +80,7 @@ class Evaluation(Base):
     # generated once at the moment sentToPatient flips True — see
     # patient_summary.py.
     patientSummary = Column(Text, nullable=True)
+    encounter_id = Column(String, nullable=True, index=True)
 
 
 class SurgeryEvaluation(Base):
@@ -77,6 +96,7 @@ class SurgeryEvaluation(Base):
     sentToPatient = Column(Boolean, nullable=False, default=False)
     soapNote = Column(JSON, nullable=True)
     patientSummary = Column(Text, nullable=True)
+    encounter_id = Column(String, nullable=True, index=True)
 
 
 class Document(Base):
@@ -92,6 +112,7 @@ class Document(Base):
     contentType = Column(String, nullable=False)
     uploadedBy = Column(String, nullable=False)
     uploadedAt = Column(String, nullable=False)
+    encounter_id = Column(String, nullable=True, index=True)
 
 
 class Diagnostic(Base):
@@ -103,6 +124,7 @@ class Diagnostic(Base):
     date = Column(String, nullable=False)
     status = Column(String, nullable=False, default="pending")
     result = Column(Text, nullable=True)
+    encounter_id = Column(String, nullable=True, index=True)
 
 
 class Treatment(Base):
@@ -117,6 +139,26 @@ class Treatment(Base):
     details = Column(Text, nullable=True)
     followUpDate = Column(String, nullable=True)
     status = Column(String, nullable=False, default="active")
+    encounter_id = Column(String, nullable=True, index=True)
+
+
+class TreatmentOutcome(Base):
+    """Follow-up outcome recorded against a treatment episode."""
+    __tablename__ = "treatment_outcomes"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    treatment_id = Column(String, nullable=True, index=True)
+    encounter_id = Column(String, nullable=True, index=True)
+    outcomeDate = Column(String, nullable=False)
+    followupScore = Column(Float, nullable=True)
+    response = Column(String, nullable=True)  # improved | unchanged | worse
+    adherence = Column(String, nullable=True)
+    adverseEvents = Column(Text, nullable=True)
+    escalation = Column(String, nullable=True)
+    clinicianNote = Column(Text, nullable=True)
+    recordedBy = Column(String, nullable=True)
+    createdAt = Column(String, nullable=False)
 
 
 class User(Base):
@@ -228,6 +270,36 @@ class PROMAssignment(Base):
     completedAt = Column(String, nullable=True)
     assessmentId = Column(String, nullable=True)
     accessToken = Column(String, nullable=True, unique=True)
+    encounter_id = Column(String, nullable=True, index=True)
+
+
+class ModelSuggestion(Base):
+    """Immutable snapshot of a model suggestion shown to a clinician."""
+    __tablename__ = "model_suggestions"
+
+    id = Column(String, primary_key=True)
+    patient_id = Column(String, nullable=False, index=True)
+    encounter_id = Column(String, nullable=True, index=True)
+    modelVersion = Column(String, nullable=False)
+    featureSnapshot = Column(JSON, nullable=False)
+    suggestions = Column(JSON, nullable=False)
+    warnings = Column(JSON, nullable=True)
+    generatedAt = Column(String, nullable=False)
+
+
+class ModelFeedback(Base):
+    """Clinician response to a displayed model suggestion."""
+    __tablename__ = "model_feedback"
+
+    id = Column(String, primary_key=True)
+    suggestion_id = Column(String, nullable=False, index=True)
+    patient_id = Column(String, nullable=False, index=True)
+    encounter_id = Column(String, nullable=True, index=True)
+    action = Column(String, nullable=False)  # accepted | edited | rejected | insufficient
+    finalTreatment = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
+    clinician = Column(String, nullable=True)
+    createdAt = Column(String, nullable=False)
 
 
 class PatientOTP(Base):

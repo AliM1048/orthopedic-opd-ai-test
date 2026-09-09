@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
@@ -89,7 +89,7 @@ class TreatmentOut(BaseModel):
 
 class PatientOut(BaseModel):
     id: str
-    name: str
+    name: Optional[str] = None
     age: int
     gender: str
     dob: str
@@ -119,13 +119,61 @@ class PatientListResponse(BaseModel):
     patients: list[PatientOut]
 
 
+class EncounterCreate(BaseModel):
+    patient_id: str
+    encounterDate: str
+    provider: Optional[str] = None
+    encounterType: str = "initial"
+    bodyArea: Optional[str] = None
+    previsitSource: Optional[str] = None
+
+
+class EncounterOut(BaseModel):
+    id: str
+    patient_id: str
+    provider: Optional[str] = None
+    encounterDate: str
+    encounterType: str
+    bodyArea: Optional[str] = None
+    previsitSource: Optional[str] = None
+    status: str
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+class ModelSuggestionCreate(BaseModel):
+    patient_id: str
+    encounter_id: Optional[str] = None
+    modelVersion: str
+    featureSnapshot: dict
+    suggestions: list[dict]
+    warnings: Optional[list[str]] = None
+
+
+class ModelSuggestionOut(ModelSuggestionCreate):
+    id: str
+    generatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+class ModelFeedbackCreate(BaseModel):
+    action: str
+    finalTreatment: Optional[str] = None
+    note: Optional[str] = None
+
+
 class PatientCreate(BaseModel):
-    name: str
+    name: Optional[str] = None
     age: int
     gender: str
     dob: str
     phone: str
-    mrn: str
+    mrn: str = Field(min_length=1)
     email: str
     address: str
     bloodType: str
@@ -160,6 +208,7 @@ class AssessmentCreate(BaseModel):
     finalScore: Optional[float] = None
     interpretation: Optional[dict] = None
     promCode: Optional[str] = None
+    encounter_id: Optional[str] = None
 
 
 class EvaluationCreate(BaseModel):
@@ -170,6 +219,7 @@ class EvaluationCreate(BaseModel):
     diagnosis: Optional[str] = None
     audioUrl: Optional[str] = None
     soapNote: Optional[dict] = None
+    encounter_id: Optional[str] = None
 
 
 class EvaluationUpdate(BaseModel):
@@ -178,6 +228,7 @@ class EvaluationUpdate(BaseModel):
     audioUrl: Optional[str] = None
     sentToPatient: Optional[bool] = None
     soapNote: Optional[dict] = None
+    encounter_id: Optional[str] = None
 
 
 class SurgeryEvaluationCreate(BaseModel):
@@ -188,6 +239,7 @@ class SurgeryEvaluationCreate(BaseModel):
     diagnosis: Optional[str] = None
     audioUrl: Optional[str] = None
     soapNote: Optional[dict] = None
+    encounter_id: Optional[str] = None
 
 
 class SurgeryEvaluationUpdate(BaseModel):
@@ -196,6 +248,7 @@ class SurgeryEvaluationUpdate(BaseModel):
     audioUrl: Optional[str] = None
     sentToPatient: Optional[bool] = None
     soapNote: Optional[dict] = None
+    encounter_id: Optional[str] = None
 
 
 class DiagnosticCreate(BaseModel):
@@ -204,6 +257,7 @@ class DiagnosticCreate(BaseModel):
     date: str
     status: str = "pending"
     result: Optional[str] = None
+    encounter_id: Optional[str] = None
 
 
 class DiagnosticUpdate(BaseModel):
@@ -220,6 +274,19 @@ class TreatmentCreate(BaseModel):
     details: Optional[str] = None
     followUpDate: Optional[str] = None
     status: str = "active"
+    encounter_id: Optional[str] = None
+
+
+class TreatmentOutcomeCreate(BaseModel):
+    treatment_id: Optional[str] = None
+    encounter_id: Optional[str] = None
+    outcomeDate: str
+    followupScore: Optional[float] = None
+    response: Optional[str] = None
+    adherence: Optional[str] = None
+    adverseEvents: Optional[str] = None
+    escalation: Optional[str] = None
+    clinicianNote: Optional[str] = None
 
 
 class FollowUpCallOut(BaseModel):
@@ -386,7 +453,7 @@ class PatientVerifyOtp(BaseModel):
 
 class PatientAuthProfile(BaseModel):
     id: str
-    name: str
+    name: Optional[str] = None
     mrn: str
     bodyArea: str
     phone: str
@@ -400,7 +467,7 @@ class PatientLoginResponse(BaseModel):
 
 class PatientProfileOut(BaseModel):
     id: str
-    name: str
+    name: Optional[str] = None
     age: int
     gender: str
     mrn: str

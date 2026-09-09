@@ -6,6 +6,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import { usePatients } from './hooks/usePatients';
 import { LookupProvider } from './hooks/useLookupData';
 import { ThemeProvider } from './hooks/useTheme';
+import { LanguageProvider } from './hooks/useLanguage';
 
 import Login from './pages/Login';
 import NurseDashboard from './pages/NurseDashboard';
@@ -38,7 +39,7 @@ const NURSE_ALLOWED_PREFIXES = ['/patient/'];
 function AuthedApp({ user, patients, actions }) {
   const location = useLocation();
   const {
-    updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
+    createEncounter, updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
     addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
     addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
   } = actions;
@@ -80,6 +81,7 @@ function AuthedApp({ user, patients, actions }) {
                 patients={patients}
                 user={user}
                 onAddEvaluation={addEvaluation}
+                onCreateEncounter={createEncounter}
                 onUpdateEvaluation={updateEvaluation}
                 onAddDiagnostic={addDiagnostic}
                 onDeleteDiagnostic={deleteDiagnostic}
@@ -103,6 +105,7 @@ function AuthedApp({ user, patients, actions }) {
                 user={user}
                 onAddSurgeryEvaluation={addSurgeryEvaluation}
                 onUpdateSurgeryEvaluation={updateSurgeryEvaluation}
+                onCreateEncounter={createEncounter}
                 onAddDiagnostic={addDiagnostic}
                 onDeleteDiagnostic={deleteDiagnostic}
                 onAddTreatment={addTreatment}
@@ -150,6 +153,7 @@ export default function App() {
 
   const {
     patients,
+    createEncounter,
     updateStatus,
     updateBodyArea,
     addAssessment,
@@ -174,32 +178,34 @@ export default function App() {
   };
 
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public — no login required, opened from a doctor-generated link/QR */}
-          <Route path="/prom/:token" element={<PromPublicFill />} />
-          <Route
-            path="*"
-            element={
-              !token ? (
-                <Login onLogin={handleLogin} />
-              ) : (
-                <AuthedApp
-                  user={user}
-                  patients={patients}
-                  actions={{
-                    updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
-                    addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
-                    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
-                    createPatient,
-                  }}
-                />
-              )
-            }
-          />
-        </Routes>
-      </BrowserRouter>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public — no login required, opened from a doctor-generated link/QR */}
+            <Route path="/prom/:token" element={<PromPublicFill />} />
+            <Route
+              path="*"
+              element={
+                !token ? (
+                  <Login onLogin={handleLogin} />
+                ) : (
+                  <AuthedApp
+                    user={user}
+                    patients={patients}
+                    actions={{
+                      updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
+                      addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
+                      addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
+                      createPatient, createEncounter,
+                    }}
+                  />
+                )
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

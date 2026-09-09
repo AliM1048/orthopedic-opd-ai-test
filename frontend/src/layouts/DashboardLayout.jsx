@@ -5,25 +5,27 @@ import {
   LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon, ClipboardList, Scissors, MessageCircle
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../hooks/useLanguage';
+import LanguageSwitcher from '../components/common/LanguageSwitcher';
 
 const NAV_ITEMS = [
-  { label: 'NURSE', items: [
-    { to: '/',            icon: LayoutDashboard, text: 'Dashboard' },
-    { to: '/messages',    icon: MessageCircle,   text: 'Messages' },
+  { labelKey: 'nav.sectionNurse', items: [
+    { to: '/',            icon: LayoutDashboard, textKey: 'nav.dashboard' },
+    { to: '/messages',    icon: MessageCircle,   textKey: 'nav.messages' },
   ]},
-  { label: 'PHYSICIAN', items: [
-    { to: '/evaluation',  icon: Stethoscope, text: 'Evaluation' },
+  { labelKey: 'nav.sectionPhysician', items: [
+    { to: '/evaluation',  icon: Stethoscope, textKey: 'nav.evaluation' },
   ]},
-  { label: 'SURGERY', items: [
-    { to: '/surgeries', icon: Scissors, text: 'Surgeries', restricted: true },
+  { labelKey: 'nav.sectionSurgery', items: [
+    { to: '/surgeries', icon: Scissors, textKey: 'nav.surgeries', restricted: true },
   ]},
-  // { label: 'CLERK', items: [
-  //   { to: '/clerk-tasks', icon: ClipboardList, text: 'PROM Tasks' },
+  // { labelKey: 'nav.sectionClerk', items: [
+  //   { to: '/clerk-tasks', icon: ClipboardList, textKey: 'nav.promTasks' },
   // ]},
-  { label: 'RECORDS', items: [
-    { to: '/analytics',      icon: Activity,        text: 'Analytics', restricted: true },
-    { to: '/records',        icon: Users,           text: 'Patient Status', restricted: true },
-    { to: '/documents/new',  icon: FileSignature,   text: 'Generate Document', restricted: true },
+  { labelKey: 'nav.sectionRecords', items: [
+    { to: '/analytics',      icon: Activity,        textKey: 'nav.analytics', restricted: true },
+    { to: '/records',        icon: Users,           textKey: 'nav.patientStatus', restricted: true },
+    { to: '/documents/new',  icon: FileSignature,   textKey: 'nav.generateDocument', restricted: true },
   ]},
 ];
 
@@ -35,6 +37,7 @@ const NAV_ITEMS = [
 export default function DashboardLayout({ children, user }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const isNurse = user?.role === 'nurse';
   const visibleNavSections = NAV_ITEMS
@@ -63,14 +66,14 @@ export default function DashboardLayout({ children, user }) {
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon"><Activity size={20} /></div>
           <div className="sidebar-logo-text">
-            <h2>OPD AI Unit</h2>
-            <p>Patient Management</p>
+            <h2>{t('common.appName')}</h2>
+            <p>{t('common.appTagline')}</p>
           </div>
           <button
             type="button"
             className="sidebar-toggle"
             onClick={toggleCollapsed}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? t('common.expandSidebar') : t('common.collapseSidebar')}
             style={{ marginLeft: collapsed ? 0 : 'auto' }}
           >
             {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
@@ -79,20 +82,20 @@ export default function DashboardLayout({ children, user }) {
 
         <nav className="sidebar-nav">
           {visibleNavSections.map((section) => (
-            <div key={section.label}>
-              <div className="sidebar-section-label">{section.label}</div>
+            <div key={section.labelKey}>
+              <div className="sidebar-section-label">{t(section.labelKey)}</div>
               {section.items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
-                  title={item.text}
+                  title={t(item.textKey)}
                   className={({ isActive }) =>
                     `nav-item${isActive ? ' active' : ''}`
                   }
                 >
                   <item.icon size={18} />
-                  <span>{item.text}</span>
+                  <span>{t(item.textKey)}</span>
                 </NavLink>
               ))}
             </div>
@@ -103,19 +106,19 @@ export default function DashboardLayout({ children, user }) {
           <div className="sidebar-user">
             <div className="sidebar-avatar">{user?.name?.split(' ').map((w) => w[0]).join('').slice(0, 2) || 'NS'}</div>
             <div className="sidebar-user-text">
-              <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>{user?.name || 'User'}</div>
-              <div style={{ fontSize: 11, color: 'var(--sidebar-text)' }}>{user?.role === 'physician' ? 'Physician' : 'Orthopedic Ward'}</div>
+              <div style={{ fontWeight: 600, color: '#fff', fontSize: 13 }}>{user?.name || t('common.unknown')}</div>
+              <div style={{ fontSize: 11, color: 'var(--sidebar-text)' }}>{user?.role === 'physician' ? t('common.physician') : t('common.orthopedicWard')}</div>
             </div>
+            <LanguageSwitcher style={{ marginLeft: collapsed ? 0 : 'auto' }} />
             <button
               type="button"
               className="theme-toggle-btn"
               onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ marginLeft: collapsed ? 0 : 'auto' }}
+              title={theme === 'dark' ? t('common.switchToLightMode') : t('common.switchToDarkMode')}
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <button onClick={handleLogout} className="theme-toggle-btn" title="Sign out">
+            <button onClick={handleLogout} className="theme-toggle-btn" title={t('common.signOut')}>
               <LogOut size={16} />
             </button>
           </div>

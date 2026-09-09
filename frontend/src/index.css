@@ -211,6 +211,12 @@ input, textarea, select { font-family: inherit; outline: none; }
 }
 .theme-toggle-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
 
+.lang-toggle-btn {
+  border-radius: 6px;
+  padding: 4px 8px;
+  width: auto;
+}
+
 .sidebar-logo {
   padding: 24px 20px 20px;
   border-bottom: 1px solid rgba(255,255,255,.08);
@@ -814,9 +820,13 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   justify-content: center;
   padding: 24px;
 }
-.login-theme-toggle {
+.login-header-actions {
   position: absolute;
-  top: 20px; right: 20px;
+  top: 20px; inset-inline-end: 20px;
+  display: flex;
+  gap: 8px;
+}
+.login-theme-toggle {
   width: 36px; height: 36px;
   border-radius: 50%;
   border: none;
@@ -827,6 +837,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
   transition: background .2s ease;
 }
 .login-theme-toggle:hover { background: rgba(255,255,255,.22); }
+.login-theme-toggle.lang-toggle-btn { width: auto; border-radius: 18px; padding: 0 10px; }
 .login-card {
   background: var(--surface);
   border-radius: var(--radius-xl);

@@ -1,0 +1,15 @@
+{
+  "type": "hospital-patient",
+  "mrn": "DEMO-20260908-002",
+  "dob": "1978-06-22",
+  "age": 48,
+  "gender": "Male",
+  "phone": "+966500000002",
+  "email": "demo.patient.002@example.com",
+  "address": "Demo Hospital, Orthopedic Clinic",
+  "bloodType": "A+",
+  "allergies": "Penicillin",
+  "bodyArea": "Shoulder",
+  "appointmentDate": "2026-09-22",
+  "appointmentTime": "14:30"
+}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Phone, Mail, MapPin, Droplets, AlertCircle, ClipboardList, Stethoscope, FileText, Pill, LayoutGrid, CalendarClock, Plus, Trash2, Settings2, PhoneCall, Scissors, Paperclip, MessageCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../../api';
+import api, { withAuthToken } from '../../api';
 import { useLookup } from '../../hooks/useLookupData';
 import StatusBadge from '../common/StatusBadge';
 import FollowUpScheduleModal from './FollowUpScheduleModal';
@@ -275,7 +275,7 @@ export default function PatientRecordPanel({ patient }) {
                       {ev.documents.map((doc) => (
                         <a
                           key={doc.id}
-                          href={`${api.defaults.baseURL}/documents/${doc.filename}`}
+                          href={withAuthToken(`${api.defaults.baseURL}/documents/${doc.filename}`)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-sm"

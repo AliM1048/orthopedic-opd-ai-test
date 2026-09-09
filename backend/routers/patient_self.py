@@ -283,7 +283,7 @@ def send_message(body: ChatMessageCreate, current_patient: dict = Depends(get_cu
     db.commit()
     create_staff_notification(
         db, patient.id,
-        title=f"New message from {patient.name}",
+        title=f"New message from {patient.name or patient.mrn}",
         body=body.text[:140],
         related_type="chat_message", related_id=message.id,
         type="chat_message",

@@ -342,7 +342,7 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
 
 /* ════════════════════════════════════════════════════════════════════════ */
 
-export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluation, onUpdateSurgeryEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkSurgeryEvaluationSent }) {
+export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluation, onUpdateSurgeryEvaluation, onCreateEncounter, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkSurgeryEvaluationSent }) {
   /* eslint-disable no-use-before-define */
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -362,6 +362,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
   // inserting their own row, so one encounter doesn't fragment into several
   // partial evaluations.
   const [currentEvaluationId, setCurrentEvaluationId] = useState(null);
+  const [encounterId, setEncounterId] = useState(null);
 
   /* ── Quick-action modal state ── */
   const [showMedModal, setShowMedModal] = useState(false);
@@ -509,45 +510,76 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
   // aborts under the hood.
   const handleCancelDictation = () => { cancelRecording(); setShowDictationModal(false); setError(null); };
 
-  const handleSaveAll = () => {
+  // Every clinical record written for this visit (evaluation, diagnostic,
+  // treatment) must carry the same encounter_id so it shows up in the
+  // research export — see docs/research-steps.md Step 4. The backend
+  // dedupes create-encounter calls by patient+date+status=="open", so
+  // calling this more than once in a session just returns the same row.
+  const ensureEncounter = async () => {
+    if (encounterId) return encounterId;
+    if (!onCreateEncounter) return null;
+    const encounter = await onCreateEncounter(patientId, {
+      encounterDate: patient.appointmentDate || todayIso(),
+      encounterType: 'surgery',
+      bodyArea: patient.bodyArea,
+    });
+    setEncounterId(encounter.id);
+    return encounter.id;
+  };
+
+  const handleSaveAll = async () => {
     const { diagnosis, notes } = deriveLegacyFields(soap);
     if (!diagnosis && !notes) return;
+    const activeEncounterId = await ensureEncounter();
     const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
+
+    // Collect every write instead of firing them off unawaited — a failed
+    // diagnostic/treatment save used to vanish silently (visible only in this
+    // session's optimistic state, gone on refresh) while the UI still
+    // reported success. Now the whole visit save fails loudly instead.
+    const pendingWrites = [];
+
     if (currentEvaluationId && onUpdateSurgeryEvaluation) {
-      onUpdateSurgeryEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap });
+      pendingWrites.push(onUpdateSurgeryEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap }));
     } else if (onAddSurgeryEvaluation) {
       const newId = `ev${Date.now()}`;
-      onAddSurgeryEvaluation(patientId, {
-        id: newId, date: todayIso(),
+      pendingWrites.push(Promise.resolve(onAddSurgeryEvaluation(patientId, {
+        id: newId, date: todayIso(), encounter_id: activeEncounterId,
         surgeon: surgeonName, notes, diagnosis, audioUrl, soapNote: soap,
-      });
-      setCurrentEvaluationId(newId);
+      })).then(() => setCurrentEvaluationId(newId)));
     }
     selectedTests.forEach((testId) => {
       const test = diagnosticTests.find((t) => t.id === testId);
-      if (test && onAddDiagnostic) onAddDiagnostic(patientId, {
-        id: `d${Date.now()}-${testId}`, type: test.name,
+      if (test && onAddDiagnostic) pendingWrites.push(onAddDiagnostic(patientId, {
+        id: `d${Date.now()}-${testId}`, encounter_id: activeEncounterId, type: test.name,
         date: todayIso(), status: 'pending', result: null,
-      });
+      }));
     });
     treatments.filter((t) => t.type).forEach((t) => {
       const opt = treatmentOptions.find((o) => o.id === t.type);
-      if (opt && onAddTreatment) onAddTreatment(patientId, {
-        id: `tr${Date.now()}-${t.type}`, type: opt.name,
+      if (opt && onAddTreatment) pendingWrites.push(onAddTreatment(patientId, {
+        id: `tr${Date.now()}-${t.type}`, encounter_id: activeEncounterId, type: opt.name,
         date: todayIso(), physician: surgeonName,
         duration: t.duration || 'TBD', details: t.details?.trim() || '',
         followUpDate: t.followUpDate || null, status: 'active',
-      });
+      }));
     });
-    setSaved(true);
+
+    try {
+      await Promise.all(pendingWrites);
+      setSaved(true);
+    } catch {
+      notifyError('Some changes failed to save — please try again');
+    }
   };
 
   /* ── Quick-action handlers ── */
-  const handleSaveMedication = () => {
+  const handleSaveMedication = async () => {
     if (!medForm.name.trim() || !onAddTreatment) return;
     const details = medForm.dose.trim() ? `${medForm.name.trim()} — ${medForm.dose.trim()}` : medForm.name.trim();
+    const activeEncounterId = await ensureEncounter();
     Promise.resolve(onAddTreatment(patientId, {
-      id: uid(), type: 'Medication', date: todayIso(), physician: surgeonName,
+      id: uid(), type: 'Medication', date: todayIso(), physician: surgeonName, encounter_id: activeEncounterId,
       duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
     }))
       .then(() => notifySuccess('Prescription saved'))

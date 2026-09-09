@@ -23,6 +23,11 @@ export function usePatients(token) {
     [patients]
   );
 
+  const createEncounter = useCallback((patientId, encounter) => {
+    return api.post('/api/encounters', { ...encounter, patient_id: patientId })
+      .then((res) => res.data);
+  }, []);
+
   const updateStatus = useCallback((id, status) => {
     setPatients((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
@@ -56,13 +61,12 @@ export function usePatients(token) {
           : p
       )
     );
-    api.post(`/api/patients/${patientId}/assessments`, assessment)
+    return api.post(`/api/patients/${patientId}/assessments`, assessment)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const addEvaluation = useCallback((patientId, evaluation) => {
@@ -168,13 +172,12 @@ export function usePatients(token) {
           : p
       )
     );
-    api.post(`/api/patients/${patientId}/diagnostics`, diagnostic)
+    return api.post(`/api/patients/${patientId}/diagnostics`, diagnostic)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const updateDiagnostic = useCallback((patientId, diagnosticId, updates) => {
@@ -190,13 +193,12 @@ export function usePatients(token) {
           : p
       )
     );
-    api.patch(`/api/patients/${patientId}/diagnostics/${diagnosticId}`, updates)
+    return api.patch(`/api/patients/${patientId}/diagnostics/${diagnosticId}`, updates)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const deleteDiagnostic = useCallback((patientId, diagnosticId) => {
@@ -265,8 +267,7 @@ export function usePatients(token) {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const markSurgeryEvaluationSent = useCallback((patientId, evaluationId) => {
@@ -287,8 +288,7 @@ export function usePatients(token) {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const createPatient = useCallback((patientData) => {
@@ -306,6 +306,7 @@ export function usePatients(token) {
     patients,
     loading,
     getPatient,
+    createEncounter,
     updateStatus,
     updateBodyArea,
     addAssessment,

@@ -1,0 +1,13 @@
+{
+  "sectionNurse": "NURSE",
+  "sectionPhysician": "PHYSICIAN",
+  "sectionSurgery": "SURGERY",
+  "sectionRecords": "RECORDS",
+  "dashboard": "Dashboard",
+  "messages": "Messages",
+  "evaluation": "Evaluation",
+  "surgeries": "Surgeries",
+  "analytics": "Analytics",
+  "patientStatus": "Patient Status",
+  "generateDocument": "Generate Document"
+}

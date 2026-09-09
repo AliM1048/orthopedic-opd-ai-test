@@ -62,6 +62,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
   const [submitted, setSubmitted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
 
   // The nurse confirms/picks the region at the start of every call — this
@@ -189,7 +190,18 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
       answers,
     };
 
-    if (onAddAssessment) onAddAssessment(patientId, assessment);
+    // Persist the assessment before touching the draft/patient status — if
+    // this save fails, the draft must survive so the visit isn't lost, and
+    // the UI must say so instead of claiming success (see bug hunt finding:
+    // this used to fire-and-forget, then unconditionally clear the draft).
+    try {
+      if (onAddAssessment) await onAddAssessment(patientId, assessment);
+    } catch {
+      setIsSubmitting(false);
+      setSubmitError(true);
+      return;
+    }
+    setSubmitError(false);
     if (onUpdateStatus) onUpdateStatus(patientId, 'assessment-completed');
 
     // Close out the PROM assignment that sent us here (clerk-assisted /
@@ -375,6 +387,7 @@ export default function PreVisitAssessment({ patients, user, onAddAssessment, on
                 onBack={handlePrev}
                 onSubmit={handleSubmit}
                 isSubmitting={isSubmitting}
+                submitError={submitError}
               />
             ) : (
               <>

@@ -74,7 +74,7 @@ function SectionSummary({ section, answers }) {
   );
 }
 
-export default function SummaryPage({ config, answers, patient, isFollowUp, onBack, onSubmit, isSubmitting }) {
+export default function SummaryPage({ config, answers, patient, isFollowUp, onBack, onSubmit, isSubmitting, submitError }) {
   const totalRequired = config.sections.flatMap(s => s.questions).filter(q => q.required).length;
   const answeredRequired = config.sections.flatMap(s => s.questions).filter(q => {
     if (!q.required) return false;
@@ -101,6 +101,13 @@ export default function SummaryPage({ config, answers, patient, isFollowUp, onBa
         <div className="smp-warning">
           <AlertCircle size={16} />
           Please complete all required questions before submitting.
+        </div>
+      )}
+
+      {submitError && (
+        <div className="smp-warning">
+          <AlertCircle size={16} />
+          Couldn't save this assessment — check your connection and try again. Your answers are still here.
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 SECRET_KEY = os.getenv("JWT_SECRET", "orthopedic-opd-secret-key-change-in-production")
@@ -11,6 +11,7 @@ PATIENT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days — consumer app, 
 PATIENT_AUDIENCE = "patient"
 
 security = HTTPBearer()
+_optional_security = HTTPBearer(auto_error=False)
 
 
 def create_access_token(data: dict) -> str:
@@ -48,6 +49,29 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
+def get_current_user_from_header_or_query(
+    credentials: HTTPAuthorizationCredentials = Depends(_optional_security),
+    token: str = Query(default=None),
+):
+    """Same staff-auth check as get_current_user, but also accepts the JWT as
+    a `?token=` query parameter. Needed for /audio and /documents: those URLs
+    are loaded directly by <audio src>/<a href> elements, which can't attach
+    an Authorization header the way the app's axios client does."""
+    raw_token = credentials.credentials if credentials else token
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(raw_token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"email": email, "name": payload.get("name"), "role": payload.get("role")}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 def get_current_patient(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     try:
@@ -72,6 +96,15 @@ def forbid_roles(*roles):
     dashboard + physician evaluation; every other role keeps full access)."""
     def checker(current_user: dict = Depends(get_current_user)):
         if current_user.get("role") in roles:
+            raise HTTPException(status_code=403, detail="Not authorized for this action")
+        return current_user
+    return checker
+
+
+def require_roles(*roles):
+    """Dependency factory that allows only the listed staff roles."""
+    def checker(current_user: dict = Depends(get_current_user)):
+        if current_user.get("role") not in roles:
             raise HTTPException(status_code=403, detail="Not authorized for this action")
         return current_user
     return checker

@@ -27,7 +27,7 @@ from pydub import AudioSegment
 
 from sqlalchemy import text
 from database import engine, Base
-from auth import get_current_user, get_current_patient, forbid_roles
+from auth import get_current_user, get_current_patient, get_current_user_from_header_or_query, forbid_roles
 from llm_extract import extract_structured, detect_language
 from routers.patients import router as patients_router
 from routers.assessments import router as assessments_router
@@ -46,6 +46,10 @@ from routers.patient_auth import router as patient_auth_router
 from routers.patient_self import router as patient_self_router
 from routers.staff_notifications import router as staff_notifications_router
 from routers.chat import router as chat_router
+from routers.encounters import router as encounters_router
+from routers.research import router as research_router
+from routers.ai_assistant import router as ai_assistant_router
+from routers.outcomes import router as outcomes_router
 from routers.followups import auto_send_initial_prom_forms
 from database import SessionLocal
 
@@ -89,6 +93,10 @@ app.include_router(lookup_router, dependencies=[Depends(get_current_user)])
 app.include_router(followups_router, dependencies=[Depends(get_current_user)])
 app.include_router(staff_notifications_router, dependencies=[Depends(get_current_user)])
 app.include_router(chat_router, dependencies=[Depends(get_current_user)])
+app.include_router(encounters_router, dependencies=[Depends(get_current_user)])
+app.include_router(research_router, dependencies=[Depends(get_current_user)])
+app.include_router(ai_assistant_router, dependencies=[Depends(get_current_user)])
+app.include_router(outcomes_router, dependencies=[Depends(get_current_user)])
 app.include_router(prom_assignments_router, dependencies=[Depends(get_current_user)])
 app.include_router(prom_trend_router, dependencies=[Depends(get_current_user)])
 
@@ -115,6 +123,9 @@ def on_startup():
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"sentToPatient\" BOOLEAN NOT NULL DEFAULT FALSE"))
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS \"soapNote\" JSON"))
             conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS \"followUpIntervalsMonths\" JSON"))
+            conn.execute(text("ALTER TABLE patients ALTER COLUMN \"name\" DROP NOT NULL"))
+            for table in ("assessments", "evaluations", "surgery_evaluations", "documents", "diagnostics", "treatments", "prom_assignments"):
+                conn.execute(text(f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "encounter_id" VARCHAR'))
             conn.execute(text("ALTER TABLE followup_calls ALTER COLUMN \"intervalMonths\" DROP NOT NULL"))
             conn.execute(text("ALTER TABLE followup_calls ADD COLUMN IF NOT EXISTS \"promAssignmentId\" VARCHAR"))
             conn.execute(text("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS \"finalScore\" DOUBLE PRECISION"))
@@ -286,6 +297,7 @@ def root():
 async def transcribe_preview(
     audio: UploadFile = File(...),
     language: str = Form(default=""),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Throwaway transcription of the recording-so-far, used purely to show the
@@ -329,6 +341,7 @@ async def dictate(
     patient_id: str = Form(default=None),
     language: str = Form(default=""),
     note_type: str = Form(default="physician"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     One-take physician/surgeon dictation: the doctor speaks in a single
@@ -405,8 +418,10 @@ async def dictate(
 
 
 @app.get("/audio/{filename}")
-def get_audio(filename: str):
-    """Serve audio files for playback."""
+def get_audio(filename: str, current_user: dict = Depends(get_current_user_from_header_or_query)):
+    """Serve audio files for playback. Staff-only — see
+    get_current_user_from_header_or_query for why this accepts a ?token=
+    query param in addition to a bearer header."""
     file_path = AUDIO_DIR / filename
     if not file_path.exists():
         return JSONResponse(status_code=404, content={"error": "Audio file not found"})
@@ -427,8 +442,10 @@ DOCUMENT_MEDIA_TYPES = {
 
 
 @app.get("/documents/{filename}")
-def get_document(filename: str):
-    """Serve doctor-uploaded documents (MRI images, PDF reports, etc.)."""
+def get_document(filename: str, current_user: dict = Depends(get_current_user_from_header_or_query)):
+    """Serve doctor-uploaded documents (MRI images, PDF reports, etc.).
+    Staff-only — see get_current_user_from_header_or_query for why this
+    accepts a ?token= query param in addition to a bearer header."""
     file_path = Path("documents") / filename
     if not file_path.exists():
         return JSONResponse(status_code=404, content={"error": "Document not found"})

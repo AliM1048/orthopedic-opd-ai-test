@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from database import get_db
+from auth import require_roles
 from models import Patient, Assessment, Evaluation, SurgeryEvaluation, Diagnostic, Treatment, Document
 from schemas import (
     PatientOut, PatientListResponse, UpdateStatusRequest, UpdateBodyAreaRequest,
@@ -69,7 +70,7 @@ def _build_patient(patient: Patient, db: Session) -> PatientOut:
         db.commit()
 
     return PatientOut(
-        **{c.name: getattr(patient, c.name) for c in patient.__table__.columns},
+        **{c.name: (getattr(patient, c.name) if c.name != "name" else (patient.name or patient.mrn)) for c in patient.__table__.columns},
         assessments=[AssessmentOut.model_validate(a) for a in assessments],
         evaluations=[
             EvaluationOut(
@@ -102,18 +103,23 @@ def list_patients(search: str = "", db: Session = Depends(get_db)):
     )
 
 
-@router.post("", response_model=PatientOut)
+@router.post("", response_model=PatientOut, dependencies=[Depends(require_roles("physician", "nurse"))])
 def create_patient(body: PatientCreate, db: Session = Depends(get_db)):
+    mrn = body.mrn.strip()
+    existing = db.query(Patient).filter(Patient.mrn == mrn).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="A patient with this MRN has already been added")
+
     # create a new patient with generated UUID
     pid = str(uuid.uuid4())
     patient = Patient(
         id=pid,
-        name=body.name,
+        name=body.name.strip() or None if body.name else None,
         age=body.age,
         gender=body.gender,
         dob=body.dob,
         phone=body.phone,
-        mrn=body.mrn,
+        mrn=mrn,
         email=body.email,
         address=body.address,
         bloodType=body.bloodType,

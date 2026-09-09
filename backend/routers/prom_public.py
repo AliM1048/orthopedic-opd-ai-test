@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Patient, Assessment, AssessmentConfig, FollowUpCall, PROMAssignment
+from models import Patient, Assessment, AssessmentConfig, Encounter, FollowUpCall, PROMAssignment
 from notifications import create_staff_notification
 from schemas import PublicPromConfigOut, PublicPromSubmit
 
@@ -44,7 +44,7 @@ def get_public_prom(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Questionnaire not found")
 
     return PublicPromConfigOut(
-        patientFirstName=patient.name.split(" ")[0],
+        patientFirstName=(patient.name or patient.mrn).split(" ")[0],
         bodyArea=assignment.bodyArea,
         promName=assignment.promName or cfg.promName,
         status=assignment.status,
@@ -90,6 +90,22 @@ def submit_public_prom(token: str, body: PublicPromSubmit, db: Session = Depends
         promCode=body.promCode,
         answers=body.answers,
     )
+    encounter = (
+        db.query(Encounter)
+        .filter(Encounter.patient_id == patient.id, Encounter.encounterDate == patient.appointmentDate, Encounter.status == "open")
+        .first()
+    )
+    if not encounter:
+        encounter = Encounter(
+            id=str(uuid.uuid4()), patient_id=patient.id,
+            provider=None, encounterDate=patient.appointmentDate,
+            encounterType="initial", bodyArea=assignment.bodyArea,
+            previsitSource="patient_mobile", status="open",
+            createdAt=now.isoformat() + "Z", updatedAt=now.isoformat() + "Z",
+        )
+        db.add(encounter)
+        db.flush()
+    assessment.encounter_id = encounter.id
     db.add(assessment)
 
     assignment.status = "completed"
