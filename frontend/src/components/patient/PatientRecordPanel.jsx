@@ -325,6 +325,7 @@ export default function PatientRecordPanel({ patient }) {
           {patient.diagnostics.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noDiagnosticTestsYet')}</p>
           ) : (
+            <div className="table-scroll">
             <table className="data-table">
               <thead><tr><th>{t('patientRecordPanel.tableHeaderTest')}</th><th>{t('common.date')}</th><th>{t('common.status')}</th><th>{t('patientRecordPanel.tableHeaderResult')}</th></tr></thead>
               <tbody>
@@ -338,6 +339,7 @@ export default function PatientRecordPanel({ patient }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
@@ -395,7 +397,7 @@ export default function PatientRecordPanel({ patient }) {
           ) : followUps.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noFollowUpCallsScheduled')}</p>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll">
               <table className="data-table">
                 <thead>
                   <tr><th>{t('patientRecordPanel.tableHeaderCheckIn')}</th><th>{t('patientRecordPanel.tableHeaderScheduledDate')}</th><th>{t('common.status')}</th><th>{t('common.actions')}</th></tr>

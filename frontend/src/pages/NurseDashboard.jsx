@@ -281,6 +281,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
               <p>{t('nurseDashboard.noPatientsMatchFilter')}</p>
             </div>
           ) : (
+            <div className="table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -345,6 +346,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
