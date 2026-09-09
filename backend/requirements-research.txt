@@ -1,0 +1,6 @@
+# Install separately from production requirements for offline model training.
+pandas
+scikit-learn
+catboost
+joblib
+shap

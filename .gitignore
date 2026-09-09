@@ -13,7 +13,7 @@ build/
 .venv/
 venv/
 env/
-
+audio/
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
@@ -32,3 +32,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Research model artifacts and local exports
+backend/model_artifacts/
+backend/research_exports/
+

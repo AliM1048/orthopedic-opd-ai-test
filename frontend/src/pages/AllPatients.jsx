@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar } from 'lucide-react';
+import { Search, Calendar, ArrowLeft } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 
 export default function AllPatients({ patients }) {
@@ -18,9 +18,14 @@ export default function AllPatients({ patients }) {
   return (
     <>
       <div className="topbar">
-        <div className="topbar-left">
-          <h1>All Patients</h1>
-          <p>{patients.length} patient records</p>
+        <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1>All Patients</h1>
+            <p>{patients.length} patient records</p>
+          </div>
         </div>
       </div>
 
@@ -29,7 +34,7 @@ export default function AllPatients({ patients }) {
           <div className="card-header">
             <div className="card-title">Patient Records</div>
             <div className="search-bar">
-              <Search size={16} color="#94a3b8" />
+              <Search size={16} color="var(--text-muted)" />
               <input placeholder="Search by name, MRN, or body area…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>

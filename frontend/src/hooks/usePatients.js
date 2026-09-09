@@ -1,35 +1,56 @@
 import { useState, useCallback, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
-const API_BASE = 'http://localhost:8000';
-
-export function usePatients() {
+export function usePatients(token) {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API_BASE}/api/patients`)
+    const stored = localStorage.getItem('token');
+    if (!token && !stored) {
+      setLoading(false);
+      return;
+    }
+    // fetch when a token becomes available (login) or on mount if stored
+    api.get('/api/patients')
       .then((res) => setPatients(res.data.patients))
       .catch(() => setPatients([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token]);
 
   const getPatient = useCallback(
     (id) => patients.find((p) => p.id === id) || null,
     [patients]
   );
 
+  const createEncounter = useCallback((patientId, encounter) => {
+    return api.post('/api/encounters', { ...encounter, patient_id: patientId })
+      .then((res) => res.data);
+  }, []);
+
   const updateStatus = useCallback((id, status) => {
     setPatients((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
     );
-    axios.patch(`${API_BASE}/api/patients/${id}/status`, { status })
+    api.patch(`/api/patients/${id}/status`, { status })
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === id ? res.data : p))
         );
       })
       .catch(() => {});
+  }, []);
+
+  const updateBodyArea = useCallback((id, bodyArea) => {
+    setPatients((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, bodyArea } : p))
+    );
+    return api.patch(`/api/patients/${id}/body-area`, { bodyArea })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === id ? res.data : p))
+        );
+      });
   }, []);
 
   const addAssessment = useCallback((patientId, assessment) => {
@@ -40,13 +61,12 @@ export function usePatients() {
           : p
       )
     );
-    axios.post(`${API_BASE}/api/patients/${patientId}/assessments`, assessment)
+    return api.post(`/api/patients/${patientId}/assessments`, assessment)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const addEvaluation = useCallback((patientId, evaluation) => {
@@ -57,13 +77,91 @@ export function usePatients() {
           : p
       )
     );
-    axios.post(`${API_BASE}/api/patients/${patientId}/evaluations`, evaluation)
+    return api.post(`/api/patients/${patientId}/evaluations`, evaluation)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
+  }, []);
+
+  const updateEvaluation = useCallback((patientId, evaluationId, updates) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              evaluations: p.evaluations.map((e) =>
+                e.id === evaluationId ? { ...e, ...updates } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/evaluations/${evaluationId}`, updates)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const addSurgeryEvaluation = useCallback((patientId, evaluation) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, surgeryEvaluations: [...(p.surgeryEvaluations || []), evaluation] }
+          : p
+      )
+    );
+    return api.post(`/api/patients/${patientId}/surgery-evaluations`, evaluation)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const updateSurgeryEvaluation = useCallback((patientId, evaluationId, updates) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              surgeryEvaluations: (p.surgeryEvaluations || []).map((e) =>
+                e.id === evaluationId ? { ...e, ...updates } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/surgery-evaluations/${evaluationId}`, updates)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const uploadEvaluationDocument = useCallback((patientId, evaluationId, file, uploadedBy) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('uploadedBy', uploadedBy);
+    return api.post(`/api/patients/${patientId}/evaluations/${evaluationId}/documents`, formData)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const deleteEvaluationDocument = useCallback((patientId, evaluationId, documentId) => {
+    return api.delete(`/api/patients/${patientId}/evaluations/${evaluationId}/documents/${documentId}`)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
   }, []);
 
   const addDiagnostic = useCallback((patientId, diagnostic) => {
@@ -74,13 +172,12 @@ export function usePatients() {
           : p
       )
     );
-    axios.post(`${API_BASE}/api/patients/${patientId}/diagnostics`, diagnostic)
+    return api.post(`/api/patients/${patientId}/diagnostics`, diagnostic)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const updateDiagnostic = useCallback((patientId, diagnosticId, updates) => {
@@ -96,13 +193,28 @@ export function usePatients() {
           : p
       )
     );
-    axios.patch(`${API_BASE}/api/patients/${patientId}/diagnostics/${diagnosticId}`, updates)
+    return api.patch(`/api/patients/${patientId}/diagnostics/${diagnosticId}`, updates)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
+  }, []);
+
+  const deleteDiagnostic = useCallback((patientId, diagnosticId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, diagnostics: p.diagnostics.filter((d) => d.id !== diagnosticId) }
+          : p
+      )
+    );
+    return api.delete(`/api/patients/${patientId}/diagnostics/${diagnosticId}`)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
   }, []);
 
   const addTreatment = useCallback((patientId, treatment) => {
@@ -113,24 +225,104 @@ export function usePatients() {
           : p
       )
     );
-    axios.post(`${API_BASE}/api/patients/${patientId}/treatments`, treatment)
+    return api.post(`/api/patients/${patientId}/treatments`, treatment)
       .then((res) => {
         setPatients((prev) =>
           prev.map((p) => (p.id === patientId ? res.data : p))
         );
-      })
-      .catch(() => {});
+      });
   }, []);
+
+  const deleteTreatment = useCallback((patientId, treatmentId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? { ...p, treatments: p.treatments.filter((t) => t.id !== treatmentId) }
+          : p
+      )
+    );
+    return api.delete(`/api/patients/${patientId}/treatments/${treatmentId}`)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const markEvaluationSent = useCallback((patientId, evaluationId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              evaluations: p.evaluations.map((e) =>
+                e.id === evaluationId ? { ...e, sentToPatient: true } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/evaluations/${evaluationId}`, { sentToPatient: true })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const markSurgeryEvaluationSent = useCallback((patientId, evaluationId) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              surgeryEvaluations: (p.surgeryEvaluations || []).map((e) =>
+                e.id === evaluationId ? { ...e, sentToPatient: true } : e
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/surgery-evaluations/${evaluationId}`, { sentToPatient: true })
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
+  const createPatient = useCallback((patientData) => {
+    // optimistic UI: add placeholder until server returns
+    return api.post('/api/patients', patientData)
+      .then((res) => {
+        setPatients((prev) => [res.data, ...prev]);
+        return res.data;
+      })
+      .catch((err) => { throw err; });
+  }, []);
+  
 
   return {
     patients,
     loading,
     getPatient,
+    createEncounter,
     updateStatus,
+    updateBodyArea,
     addAssessment,
     addEvaluation,
+    updateEvaluation,
+    addSurgeryEvaluation,
+    updateSurgeryEvaluation,
+    uploadEvaluationDocument,
+    deleteEvaluationDocument,
     addDiagnostic,
     updateDiagnostic,
-    addTreatment
+    deleteDiagnostic,
+    addTreatment,
+    deleteTreatment,
+    markEvaluationSent,
+    markSurgeryEvaluationSent,
+    createPatient
   };
 }

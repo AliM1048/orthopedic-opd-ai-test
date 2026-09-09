@@ -1,91 +1,1097 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mic, Square, Save, FileText } from 'lucide-react';
-import { useRecorder } from '../hooks/useRecorder';
+import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
+         FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
+         Zap, TrendingUp, Activity, FileText, Trash2, History, Search, ListChecks,
+         AlertTriangle, Clock3, BrainCircuit } from 'lucide-react';
+import Swal from 'sweetalert2';
+import api, { withAuthToken } from '../api';
+import { useDictation } from '../hooks/useDictation';
+import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
+import { getOdiNdiInterpretation } from '../utils/scoring';
+import DictationRecordingModal from '../components/DictationRecordingModal';
+import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
+import PrintDocModal from '../components/PrintDocModal';
+import PrintTypeModal from '../components/PrintTypeModal';
+import PromAssignmentModal from '../components/PromAssignmentModal';
+import PromTrendChart from '../components/PromTrendChart';
+import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
 
-function formatTimer(seconds) {
-  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${m}:${s}`;
+const API_BASE = 'http://localhost:8000';
+
+function uid() {
+  return `t${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
-export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const patientId = searchParams.get('patient');
-  const patient = patients.find((p) => p.id === patientId);
+function todayIso() {
+  return new Date().toISOString().split('T')[0];
+}
 
-  const [diagnosis, setDiagnosis] = useState('');
-  const [notes, setNotes] = useState('');
-  const [transcript, setTranscript] = useState(null);
-  const [error, setError] = useState(null);
-  const [saved, setSaved] = useState(false);
+const successToast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 1800,
+  timerProgressBar: true,
+  didOpen: (el) => {
+    el.addEventListener('mouseenter', Swal.stopTimer);
+    el.addEventListener('mouseleave', Swal.resumeTimer);
+  },
+});
 
-  const handleTranscriptReceived = (data) => {
-    setTranscript(data);
-    setError(null);
-    // Append transcription to notes
-    if (data?.text) {
-      setNotes((prev) => (prev ? prev + '\n' + data.text : data.text));
+function notifySuccess(title) {
+  successToast.fire({ icon: 'success', title });
+}
+
+function notifyError(title) {
+  successToast.fire({ icon: 'error', title, timer: 3000 });
+}
+
+function latestByDate(items) {
+  if (!items || items.length === 0) return null;
+  return [...items].sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
+/* ── Clinical Note (SOAP-style) ──────────────────────────────────────────── */
+const SOAP_SECTIONS = [
+  { id: 'chiefComplaint', label: 'Chief Complaint', icon: Stethoscope, rows: 2,
+    placeholder: 'e.g. Right knee pain for 3 weeks, worse going up stairs.' },
+  { id: 'historyOfPresentIllness', label: 'History of Present Illness', icon: History, rows: 4,
+    placeholder: 'Onset, duration, character, aggravating/relieving factors…' },
+  { id: 'pastMedicalHistory', label: 'Past Medical History', icon: FileText, rows: 3,
+    placeholder: 'Relevant prior conditions, surgeries, medications — leave blank if none.' },
+  { id: 'examination', label: 'Examination', icon: Search, rows: 4,
+    placeholder: 'Inspection, palpation, range of motion, special tests…' },
+  { id: 'assessment', label: 'Assessment', icon: ClipboardList, rows: 3,
+    placeholder: 'Clinical assessment / diagnosis…' },
+  { id: 'plan', label: 'Plan', icon: ListChecks, rows: 4,
+    placeholder: 'Management plan — tests, treatment, follow-up…' },
+];
+
+const EMPTY_SOAP = SOAP_SECTIONS.reduce((acc, s) => ({ ...acc, [s.id]: '' }), {});
+
+// The evaluation's `diagnosis`/`notes` columns are kept for older pages that
+// still read them directly (patient timeline, analytics diagnosis tally,
+// print views) — this derives both from the structured note so there's one
+// source of truth (`soap`) instead of two things that can drift apart.
+function deriveLegacyFields(soap) {
+  const assessmentText = (soap.assessment || '').trim();
+  const diagnosis = assessmentText.split('\n')[0].trim();
+  const notes = SOAP_SECTIONS
+    .map((s) => [s.label, (soap[s.id] || '').trim()])
+    .filter(([, text]) => text)
+    .map(([label, text]) => `${label}:\n${text}`)
+    .join('\n\n');
+  return { diagnosis, notes };
+}
+
+/* ── Workflow Steps ──────────────────────────────────────────────────────── */
+const WORKFLOW_STEPS = [
+  { id: 'check-in',   label: 'Check In',         icon: '🏥' },
+  { id: 'pre-visit',  label: 'Pre-Visit Call',    icon: '📞' },
+  { id: 'assessment', label: 'Nurse Assessment',  icon: '📋' },
+  { id: 'evaluation', label: 'Doctor Evaluation', icon: '🩺' },
+  { id: 'discharge',  label: 'Discharge',         icon: '✅' },
+];
+
+function getActiveStepIndex(patient) {
+  if (!patient) return 0;
+  if (patient.status === 'completed') return 4;
+  if ((patient.evaluations?.length || 0) > 0) return 3;
+  if ((patient.assessments?.length || 0) > 0) return 2;
+  return 0;
+}
+
+// A pre-migration assessment (taken before the real per-instrument scoring
+// engine existed) has no finalScore stored — fall back to the raw/max ratio
+// it does have rather than showing nothing.
+function resolveFinalScore(assessment) {
+  if (!assessment) return null;
+  if (assessment.finalScore !== null && assessment.finalScore !== undefined) return assessment.finalScore;
+  if (assessment.maxScore) return Math.round((assessment.score / assessment.maxScore) * 100);
+  return null;
+}
+
+/* ── Tag Pill ────────────────────────────────────────────────────────────── */
+function TagPill({ label, color }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 12px', borderRadius: 999,
+      fontSize: 12, fontWeight: 600,
+      background: color + '18', color, border: `1px solid ${color}30`,
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  );
+}
+
+/* ── PROM Score Ring (SVG) ──────────────────────────────────────────────── */
+function ScoreRing({ score, max = 100, size = 88, stroke = 8, direction = 'higher_better' }) {
+  const hasScore = score !== null && score !== undefined;
+  const pct    = hasScore ? Math.min(score / max, 1) : 0;
+  const r      = (size - stroke) / 2;
+  const circ   = 2 * Math.PI * r;
+  const offset = circ * (1 - pct);
+
+  // Direction-aware: for a lower_better instrument (e.g. QuickDASH/ODI/NDI,
+  // where 0=best/100=worst) a low score is good, so the colour bands invert.
+  const wellnessPct = direction === 'lower_better' ? 1 - pct : pct;
+  const color = !hasScore ? 'var(--text-muted)' : wellnessPct > 0.7 ? 'var(--success)' : wellnessPct > 0.4 ? 'var(--warning)' : 'var(--danger)';
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        {/* track */}
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        {/* progress */}
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke={color} strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+        />
+      </svg>
+      {/* centre label */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        lineHeight: 1.1,
+      }}>
+        <span style={{ fontSize: 20, fontWeight: 800, color }}>{hasScore ? score : '—'}</span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>/ {max}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Section card wrapper ───────────────────────────────────────────────── */
+function SCard({ title, icon: Icon, children, style = {} }) {
+  return (
+    <div className="pe-scard" style={style}>
+      {title && (
+        <div className="pe-scard-header">
+          {Icon && <Icon size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />}
+          <span className="pe-scard-title">{title}</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/* ── Imaging status badge ───────────────────────────────────────────────── */
+function StatusBadge({ status }) {
+  const cfg = {
+    completed: { label: 'Done',    color: '#059669' },
+    pending:   { label: 'Pending', color: '#d97706' },
+    ordered:   { label: 'Ordered', color: '#6366f1' },
+  }[status] || { label: status, color: '#7a9a9e' };
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: '2px 8px',
+      borderRadius: 999, background: cfg.color + '18', color: cfg.color,
+      border: `1px solid ${cfg.color}30`,
+    }}>{cfg.label}</span>
+  );
+}
+
+/* ── Small modal wrapper (shares .modal-backdrop / .modal / .form-grid) ──── */
+function MiniModal({ title, onClose, onSubmit, submitLabel = 'Save', children }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <h3>{title}</h3>
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+          {children}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={onSubmit}>{submitLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Review & Print View ─────────────────────────────────────────────────── */
+const ORDER_STATUS_COLORS = {
+  pending: '#d97706',
+  active: '#059669',
+  completed: '#059669',
+  scheduled: '#0369a1',
+};
+
+function iconForName(name, options) {
+  return options.find((o) => o.name.toLowerCase() === (name || '').toLowerCase())?.icon || '📄';
+}
+
+/** Derives the printable orders list from the patient's real diagnostics/
+ * treatments records instead of fabricated demo content — necessarily less
+ * detailed than a hand-written demo order (no invented MRI sequence
+ * protocols etc.), since only fields that actually exist in the DB are used. */
+function buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions) {
+  const treatmentOrders = (patient.treatments || []).map((t) => ({
+    id: t.id,
+    kind: 'treatment',
+    icon: iconForName(t.type, treatmentOptions),
+    title: `${t.type} Order`,
+    status: t.status,
+    statusColor: ORDER_STATUS_COLORS[t.status] || '#7a9a9e',
+    summary: t.details || t.type,
+    details: `Duration: ${t.duration}`,
+    note: null,
+    printTitle: `${t.type} Order`,
+    printBody: [
+      ['Treatment', t.type],
+      ['Details', t.details || '—'],
+      ['Duration', t.duration],
+      ['Physician', t.physician],
+      ['Date', t.date],
+      ...(t.followUpDate ? [['Follow-Up Date', t.followUpDate]] : []),
+    ],
+  }));
+
+  const diagnosticOrders = (patient.diagnostics || []).map((d) => ({
+    id: d.id,
+    kind: 'diagnostic',
+    icon: iconForName(d.type, diagnosticTests),
+    title: `${d.type} Request`,
+    status: d.status,
+    statusColor: ORDER_STATUS_COLORS[d.status] || '#7a9a9e',
+    summary: d.type,
+    details: d.result || 'Pending results',
+    note: null,
+    printTitle: `Diagnostic Request — ${d.type}`,
+    printBody: [
+      ['Examination', d.type],
+      ['Date', d.date],
+      ['Status', d.status],
+      ['Result', d.result || 'Pending'],
+    ],
+  }));
+
+  return [...treatmentOrders, ...diagnosticOrders];
+}
+
+function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePlay, audioProgress, audioCurrentTime, audioDuration, formatAudioTime, handleTimeUpdate, handleLoadedMetadata, handleAudioEnd, audioRef, latestAssessment, promName, scoreDirection, finalScore, painNRS, painColor, onBack, diagnosticTests, treatmentOptions }) {
+  const [printOrder, setPrintOrder] = React.useState(null);
+  const [showPrintTypeModal, setShowPrintTypeModal] = React.useState(false);
+  const [printDocType, setPrintDocType] = React.useState(null);
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const evaluation = (patient?.evaluations || []).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const orders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+
+  // Printing is blocking in mainstream browsers — window.print() only returns
+  // once the print dialog closes — so resetting printDocType right after the
+  // call still leaves the insurance flag visible for the whole print/preview.
+  React.useEffect(() => {
+    if (printDocType) {
+      window.print();
+      setPrintDocType(null);
     }
-  };
+  }, [printDocType]);
 
-  const handleError = (msg) => setError(msg);
-
-  const { isRecording, isProcessing, elapsedSeconds, startRecording, stopRecording } =
-    useRecorder({ onTranscriptReceived: handleTranscriptReceived, onError: handleError });
-
-  const handleSave = () => {
-    if (!diagnosis.trim() && !notes.trim()) return;
-    const evaluation = {
-      id: `ev${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      physician: 'Dr. Khalid Mansour',
-      notes: notes.trim(),
-      diagnosis: diagnosis.trim(),
-      audioUrl: null
-    };
-    if (onAddEvaluation) onAddEvaluation(patientId, evaluation);
-    setSaved(true);
-  };
-
-  if (!patient) {
-    return (
-      <>
-        <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
-        <div className="page-body">
-          <div className="empty-state">
-            <div className="empty-state-icon">🩺</div>
-            <p>No patient selected. Please select a patient from their profile page.</p>
-            <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Dashboard</button>
+  return (
+    <div className="pe-review-root" data-doc-type={printDocType || 'standard'} style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Insurance flag — placeholder until the real insurance layout is provided */}
+      {printDocType === 'insurance' && (
+        <div style={{ background: '#fef3c7', color: '#92400e', textAlign: 'center', padding: '6px 12px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
+          🏷 INSURANCE COPY
+        </div>
+      )}
+      {/* Top bar */}
+      <div className="topbar">
+        <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ArrowLeft size={18} /> Back to Evaluation
+          </button>
+          <div>
+            <h1>Review & Print</h1>
+            <p>{patient?.name} · {patient?.mrn}</p>
           </div>
         </div>
-      </>
-    );
-  }
+        <div className="topbar-right">
+          <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            🖨 Print Full Summary
+          </button>
+        </div>
+      </div>
 
-  if (saved) {
-    return (
-      <>
-        <div className="topbar"><div className="topbar-left"><h1>Evaluation Saved</h1></div></div>
-        <div className="page-body">
-          <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Evaluation Recorded</h2>
-            <p className="text-muted mb-4">Physician evaluation for {patient.name} has been saved.</p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
-              <button className="btn btn-outline" onClick={() => navigate(`/diagnostics?patient=${patient.id}`)}>Request Diagnostics</button>
-              <button className="btn btn-outline" onClick={() => navigate('/')}>Dashboard</button>
+      <div className="pe-review-grid" style={{ display: 'grid', gridTemplateColumns: '260px 1fr 360px', gap: 16, padding: '16px 24px', flex: 1, alignItems: 'start' }}>
+
+        {/* ── LEFT: Patient Stats ───────────────────────────────────── */}
+        <div className="pe-review-aside" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Patient card */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ background: patient?.avatar || 'var(--primary)', height: 6 }} />
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{patient?.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{patient?.mrn} · {patient?.age} yrs · {patient?.bodyArea}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div><span style={{ fontWeight: 600 }}>Diagnosis:</span> {evaluation?.diagnosis || '—'}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Physician:</span> {physicianName}</div>
+                <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Date:</span> {today}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pain NRS */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>Pain Score (NRS)</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: 40, fontWeight: 900, color: painColor, lineHeight: 1 }}>{painNRS === null ? '—' : painNRS}</span>
+              <span style={{ fontSize: 18, color: 'var(--text-muted)', fontWeight: 600 }}>/10</span>
+            </div>
+            <div style={{ marginTop: 10, height: 8, borderRadius: 4, background: 'linear-gradient(to right,#10b981,#f59e0b,#ef4444)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>
+              <span>0</span><span>5</span><span>10</span>
+            </div>
+          </div>
+
+          {/* Pre-Visit PROM */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 2 }}>Pre-Visit PROM</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginBottom: 10 }}>{promName}</div>
+            {!latestAssessment ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>No pre-visit assessment completed yet.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Raw Score</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
+                </div>
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Final Score</span>
+                  <span style={{ color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>{finalScore === null ? '—' : finalScore}/100</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function'}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── MIDDLE: Voice Player + Extracted Orders ───────────────── */}
+        <div className="pe-review-aside" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Voice Player */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <AudioWaveformPlayer
+              audioUrl={audioUrl}
+              audioRef={audioRef}
+              isPlaying={isPlaying}
+              togglePlay={togglePlay}
+              audioProgress={audioProgress}
+              audioCurrentTime={audioCurrentTime}
+              audioDuration={audioDuration}
+              formatAudioTime={formatAudioTime}
+              handleTimeUpdate={handleTimeUpdate}
+              handleLoadedMetadata={handleLoadedMetadata}
+              handleAudioEnd={handleAudioEnd}
+            />
+            {/* Clinical notes */}
+            {evaluation?.notes && (
+              <div style={{ padding: '0 18px 14px', fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.6 }}>
+                &ldquo;{evaluation.notes}&rdquo;
+              </div>
+            )}
+          </div>
+
+          {/* Extracted Orders (list) */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ClipboardList size={13} /> Extracted Orders
+            </div>
+            <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {orders.map((order) => (
+                <div key={order.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  padding: '11px 14px', background: 'var(--surface-2)',
+                  borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+                }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{order.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{order.summary}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{order.details}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
+                    <button
+                      onClick={() => setPrintOrder(order)}
+                      style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                    >
+                      🖨 Review & Print
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </>
+
+        {/* ── RIGHT: Formal Document Paper ─────────────────────────── */}
+        <div className="pe-review-paper" style={{
+          background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.08)', overflow: 'hidden',
+          position: 'sticky', top: 80,
+        }}>
+          {/* Document header — hospital letterhead */}
+          <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #0369a1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <img src={rasoulLogo} alt="Al-Rasoul Al-Aazam Hospital" style={{ width: 48, height: 48, flexShrink: 0, objectFit: 'contain' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Al-Rasoul Al-Aazam Hospital</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Orthopedic OPD — Clinical Summary</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>Doctor's Orders Summary</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{patient?.name} · {today}</div>
+          </div>
+
+          {/* Patient strip */}
+          <div style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '10px 24px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[['MRN', patient?.mrn], ['Age', patient?.age ? `${patient.age} yrs` : '—'], ['Diagnosis', evaluation?.diagnosis || '—']].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{l}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Orders table */}
+          <div style={{ padding: '16px 24px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Order</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Details</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Status</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>Print</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order, i) => (
+                  <tr key={order.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '9px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 15 }}>{order.icon}</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 11 }}>{order.title}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '9px 10px', color: '#475569', fontSize: 11 }}>{order.summary}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}25` }}>{order.status}</span>
+                    </td>
+                    <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setPrintOrder(order)}
+                        style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#64748b', fontWeight: 600 }}
+                        title={`Print ${order.title}`}
+                      >
+                        🖨
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Signature block */}
+          <div style={{ margin: '0 24px 20px', borderTop: '1px solid #e2e8f0', paddingTop: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                <div>Date: {today}</div>
+                <div style={{ marginTop: 3 }}>Orthopedic OPD — Official Clinical Document</div>
+                <div style={{ marginTop: 3, fontWeight: 600 }}>This document is computer-generated.</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 140, borderBottom: '2px solid #334155', marginBottom: 4 }} />
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{physicianName}</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>Attending Physician</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Print full doc button */}
+          <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowPrintTypeModal(true)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              🖨 Print Full Document
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {printOrder && (
+        <PrintDocModal
+          order={printOrder}
+          patient={patient}
+          physicianName={physicianName}
+          onClose={() => setPrintOrder(null)}
+        />
+      )}
+
+      {showPrintTypeModal && (
+        <PrintTypeModal
+          onChoose={(type) => { setShowPrintTypeModal(false); setPrintDocType(type); }}
+          onClose={() => setShowPrintTypeModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+export default function PhysicianEvaluation({ patients, user, onAddEvaluation, onCreateEncounter, onUpdateEvaluation, onAddDiagnostic, onDeleteDiagnostic, onAddTreatment, onDeleteTreatment, onMarkEvaluationSent, onUploadDocument, onDeleteDocument }) {
+  /* eslint-disable no-use-before-define */
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const patientId = searchParams.get('patient');
+  const patient   = patients.find((p) => p.id === patientId);
+  const physicianName = user?.name || 'Physician';
+  const latestAssessment = patient ? latestByDate(patient.assessments) : null;
+
+  const [soap, setSoap]                       = useState(EMPTY_SOAP);
+  const [selectedTests, setSelectedTests]     = useState([]);
+  const [treatments, setTreatments]           = useState([]);
+  const [dictation, setDictation]             = useState(null);
+  const [showDictationModal, setShowDictationModal] = useState(false);
+  const [error, setError]                     = useState(null);
+  const [saved, setSaved]                     = useState(false);
+  // The evaluation row (if any) already saved today for this patient — once
+  // set, "Complete Visit" and "New Note" amend it in place instead of each
+  // inserting their own row, so one encounter doesn't fragment into several
+  // partial evaluations (one with no diagnosis, one with no notes, etc.).
+  const [currentEvaluationId, setCurrentEvaluationId] = useState(null);
+  const [encounterId, setEncounterId] = useState(null);
+
+  /* ── Quick-action modal state ── */
+  const [showMedModal, setShowMedModal] = useState(false);
+  const [medForm, setMedForm] = useState({ name: '', dose: '', duration: '' });
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+  const [outcomeForm, setOutcomeForm] = useState({ response: 'improved', outcomeDate: todayIso(), followupScore: '', adherence: '', adverseEvents: '', escalation: '', clinicianNote: '' });
+  const [sendingToPatient, setSendingToPatient] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState(null);
+
+  // Seed the SOAP note from the most recent saved evaluation once per
+  // patient, so reopening an existing evaluation is editable too — not just
+  // a fresh dictation. Only fills in fields that are actually blank so it
+  // never clobbers an in-progress dictation or edit. Chief Complaint also
+  // carries over from the pre-visit intake when nothing's been dictated for
+  // this evaluation yet — the doctor can still overwrite it either way.
+  useEffect(() => {
+    if (!patient) return;
+    const latestEval = latestByDate(patient.evaluations);
+    const seeded = (latestEval?.soapNote && typeof latestEval.soapNote === 'object') ? latestEval.soapNote : null;
+    setSoap((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const field of Object.keys(EMPTY_SOAP)) {
+        if (!next[field] && seeded?.[field]) { next[field] = seeded[field]; changed = true; }
+      }
+      if (!next.chiefComplaint && latestAssessment?.chiefComplaint) {
+        next.chiefComplaint = latestAssessment.chiefComplaint;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+    // Only today's evaluation counts as "the current encounter" to amend —
+    // an older saved evaluation is a past visit and must stay untouched.
+    setCurrentEvaluationId(latestEval?.date === todayIso() ? latestEval.id : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.id]);
+
+  // Walk-in / ER-referral patients can reach the doctor with no pre-visit
+  // PROM on file — this tracks whether one's already been assigned (and to
+  // whom/how) so the "PROM Not Completed" alert doesn't nag once it's in
+  // motion. See components/PromAssignmentModal.jsx / backend/routers/prom_assignments.py.
+  const [promAssignments, setPromAssignments] = useState([]);
+  const [showPromAssignModal, setShowPromAssignModal] = useState(false);
+  useEffect(() => {
+    if (!patientId) { setPromAssignments([]); return; }
+    api.get(`/api/patients/${patientId}/prom-assignments`)
+      .then((res) => setPromAssignments(res.data))
+      .catch(() => setPromAssignments([]));
+  }, [patientId]);
+
+  useEffect(() => {
+    if (!patientId) return;
+    api.get('/api/ai/status').then((res) => setAiStatus(res.data)).catch(() => setAiStatus({ available: false, message: 'AI assistant is unavailable.' }));
+  }, [patientId]);
+
+  const requestAiRecommendation = () => {
+    if (!patientId || aiLoading) return;
+    setAiLoading(true);
+    api.post(`/api/ai/patients/${patientId}/recommendation`, null, { params: { encounter_id: encounterId || undefined } })
+      .then((res) => setAiRecommendation(res.data))
+      .catch(() => setAiRecommendation({ available: false, warnings: ['The assistant could not generate a recommendation.'] }))
+      .finally(() => setAiLoading(false));
+  };
+
+  const recordAiFeedback = (action) => {
+    if (!aiRecommendation?.suggestionId) return;
+    const topTreatment = aiRecommendation.suggestions?.[0]?.treatment || null;
+    api.post(`/api/model-suggestions/${aiRecommendation.suggestionId}/feedback`, {
+      action,
+      finalTreatment: action === 'accepted' ? topTreatment : null,
+    })
+      .then(() => setAiFeedback(action))
+      .catch(() => setAiFeedback('error'));
+  };
+
+  const latestPromAssignment = promAssignments[0] || null;
+  const promAssignmentActive = latestPromAssignment && ['sent_pending', 'assigned_to_clerk', 'overdue'].includes(latestPromAssignment.status);
+
+  const handlePromAssigned = (assignment) => {
+    setShowPromAssignModal(false);
+    setPromAssignments((prev) => [assignment, ...prev.filter((a) => a.id !== assignment.id)]);
+    if (assignment.completionMethod === 'physician_assisted') {
+      navigate(`/assessment?patient=${patientId}&promAssignment=${assignment.id}`);
+    }
+  };
+
+  const updateSoap = (field, value) => setSoap((prev) => ({ ...prev, [field]: value }));
+
+  const toggleDiagnosticTest = (testId) => {
+    setSelectedTests((prev) => prev.includes(testId) ? prev.filter((t) => t !== testId) : [...prev, testId]);
+  };
+
+  const addTreatmentEntry = () => {
+    setTreatments((prev) => [...prev, { uid: uid(), type: '', duration: '', details: '', followUpDate: '' }]);
+  };
+
+  const updateTreatmentEntry = (entryUid, field, value) => {
+    setTreatments((prev) => prev.map((t) => (t.uid === entryUid ? { ...t, [field]: value } : t)));
+  };
+
+  const removeTreatmentEntry = (entryUid) => {
+    setTreatments((prev) => prev.filter((t) => t.uid !== entryUid));
+  };
+
+  /* ── Audio Player State ── */
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  // Set while handleLoadedMetadata is forcing a seek purely to read the real
+  // duration (see below) — handleTimeUpdate skips updating playback-position
+  // state during that window so the seek-and-back doesn't visibly flash the
+  // waveform to "fully played" for a frame.
+  const fixingDurationRef = useRef(false);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) audioRef.current.pause();
+      else audioRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current && !fixingDurationRef.current) {
+      setAudioCurrentTime(audioRef.current.currentTime);
+      setAudioProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isFinite(audio.duration)) {
+      setAudioDuration(audio.duration);
+      return;
+    }
+    // MediaRecorder-produced WebM/Opus commonly reports duration=Infinity on
+    // loadedmetadata (the container has no duration header) — Chrome only
+    // computes the real value once playback seeks near the end. Force that,
+    // capture the now-finite duration, then seek back to the start so this
+    // doesn't disturb normal playback.
+    fixingDurationRef.current = true;
+    const onTimeUpdate = () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      setAudioDuration(audio.duration);
+      audio.currentTime = 0;
+      fixingDurationRef.current = false;
+    };
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.currentTime = 1e101;
+  };
+
+  const handleAudioEnd = () => {
+    setIsPlaying(false);
+    setAudioProgress(0);
+    setAudioCurrentTime(0);
+  };
+
+
+  const formatAudioTime = (time) => {
+    if (isNaN(time) || !isFinite(time)) return '00:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleDictationResult = (data) => {
+    setError(null); setDictation(data); setShowDictationModal(false);
+    // Reset the audio player so it doesn't show stale progress/duration from
+    // a previous recording once the <audio> element's src switches over.
+    setIsPlaying(false); setAudioProgress(0); setAudioCurrentTime(0); setAudioDuration(0);
+    const s = data?.structured;
+    if (!s) return;
+    if (s.soap) {
+      setSoap((prev) => {
+        const next = { ...prev };
+        for (const field of Object.keys(EMPTY_SOAP)) {
+          if (s.soap[field]) next[field] = s.soap[field];
+        }
+        return next;
+      });
+    }
+    if (s.diagnostic_tests?.length) setSelectedTests(s.diagnostic_tests);
+    if (s.treatments?.length)
+      setTreatments(s.treatments.map((t) => ({
+        uid: uid(), type: t.type, duration: t.duration || '',
+        details: t.details || '', followUpDate: t.followUpDate || '',
+      })));
+  };
+
+  const { isRecording, isProcessing, elapsedSeconds, liveCaption, detectedLanguage, analyserRef, startRecording, stopRecording, cancelRecording } =
+    useDictation({ patientId, onResult: handleDictationResult, onError: setError });
+
+  const { diagnosticTests, treatmentOptions, bodyAreas } = useLookup();
+  const assessmentConfig = useAssessmentConfig(latestAssessment?.bodyArea || patient?.bodyArea);
+
+  // Opens the modal in its idle state — recording itself starts when the
+  // doctor clicks the mic inside the modal, not the instant the modal opens.
+  const handleStartDictation = () => { setDictation(null); setError(null); setShowDictationModal(true); };
+  const handleRetryDictation  = () => { setError(null); startRecording(); };
+  const handleCloseDictationModal = () => { setShowDictationModal(false); setError(null); };
+  // Discards the current take (recording or in-flight transcription) and
+  // closes the modal — see useDictation's cancelRecording for what this
+  // aborts under the hood.
+  const handleCancelDictation = () => { cancelRecording(); setShowDictationModal(false); setError(null); };
+
+  // Every clinical record written for this visit (evaluation, diagnostic,
+  // treatment, outcome) must carry the same encounter_id so it shows up in
+  // the research export — see docs/research-steps.md Step 4. The backend
+  // dedupes create-encounter calls by patient+date+status=="open", so
+  // calling this more than once in a session just returns the same row.
+  const ensureEncounter = async () => {
+    if (encounterId) return encounterId;
+    if (!onCreateEncounter) return null;
+    const encounter = await onCreateEncounter(patientId, {
+      encounterDate: patient.appointmentDate || todayIso(),
+      encounterType: isNew ? 'initial' : 'follow_up',
+      bodyArea: patient.bodyArea,
+      previsitSource: latestAssessment?.completedBy || null,
+    });
+    setEncounterId(encounter.id);
+    return encounter.id;
+  };
+
+  const handleSaveAll = async () => {
+    const { diagnosis, notes } = deriveLegacyFields(soap);
+    if (!diagnosis && !notes) return;
+    const activeEncounterId = await ensureEncounter();
+    const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
+
+    // Collect every write instead of firing them off unawaited — a failed
+    // diagnostic/treatment save used to vanish silently (visible only in this
+    // session's optimistic state, gone on refresh) while the UI still
+    // reported success. Now the whole visit save fails loudly instead.
+    const pendingWrites = [];
+
+    if (currentEvaluationId && onUpdateEvaluation) {
+      pendingWrites.push(onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, audioUrl, soapNote: soap }));
+    } else if (onAddEvaluation) {
+      const newId = `ev${Date.now()}`;
+      pendingWrites.push(Promise.resolve(onAddEvaluation(patientId, {
+        id: newId, date: todayIso(), encounter_id: activeEncounterId,
+        physician: physicianName, notes, diagnosis, audioUrl, soapNote: soap,
+      })).then(() => setCurrentEvaluationId(newId)));
+    }
+    selectedTests.forEach((testId) => {
+      const test = diagnosticTests.find((t) => t.id === testId);
+      if (test && onAddDiagnostic) pendingWrites.push(onAddDiagnostic(patientId, {
+        id: `d${Date.now()}-${testId}`, encounter_id: activeEncounterId, type: test.name,
+        date: todayIso(), status: 'pending', result: null,
+      }));
+    });
+    treatments.filter((t) => t.type).forEach((t) => {
+      const opt = treatmentOptions.find((o) => o.id === t.type);
+      if (opt && onAddTreatment) pendingWrites.push(onAddTreatment(patientId, {
+        id: `tr${Date.now()}-${t.type}`, encounter_id: activeEncounterId, type: opt.name,
+        date: todayIso(), physician: physicianName,
+        duration: t.duration || 'TBD', details: t.details?.trim() || '',
+        followUpDate: t.followUpDate || null, status: 'active',
+      }));
+    });
+
+    try {
+      await Promise.all(pendingWrites);
+      setSaved(true);
+    } catch {
+      notifyError('Some changes failed to save — please try again');
+    }
+  };
+
+  /* ── Quick-action handlers ── */
+  const handleSaveMedication = async () => {
+    if (!medForm.name.trim() || !onAddTreatment) return;
+    const details = medForm.dose.trim() ? `${medForm.name.trim()} — ${medForm.dose.trim()}` : medForm.name.trim();
+    const activeEncounterId = await ensureEncounter();
+    Promise.resolve(onAddTreatment(patientId, {
+      id: uid(), type: 'Medication', date: todayIso(), physician: physicianName, encounter_id: activeEncounterId,
+      duration: medForm.duration.trim() || 'TBD', details, followUpDate: null, status: 'active',
+    }))
+      .then(() => notifySuccess('Prescription saved'))
+      .catch(() => notifyError('Failed to save prescription'));
+    setMedForm({ name: '', dose: '', duration: '' });
+    setShowMedModal(false);
+  };
+
+  const handleSaveOutcome = async () => {
+    if (!outcomeForm.outcomeDate) return;
+    const activeEncounterId = await ensureEncounter();
+    api.post(`/api/patients/${patientId}/treatment-outcomes`, {
+      treatment_id: latestTreatment?.id || null,
+      encounter_id: activeEncounterId,
+      outcomeDate: outcomeForm.outcomeDate,
+      followupScore: outcomeForm.followupScore === '' ? null : Number(outcomeForm.followupScore),
+      response: outcomeForm.response,
+      adherence: outcomeForm.adherence.trim() || null,
+      adverseEvents: outcomeForm.adverseEvents.trim() || null,
+      escalation: outcomeForm.escalation.trim() || null,
+      clinicianNote: outcomeForm.clinicianNote.trim() || null,
+    })
+      .then(() => notifySuccess('Treatment outcome saved'))
+      .catch(() => notifyError('Failed to save treatment outcome'));
+    setShowOutcomeModal(false);
+  };
+
+  const handleSaveNote = () => {
+    if (!noteText.trim()) return;
+    // Appends to today's evaluation's Plan section (if one is already open)
+    // instead of inserting a separate row, so a quick note doesn't fork the
+    // encounter into a second, diagnosis-less evaluation — see
+    // currentEvaluationId. Plan is the catch-all section for anything said
+    // outside the structured dictation flow.
+    const mergedPlan = soap.plan.trim() ? `${soap.plan.trim()}\n\n${noteText.trim()}` : noteText.trim();
+    const nextSoap = { ...soap, plan: mergedPlan };
+    setSoap(nextSoap);
+    const { diagnosis, notes } = deriveLegacyFields(nextSoap);
+    let promise;
+    if (currentEvaluationId && onUpdateEvaluation) {
+      promise = onUpdateEvaluation(patientId, currentEvaluationId, { notes, diagnosis, soapNote: nextSoap });
+    } else if (onAddEvaluation) {
+      const newId = `ev${Date.now()}`;
+      const audioUrl = dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null;
+      promise = onAddEvaluation(patientId, {
+        id: newId, date: todayIso(),
+        physician: physicianName, notes, diagnosis, audioUrl, soapNote: nextSoap,
+      });
+      setCurrentEvaluationId(newId);
+    } else {
+      return;
+    }
+    Promise.resolve(promise)
+      .then(() => notifySuccess('Note saved'))
+      .catch(() => notifyError('Failed to save note'));
+    setNoteText('');
+    setShowNoteModal(false);
+  };
+
+  const handleSendToPatient = (evaluationId) => {
+    if (!onMarkEvaluationSent || sendingToPatient) return;
+    setSendingToPatient(true);
+    Promise.resolve(onMarkEvaluationSent(patientId, evaluationId))
+      .then(() => notifySuccess('Sent to patient'))
+      .catch(() => notifyError('Failed to send to patient'))
+      .finally(() => setSendingToPatient(false));
+  };
+
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const handleUploadDocument = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !currentEvaluationId || !onUploadDocument) return;
+    setUploadingDoc(true);
+    Promise.resolve(onUploadDocument(patientId, currentEvaluationId, file, physicianName))
+      .then(() => notifySuccess('Document uploaded'))
+      .catch(() => notifyError('Failed to upload document'))
+      .finally(() => setUploadingDoc(false));
+  };
+
+  const handleDeleteDocument = (documentId) => {
+    if (!onDeleteDocument || !currentEvaluationId) return;
+    Promise.resolve(onDeleteDocument(patientId, currentEvaluationId, documentId))
+      .then(() => notifySuccess('Document removed'))
+      .catch(() => notifyError('Failed to remove document'));
+  };
+
+  const handleDeleteOrder = async (order) => {
+    if (deletingOrderId) return;
+    const confirmed = await Swal.fire({
+      icon: 'warning',
+      title: `Remove ${order.title}?`,
+      text: 'This order will be permanently removed from the patient record.',
+      showCancelButton: true,
+      confirmButtonText: 'Remove',
+      confirmButtonColor: 'var(--danger)',
+      cancelButtonText: 'Cancel',
+    }).then((r) => r.isConfirmed);
+    if (!confirmed) return;
+
+    const handler = order.kind === 'treatment' ? onDeleteTreatment : onDeleteDiagnostic;
+    if (!handler) return;
+    setDeletingOrderId(order.id);
+    Promise.resolve(handler(patientId, order.id))
+      .then(() => notifySuccess('Order removed'))
+      .catch(() => notifyError('Failed to remove order'))
+      .finally(() => setDeletingOrderId(null));
+  };
+
+  /* ── Empty / saved states ── */
+  if (!patient) return (
+    <>
+      <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
+      <div className="page-body">
+        <div className="empty-state">
+          <div className="empty-state-icon">🩺</div>
+          <p>No patient selected.</p>
+          <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Dashboard</button>
+        </div>
+      </div>
+    </>
+  );
+
+  if (saved) return (
+    <>
+      <div className="topbar"><div className="topbar-left"><h1>Visit Recorded</h1></div></div>
+      <div className="page-body">
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Visit Recorded</h2>
+          <p className="text-muted mb-4">Evaluation saved for {patient.name}.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button className="btn btn-primary" onClick={() => navigate(`/patient/${patient.id}`)}>View Profile</button>
+            <button className="btn btn-outline"  onClick={() => navigate('/')}>Dashboard</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  if (!assessmentConfig) return (
+    <>
+      <div className="topbar"><div className="topbar-left"><h1>Physician Evaluation</h1></div></div>
+      <div className="page-body">
+        <div className="empty-state">
+          <div className="empty-state-icon">🩺</div>
+          <p>Loading assessment data…</p>
+        </div>
+      </div>
+    </>
+  );
+
+  /* ── Derived values ── */
+  const initials    = patient.name.split(' ').map((w) => w[0]).join('').slice(0, 2);
+  const isNew       = !patient.evaluations?.length;
+  const activeStep  = getActiveStepIndex(patient);
+
+  const latestEvaluation = latestByDate(patient.evaluations);
+  const currentEvaluationDocuments = patient.evaluations.find((e) => e.id === currentEvaluationId)?.documents || [];
+  const latestTreatment   = latestByDate(patient.treatments);
+  const sortedDiagnostics = [...(patient.diagnostics || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const medications        = (patient.treatments || []).filter((t) => t.type === 'Medication').sort((a, b) => b.date.localeCompare(a.date));
+
+  const chiefComplaint = latestAssessment?.chiefComplaint || 'Not recorded yet.';
+
+  const answers = latestAssessment?.answers || {};
+  const promName = assessmentConfig?.promName || assessmentConfig?.title || 'PROM';
+  const scoreDirection = assessmentConfig?.scoreDirection || 'higher_better';
+  const finalScore = resolveFinalScore(latestAssessment);
+  // getOdiNdiInterpretation assumes ODI/NDI's native 0=best/100=worst scale —
+  // only usable as a fallback for a lower_better instrument. Applying it to a
+  // higher_better score (e.g. a good 72% function score) would mislabel it
+  // with disability-index language like "Crippled".
+  const disabilityInterpretation = latestAssessment?.interpretation
+    || (scoreDirection === 'lower_better' ? getOdiNdiInterpretation(finalScore) : null);
+  const directionCaption = scoreDirection === 'lower_better' ? 'Higher = more disability' : 'Higher = better function';
+
+  // Pain NRS score (0-10) — real only, straight from the shared pain_scale
+  // intake item; null when there's genuinely no pain data recorded (no
+  // fabricated fallback number).
+  let painNRS = null;
+  if (answers['pain_scale'] !== undefined && answers['pain_scale'] !== null && answers['pain_scale'] !== '') {
+    painNRS = Number(answers['pain_scale']);
+  }
+
+  const painColor = painNRS === null ? 'var(--text-muted)' : painNRS > 6 ? '#dc2626' : painNRS > 3 ? '#d97706' : '#059669';
+  const painLabel = painNRS === null ? 'Not recorded' : painNRS > 6 ? 'Severe Pain (ألم شديد)' : painNRS > 3 ? 'Moderate Pain (ألم متوسط)' : 'Mild / Low Pain (ألم خفيف)';
+
+  // Prefer the just-recorded dictation (playable immediately, before the
+  // doctor hits "Confirm & Save All") over the last persisted evaluation's
+  // audio, which only exists once a recording has actually been saved.
+  const audioUrl = (dictation?.audio_filename ? `${API_BASE}/audio/${dictation.audio_filename}` : null)
+    || latestEvaluation?.audioUrl
+    || null;
+
+  const visitDateStr = patient.appointmentDate
+    ? new Date(patient.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '—';
+  const visitTime = patient.appointmentTime || '—';
+
+  const mainOrders = buildOrdersFromPatient(patient, diagnosticTests, treatmentOptions);
+
+  if (showReview) {
+    return (
+      <ReviewPrintView
+        patient={patient}
+        physicianName={physicianName}
+        audioUrl={audioUrl}
+        isPlaying={isPlaying}
+        togglePlay={togglePlay}
+        audioProgress={audioProgress}
+        audioCurrentTime={audioCurrentTime}
+        audioDuration={audioDuration}
+        formatAudioTime={formatAudioTime}
+        handleTimeUpdate={handleTimeUpdate}
+        handleLoadedMetadata={handleLoadedMetadata}
+        handleAudioEnd={handleAudioEnd}
+        audioRef={audioRef}
+        latestAssessment={latestAssessment}
+        promName={promName}
+        scoreDirection={scoreDirection}
+        finalScore={finalScore}
+        painNRS={painNRS}
+        painColor={painColor}
+        onBack={() => setShowReview(false)}
+        diagnosticTests={diagnosticTests}
+        treatmentOptions={treatmentOptions}
+      />
     );
   }
 
   return (
     <>
+      {/* ── Top Bar ─────────────────────────────────────────────────────── */}
       <div className="topbar">
         <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
@@ -96,127 +1102,640 @@ export default function PhysicianEvaluation({ patients, onAddEvaluation }) {
         </div>
       </div>
 
-      <div className="page-body">
-        <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          {/* Patient Summary */}
-          <div className="card mb-4">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div className="patient-avatar" style={{ background: patient.avatar, width: 48, height: 48 }}>
-                {patient.name.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+      {/* ── Page Body ───────────────────────────────────────────────────── */}
+      <div className="pe-page-body">
+
+        {/* ══════════════════════════════════════════════════════════════
+            SECTION 1 — Patient card + workflow progress
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="pe-section1">
+
+          {/* Part A — Patient card */}
+          <div className="pe-patient-card">
+            <div className="pe-avatar-stripe" style={{ background: patient.avatar }}>
+              <span className="pe-avatar-circle">{initials}</span>
+            </div>
+            <div className="pe-patient-info">
+              <div className="pe-info-row pe-name-row">
+                <span className="pe-patient-name">{patient.name}</span>
+                <span className="pe-patient-age">{patient.age} yrs</span>
               </div>
-              <div style={{ flex: 1 }}>
-                <div className="fw-700">{patient.name}</div>
-                <div className="text-muted">{patient.age}y · {patient.gender} · {patient.bodyArea}</div>
+              <div className="pe-info-row">
+                <span className="pe-info-label">MRN</span>
+                <span className="pe-info-value">{patient.mrn}</span>
+                <span className="pe-dot">·</span>
+                <span className="pe-info-label">Visit</span>
+                <span className="pe-info-value">{visitDateStr} at {visitTime}</span>
               </div>
-              {patient.assessments.length > 0 && (
-                <div style={{ textAlign: 'right' }}>
-                  <div className="text-muted text-sm">Last Assessment Score</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)' }}>
-                    {patient.assessments[patient.assessments.length - 1].score}/{patient.assessments[patient.assessments.length - 1].maxScore}
-                  </div>
-                </div>
-              )}
+              <div className="pe-info-row pe-tags-row">
+                <TagPill label={isNew ? '🆕 New Patient' : '🔄 Returning'} color={isNew ? '#0369a1' : '#059669'} />
+                {patient.bodyArea && <TagPill label={`📍 ${patient.bodyArea}`} color="#d97706" />}
+              </div>
             </div>
           </div>
 
-          {/* Previous Assessments Quick View */}
-          {patient.assessments.length > 0 && (
-            <div className="card mb-4">
-              <div className="card-title" style={{ marginBottom: 12 }}>
-                <FileText size={16} style={{ display: 'inline', marginRight: 6 }} />
-                Nurse Assessment Summary
-              </div>
-              {patient.assessments.map((a) => (
-                <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm fw-600">{a.type} — {a.bodyArea} ({a.date})</span>
-                    <span className="badge badge-active">Score: {a.score}/{a.maxScore}</span>
+          {/* Part B — Progress stepper */}
+          <div className="pe-progress-wrapper">
+            <div className="pe-progress-track">
+              {WORKFLOW_STEPS.map((step, idx) => {
+                const isDone    = idx < activeStep;
+                const isCurrent = idx === activeStep;
+                return (
+                  <div key={step.id} className="pe-step-item">
+                    {idx > 0 && <div className={`pe-connector ${isDone || isCurrent ? 'pe-connector--done' : ''}`} />}
+                    <div className={`pe-step-node ${isDone ? 'pe-step--done' : isCurrent ? 'pe-step--current' : 'pe-step--pending'}`}>
+                      {isDone ? '✓' : step.icon}
+                    </div>
+                    <div className={`pe-step-label ${isCurrent ? 'pe-step-label--current' : ''}`}>{step.label}</div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Diagnosis */}
-          <div className="card mb-4">
-            <div className="form-group">
-              <label className="form-label">Diagnosis</label>
-              <input
-                className="form-control"
-                placeholder="e.g., Osteoarthritis Grade 3, Rotator Cuff Tear…"
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-              />
+                );
+              })}
             </div>
           </div>
 
-          {/* Voice Recorder */}
-          <div className="voice-recorder-card mb-4">
-            <h3>🎙 Voice Notes — Whisper AI</h3>
-            <p>Record your clinical observations. Speech will be transcribed automatically.</p>
+        </div>{/* end section1 */}
 
-            <button
-              className={`record-btn-medical ${isRecording ? 'recording' : ''}`}
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <div className="spin-ring" style={{ width: 28, height: 28 }} />
-              ) : isRecording ? (
-                <Square size={28} />
+        {/* ══════════════════════════════════════════════════════════════
+            SECTION 2 — Main 3-column grid
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="pe-grid">
+
+          {/* ── LEFT COLUMN ──────────────────────────────────────────── */}
+          <div className="pe-col pe-col-left">
+
+            {/* Card 1 — Chief Complaint */}
+            <SCard title="Chief Complaint" icon={Stethoscope}>
+              <p className="pe-complaint-text">{chiefComplaint}</p>
+            </SCard>
+
+            {/* Card 2 — Pre-Visit PROM */}
+            <SCard title={`Pre-Visit PROM — ${promName}`} icon={FlaskConical}>
+              {!latestAssessment ? (
+                promAssignmentActive ? (
+                  <div className="prom-alert-banner" style={{ background: 'var(--info-light)', color: 'var(--info-dark)', borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                    <Clock3 size={16} />
+                    <span>
+                      PROM assigned — {latestPromAssignment.status === 'assigned_to_clerk' ? 'Assigned to Clerk' : latestPromAssignment.status === 'overdue' ? 'Overdue' : 'Sent to Patient (Pending)'}
+                    </span>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowPromAssignModal(true)}>Reassign</button>
+                  </div>
+                ) : (
+                  <div className="prom-alert-banner">
+                    <AlertTriangle size={16} />
+                    <span>PROM Not Completed</span>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowPromAssignModal(true)}>Select &amp; Assign PROM</button>
+                  </div>
+                )
               ) : (
-                <Mic size={28} />
-              )}
-            </button>
-
-            {isRecording && (
-              <>
-                <div className="record-timer-medical">{formatTimer(elapsedSeconds)}</div>
-                <div className="record-status-medical">Recording… Click to stop</div>
-              </>
-            )}
-            {isProcessing && <div className="record-status-medical">Transcribing with Whisper AI…</div>}
-            {!isRecording && !isProcessing && <div className="record-status-medical">Click the mic to start recording</div>}
-
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 12, marginTop: 16, color: '#fca5a5', fontSize: 13 }}>
-                ⚠️ {error}
-              </div>
-            )}
-
-            {transcript && (
-              <div className="transcript-result">
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {transcript.language && `Detected: ${transcript.language}`}
+                <div className="pe-prom-body">
+                  <ScoreRing score={finalScore} size={96} stroke={9} direction={scoreDirection} />
+                  <div className="pe-prom-list">
+                    <div className="pe-prom-row">
+                      <span className="pe-prom-label">Raw Score</span>
+                      <span className="pe-prom-val" style={{ color: 'var(--text-primary)' }}>{latestAssessment.score} / {latestAssessment.maxScore}</span>
+                    </div>
+                    <div className="pe-prom-total">
+                      <span>Final Score</span>
+                      <span style={{ fontWeight: 800, color: finalScore === null ? 'var(--text-muted)' : 'var(--primary)' }}>
+                        {finalScore === null ? '—' : finalScore} / 100
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{directionCaption}</div>
+                    {disabilityInterpretation && (
+                      <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Disability Severity</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{disabilityInterpretation.label}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {transcript.text}
+              )}
+            </SCard>
+
+            {/* Card 3 — Pain Score (NRS) */}
+            <SCard title="Pain Score (NRS)" icon={Zap}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1, color: painColor }}>
+                    {painNRS === null ? '—' : painNRS} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>/ 10</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>
+                    Numeric Rating Scale
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+                  background: `${painColor}18`, color: painColor, border: `1px solid ${painColor}35`
+                }}>
+                  {painLabel}
+                </span>
               </div>
-            )}
-          </div>
 
-          {/* Written Notes */}
-          <div className="card mb-4">
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Clinical Notes</label>
-              <textarea
-                className="form-control"
-                rows={8}
-                placeholder="Type or use the voice recorder above to add notes. Transcribed audio will appear here automatically."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+              <div style={{ position: 'relative', marginTop: 14, marginBottom: 8 }}>
+                <div style={{
+                  height: 10, borderRadius: 5,
+                  background: 'linear-gradient(to right, #059669 0%, #d97706 50%, #dc2626 100%)',
+                  width: '100%'
+                }} />
+                {painNRS !== null && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -3,
+                    left: `calc(${Math.min(100, Math.max(0, (painNRS / 10) * 100))}% - 8px)`,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    border: `3px solid ${painColor}`,
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                    transition: 'left 0.4s ease'
+                  }} />
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
+                <span>0 (No Pain)</span>
+                <span>3 (Mild)</span>
+                <span>6 (Moderate)</span>
+                <span>10 (Severe)</span>
+              </div>
+            </SCard>
+
+            {/* Card 4 — PROM Trend */}
+            <SCard title={`PROM Trend — ${promName}`} icon={TrendingUp}>
+              <PromTrendChart patientId={patientId} scoreDirection={scoreDirection} />
+            </SCard>
+
+          </div>{/* end left col */}
+
+          {/* ── MIDDLE COLUMN (double width) ─────────────────────────── */}
+          <div className="pe-col pe-col-mid">
+            <SCard style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+
+              {/* 1. Doctor Voice Note — decoded waveform player */}
+              <AudioWaveformPlayer
+                audioUrl={audioUrl}
+                audioRef={audioRef}
+                isPlaying={isPlaying}
+                togglePlay={togglePlay}
+                audioProgress={audioProgress}
+                audioCurrentTime={audioCurrentTime}
+                audioDuration={audioDuration}
+                formatAudioTime={formatAudioTime}
+                handleTimeUpdate={handleTimeUpdate}
+                handleLoadedMetadata={handleLoadedMetadata}
+                handleAudioEnd={handleAudioEnd}
               />
-            </div>
+
+              {/* 2. Clinical Note — 6-section SOAP-style notepad. Scrolls
+                  internally (pe-note-paper already has overflow-y:auto and
+                  sits in a flex:1 card) so a long dictation never grows the
+                  page layout; each field is dictation-filled, then editable. */}
+              <div className="pe-note-paper pe-soap-notepad">
+                {isRecording && (
+                  <div className="pe-soap-live-caption">
+                    <Mic size={12} />
+                    <span>{liveCaption || 'Listening…'}</span>
+                  </div>
+                )}
+                {dictation?.text && (
+                  <div className="pe-note-section pe-soap-transcript">
+                    <h4 className="pe-note-h4"><FileText size={13} /> Raw Transcript</h4>
+                    <p style={{ fontStyle: 'italic' }}>{dictation.text}</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Check this against what was actually said — the sections below are the AI's structured, grammar-corrected read of it, and can be edited before you click Complete Visit.
+                    </p>
+                  </div>
+                )}
+                {SOAP_SECTIONS.map(({ id, label, icon: Icon, rows, placeholder }) => (
+                  <div className="pe-note-section pe-soap-section" key={id}>
+                    <h4 className="pe-note-h4"><Icon size={13} /> {label}</h4>
+                    <textarea
+                      className="form-control pe-soap-textarea"
+                      rows={rows}
+                      placeholder={placeholder}
+                      value={soap[id]}
+                      onChange={(e) => updateSoap(id, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {/* 3. Record Button Area */}
+              <div className="pe-record-controls">
+                <button
+                  className={`pe-btn-toggle-record ${isRecording ? 'recording' : ''}`}
+                  onClick={isRecording ? stopRecording : handleStartDictation}
+                >
+                  <Mic size={20} />
+                  {isRecording ? 'Stop Recording' : 'Start Recording'}
+                </button>
+              </div>
+
+            </SCard>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button className="btn btn-ghost" onClick={() => navigate(-1)}>Cancel</button>
-            <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={!diagnosis.trim() && !notes.trim()}>
-              <Save size={18} /> Save Evaluation
+          {/* ── RIGHT COLUMN ─────────────────────────────────────────── */}
+          <div className="pe-col pe-col-right">
+
+            <SCard title="AI Clinical Assistant" icon={BrainCircuit}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+                  Decision support only. Suggestions never prescribe or place orders automatically.
+                </p>
+                {!aiStatus?.available && !aiRecommendation?.available ? (
+                  <div style={{ padding: 10, borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 12 }}>
+                    {aiStatus?.message || 'Checking for a validated treatment model…'}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={requestAiRecommendation}
+                  disabled={aiLoading || !aiStatus?.available}
+                >
+                  <BrainCircuit size={14} /> {aiLoading ? 'Analyzing…' : 'Generate suggestions'}
+                </button>
+                {aiRecommendation?.available && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {aiRecommendation.suggestions?.map((item) => (
+                      <div key={item.treatment} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 'var(--radius)', background: 'var(--primary-light)' }}>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{item.treatment}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)' }}>{Math.round(item.confidence * 100)}%</span>
+                      </div>
+                    ))}
+                    {aiRecommendation.warnings?.map((warning) => <p key={warning} style={{ color: 'var(--warning-dark)', fontSize: 11, margin: 0 }}><AlertTriangle size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{warning}</p>)}
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Model: {aiRecommendation.modelVersion}</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => recordAiFeedback('accepted')} disabled={!!aiFeedback}>Accept</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('edited')} disabled={!!aiFeedback}>Edit in treatment plan</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => recordAiFeedback('rejected')} disabled={!!aiFeedback}>Reject</button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => recordAiFeedback('insufficient')} disabled={!!aiFeedback}>Not enough information</button>
+                    </div>
+                    {aiFeedback && aiFeedback !== 'error' && <span style={{ color: 'var(--success)', fontSize: 11 }}>Feedback recorded: {aiFeedback}.</span>}
+                    {aiFeedback === 'error' && <span style={{ color: 'var(--danger)', fontSize: 11 }}>Feedback could not be recorded.</span>}
+                  </div>
+                )}
+              </div>
+            </SCard>
+
+            {/* ─── Card: Orders & Documents ─────────────────────────── */}
+            <SCard title="Orders & Documents" icon={ClipboardList} style={{ flex: 1 }}>
+
+              {/* ── Draft orders for this visit — dictation-filled or added
+                  manually, editable right up until Complete Visit persists
+                  them below as Diagnostic/Treatment records. ── */}
+              <div className="pe-orders-draft">
+                <div className="pe-orders-draft-label">
+                  <FlaskConical size={13} /> Diagnostic Tests
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                  {diagnosticTests.map((t) => (
+                    <label
+                      key={t.id}
+                      className={`pe-test-pill ${selectedTests.includes(t.id) ? 'selected' : ''}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                        fontSize: 12, padding: '5px 10px', borderRadius: 999,
+                        border: `1px solid ${selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--border)'}`,
+                        background: selectedTests.includes(t.id) ? 'var(--primary-light)' : 'var(--surface-2)',
+                        color: selectedTests.includes(t.id) ? 'var(--primary)' : 'var(--text-secondary)',
+                        fontWeight: selectedTests.includes(t.id) ? 700 : 500,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTests.includes(t.id)}
+                        onChange={() => toggleDiagnosticTest(t.id)}
+                        style={{ margin: 0 }}
+                      />
+                      {t.icon} {t.name}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="pe-orders-draft-label">
+                  <Pill size={13} /> Treatment Plan
+                </div>
+                {treatments.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>No treatments added yet.</p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {treatments.map((t) => (
+                    <div key={t.uid} className="pe-treatment-card">
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          value={t.type}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'type', e.target.value)}
+                        >
+                          <option value="">Select treatment type…</option>
+                          {treatmentOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="pe-treatment-remove"
+                          onClick={() => removeTreatmentEntry(t.uid)}
+                          title="Remove"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          placeholder="Duration (e.g. 6 weeks)"
+                          value={t.duration}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'duration', e.target.value)}
+                        />
+                        <input
+                          className="form-control"
+                          style={{ flex: 1 }}
+                          type="date"
+                          value={t.followUpDate || ''}
+                          onChange={(e) => updateTreatmentEntry(t.uid, 'followUpDate', e.target.value)}
+                        />
+                      </div>
+                      <textarea
+                        className="form-control"
+                        rows={2}
+                        placeholder="Details / instructions"
+                        value={t.details}
+                        onChange={(e) => updateTreatmentEntry(t.uid, 'details', e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{ marginTop: 8 }}
+                  onClick={addTreatmentEntry}
+                >
+                  + Add Treatment
+                </button>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
+
+              <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
+                <ClipboardList size={13} /> Recorded Orders
+              </div>
+              {mainOrders.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No orders recorded yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {mainOrders.map((order) => (
+                    <div key={order.id} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                        <span style={{ fontSize: 16 }}>{order.icon}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrder(order)}
+                          disabled={deletingOrderId === order.id}
+                          title="Remove order"
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22, borderRadius: 6, border: 'none',
+                            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                            opacity: deletingOrderId === order.id ? 0.5 : 1, flexShrink: 0,
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 12%, transparent)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{order.summary} — {order.details}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
+
+              {/* ── Attached Documents (MRI scans, reports, etc.) ── */}
+              <div className="pe-orders-draft-label" style={{ marginBottom: 10 }}>
+                <FileText size={13} /> Attached Documents
+              </div>
+              {!currentEvaluationId ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Save the evaluation (Complete Visit) before attaching documents.</p>
+              ) : (
+                <>
+                  {currentEvaluationDocuments.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>No documents attached yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      {currentEvaluationDocuments.map((doc) => (
+                        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '8px 12px' }}>
+                          <FileText size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                          <a
+                            href={withAuthToken(`${API_BASE}/documents/${doc.filename}`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {doc.originalName}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            title="Remove document"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              width: 22, height: 22, borderRadius: 6, border: 'none',
+                              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="btn btn-outline btn-sm" style={{ display: 'inline-flex', cursor: uploadingDoc ? 'not-allowed' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
+                    {uploadingDoc ? 'Uploading…' : '+ Attach Document (JPG/PNG/PDF)'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,application/pdf"
+                      onChange={handleUploadDocument}
+                      disabled={uploadingDoc}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </>
+              )}
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 14px' }} />
+
+              {/* ── Follow-Up ── */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                  <span style={{ fontSize: 16 }}>📅</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Follow-Up</span>
+                </div>
+                {latestTreatment?.followUpDate ? (
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>{latestTreatment.followUpDate}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{latestTreatment.type}{latestTreatment.details ? ` — ${latestTreatment.details}` : ''}</div>
+                    </div>
+                    <CalendarCheck size={22} style={{ color: 'var(--primary)', opacity: 0.7 }} />
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No follow-up scheduled yet.</p>
+                )}
+              </div>
+
+            </SCard>
+
+          </div>{/* end right col */}
+
+        </div>{/* end pe-grid */}
+
+        {/* ══════════════════════════════════════════════════════════════
+            SECTION 3 — Quick Actions
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="pe-quick-actions">
+          <span className="pe-qa-label">Quick Actions</span>
+          <div className="pe-qa-buttons">
+            <button className="pe-qa-btn pe-qa-note" onClick={() => setShowNoteModal(true)}>
+              <FilePlus size={18} />
+              <span>New Note</span>
+            </button>
+            <button className="pe-qa-btn pe-qa-rx" onClick={() => setShowMedModal(true)}>
+              <ClipboardList size={18} />
+              <span>Order Prescription</span>
+            </button>
+            <button className="pe-qa-btn pe-qa-note" onClick={() => setShowOutcomeModal(true)}>
+              <TrendingUp size={18} />
+              <span>Record Outcome</span>
+            </button>
+            <button className="pe-qa-btn pe-qa-print" onClick={() => setShowReview(true)}>
+              <Printer size={18} />
+              <span>Review & Print</span>
+            </button>
+            <button
+              className="pe-qa-btn pe-qa-send"
+              disabled={!latestEvaluation || sendingToPatient || latestEvaluation?.sentToPatient}
+              title={!latestEvaluation ? 'Complete an evaluation first' : undefined}
+              onClick={() => latestEvaluation && handleSendToPatient(latestEvaluation.id)}
+            >
+              {latestEvaluation?.sentToPatient ? <Check size={18} /> : <Send size={18} />}
+              <span>{latestEvaluation?.sentToPatient ? 'Sent to Patient' : 'Send to Patient'}</span>
+            </button>
+            <button className="pe-qa-btn pe-qa-complete" onClick={handleSaveAll}>
+              <UserCheck size={18} />
+              <span>Complete Visit</span>
             </button>
           </div>
         </div>
-      </div>
+
+      </div>{/* end pe-page-body */}
+
+      <DictationRecordingModal
+        open={showDictationModal}
+        isRecording={isRecording}
+        isProcessing={isProcessing}
+        elapsedSeconds={elapsedSeconds}
+        liveCaption={liveCaption}
+        error={error}
+        detectedLanguage={detectedLanguage}
+        analyserRef={analyserRef}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+        onCancel={handleCancelDictation}
+        onRetry={handleRetryDictation}
+        onClose={handleCloseDictationModal}
+      />
+
+      {showPromAssignModal && (
+        <PromAssignmentModal
+          patient={patient}
+          bodyAreas={bodyAreas}
+          onClose={() => setShowPromAssignModal(false)}
+          onAssigned={handlePromAssigned}
+        />
+      )}
+
+      {/* ── Add Medication / Order Prescription modal ── */}
+      {showMedModal && (
+        <MiniModal title="Order Prescription" onClose={() => setShowMedModal(false)} onSubmit={handleSaveMedication}>
+          <div className="form-group">
+            <label className="form-label">Medication Name</label>
+            <input className="form-control" placeholder="e.g. Diclofenac 75mg" value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Dose</label>
+            <input className="form-control" placeholder="e.g. 1 tab twice daily" value={medForm.dose} onChange={(e) => setMedForm({ ...medForm, dose: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Duration</label>
+            <input className="form-control" placeholder="e.g. 7 days" value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} />
+          </div>
+        </MiniModal>
+      )}
+
+      {/* ── New Note modal ── */}
+      {showNoteModal && (
+        <MiniModal title="New Note" onClose={() => setShowNoteModal(false)} onSubmit={handleSaveNote}>
+          <div className="form-group">
+            <label className="form-label">Note</label>
+            <textarea className="form-control" rows={5} placeholder="Add a quick note — appended to the Plan section…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+          </div>
+        </MiniModal>
+      )}
+
+      {showOutcomeModal && (
+        <MiniModal title="Record Treatment Outcome" onClose={() => setShowOutcomeModal(false)} onSubmit={handleSaveOutcome}>
+          <p className="text-muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Record the patient response after treatment. This supports longitudinal research and does not change the original treatment order.
+          </p>
+          <div className="form-group">
+            <label className="form-label">Treatment</label>
+            <input className="form-control" value={latestTreatment ? `${latestTreatment.type}${latestTreatment.details ? ` — ${latestTreatment.details}` : ''}` : 'No treatment selected'} readOnly />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Outcome date</label>
+              <input className="form-control" type="date" value={outcomeForm.outcomeDate} onChange={(e) => setOutcomeForm({ ...outcomeForm, outcomeDate: e.target.value })} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Follow-up score</label>
+              <input className="form-control" type="number" min="0" step="0.1" placeholder="Optional" value={outcomeForm.followupScore} onChange={(e) => setOutcomeForm({ ...outcomeForm, followupScore: e.target.value })} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Patient response</label>
+            <select className="form-control" value={outcomeForm.response} onChange={(e) => setOutcomeForm({ ...outcomeForm, response: e.target.value })}>
+              <option value="improved">Improved</option>
+              <option value="unchanged">Unchanged</option>
+              <option value="worse">Worse</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Adherence</label>
+            <input className="form-control" placeholder="e.g. Completed physiotherapy as planned" value={outcomeForm.adherence} onChange={(e) => setOutcomeForm({ ...outcomeForm, adherence: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Adverse events</label>
+            <input className="form-control" placeholder="None, or describe" value={outcomeForm.adverseEvents} onChange={(e) => setOutcomeForm({ ...outcomeForm, adverseEvents: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Escalation</label>
+            <input className="form-control" placeholder="e.g. Referred for MRI or surgery review" value={outcomeForm.escalation} onChange={(e) => setOutcomeForm({ ...outcomeForm, escalation: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Clinical note</label>
+            <textarea className="form-control" rows={3} placeholder="Additional follow-up context" value={outcomeForm.clinicianNote} onChange={(e) => setOutcomeForm({ ...outcomeForm, clinicianNote: e.target.value })} />
+          </div>
+        </MiniModal>
+      )}
     </>
   );
 }

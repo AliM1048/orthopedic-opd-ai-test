@@ -1,0 +1,13 @@
+{
+  "sectionNurse": "الممرض/ة",
+  "sectionPhysician": "الطبيب",
+  "sectionSurgery": "الجراحة",
+  "sectionRecords": "السجلات",
+  "dashboard": "لوحة التحكم",
+  "messages": "الرسائل",
+  "evaluation": "التقييم",
+  "surgeries": "العمليات الجراحية",
+  "analytics": "التحليلات",
+  "patientStatus": "حالة المريض",
+  "generateDocument": "إنشاء مستند"
+}

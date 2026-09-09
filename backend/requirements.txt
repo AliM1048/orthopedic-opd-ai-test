@@ -1,14 +1,15 @@
 fastapi
 uvicorn[standard]
-openai-whisper
-pymongo
+openai
 python-multipart
 python-dotenv
-resemblyzer
 pydub
-numpy
 sqlalchemy
 psycopg2-binary
 pyjwt
 passlib[bcrypt]
 bcrypt
+requests
+# Runtime dependencies for loading the validated treatment model.
+pandas
+catboost

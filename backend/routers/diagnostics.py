@@ -33,3 +33,18 @@ def update_diagnostic(patient_id: str, diagnostic_id: str, body: DiagnosticUpdat
         setattr(diagnostic, key, val)
     db.commit()
     return _build_patient(patient, db)
+
+
+@router.delete("/{patient_id}/diagnostics/{diagnostic_id}", response_model=PatientOut)
+def delete_diagnostic(patient_id: str, diagnostic_id: str, db: Session = Depends(get_db)):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    diagnostic = db.query(Diagnostic).filter(
+        Diagnostic.id == diagnostic_id, Diagnostic.patient_id == patient_id
+    ).first()
+    if not diagnostic:
+        raise HTTPException(status_code=404, detail="Diagnostic not found")
+    db.delete(diagnostic)
+    db.commit()
+    return _build_patient(patient, db)

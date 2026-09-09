@@ -1,68 +1,96 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Activity, Stethoscope, HeartPulse } from 'lucide-react';
+import { Activity, Sun, Moon } from 'lucide-react';
+import api from '../api';
+import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../hooks/useLanguage';
+import LanguageSwitcher from '../components/common/LanguageSwitcher';
 
 export default function Login({ onLogin }) {
-  const [role, setRole] = useState('nurse');
-  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
+  const [email, setEmail] = useState('nurse.sara@ortho.com');
+  const [password, setPassword] = useState('password');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (onLogin) onLogin(role);
-    navigate('/');
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      const { access_token, user } = res.data;
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      if (onLogin) onLogin(access_token, user);
+    } catch (err) {
+      setError(err.response?.data?.detail || t('login.loginFailed'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="login-page">
+      <div className="login-header-actions">
+        <LanguageSwitcher className="login-theme-toggle" />
+        <button
+          type="button"
+          className="login-theme-toggle"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? t('common.switchToLightMode') : t('common.switchToDarkMode')}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
       <div className="login-card">
         <div className="login-logo">
           <div className="login-logo-icon"><Activity size={24} /></div>
           <div>
-            <h1>OrthoOPD</h1>
-            <p>Patient Management System</p>
+            <h1>{t('common.appName')}</h1>
+            <p>{t('login.systemName')}</p>
           </div>
         </div>
 
-        <h2 className="login-title">Welcome Back</h2>
-        <p className="login-sub">Sign in to access the orthopedic patient management system.</p>
+        <h2 className="login-title">{t('login.welcomeBack')}</h2>
+        <p className="login-sub">{t('login.subtitle')}</p>
 
-        <form onSubmit={handleLogin}>
-          <div className="login-role-grid">
-            <button
-              type="button"
-              className={`role-btn ${role === 'nurse' ? 'selected' : ''}`}
-              onClick={() => setRole('nurse')}
-            >
-              <div className="role-btn-icon"><HeartPulse size={24} /></div>
-              <div className="role-btn-label">Nurse</div>
-            </button>
-            <button
-              type="button"
-              className={`role-btn ${role === 'physician' ? 'selected' : ''}`}
-              onClick={() => setRole('physician')}
-            >
-              <div className="role-btn-icon"><Stethoscope size={24} /></div>
-              <div className="role-btn-label">Physician</div>
-            </button>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">{t('login.username')}</label>
+            <input
+              className="form-control"
+              type="text"
+              placeholder={t('login.usernamePlaceholder')}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <input className="form-control" type="email" placeholder="name@hospital.com" defaultValue="nurse.sara@ortho.com" />
+            <label className="form-label">{t('login.password')}</label>
+            <input
+              className="form-control"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input className="form-control" type="password" placeholder="••••••••" defaultValue="password" />
-          </div>
+          {error && (
+            <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 8, textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
 
-          <button type="submit" className="btn btn-primary btn-lg w-full" style={{ justifyContent: 'center', marginTop: 8 }}>
-            Sign In
+          <button type="submit" className="btn btn-primary btn-lg w-full" style={{ justifyContent: 'center', marginTop: 8 }} disabled={submitting}>
+            {submitting ? t('login.signingIn') : t('login.signIn')}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 20 }}>
-          Demo credentials are pre-filled. Select a role and sign in.
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 20 }}>
+          {t('login.demoCredentials')}
         </p>
       </div>
     </div>

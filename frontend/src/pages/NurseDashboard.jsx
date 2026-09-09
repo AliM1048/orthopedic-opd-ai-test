@@ -1,12 +1,58 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, PhoneCall, ArrowRight } from 'lucide-react';
+import Swal from 'sweetalert2';
 import StatusBadge from '../components/common/StatusBadge';
+import api from '../api';
 
-export default function NurseDashboard({ patients, onUpdateStatus }) {
+// Top-center, fading in/out rather than the library's default slide-and-pop —
+// see the .opd-toast* rules in index.css for the actual look.
+const notifyToast = Swal.mixin({
+  toast: true,
+  position: 'top',
+  showConfirmButton: false,
+  timer: 6000,
+  timerProgressBar: true,
+  showClass: { popup: 'opd-toast-in' },
+  hideClass: { popup: 'opd-toast-out' },
+  customClass: { popup: 'opd-toast' },
+  didOpen: (el) => {
+    el.addEventListener('mouseenter', Swal.stopTimer);
+    el.addEventListener('mouseleave', Swal.resumeTimer);
+  },
+});
+
+export default function NurseDashboard({ patients, onUpdateStatus, createPatient }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({
+    name: '', mrn: '', age: 30, gender: 'Male', dob: '', bodyArea: 'Knee', appointmentDate: '', appointmentTime: '', phone: '', email: '', address: '', bloodType: 'O+', allergies: '', avatar: '#7c3aed'
+  });
   const navigate = useNavigate();
+
+  // Pre-visit call reminders — covers both the very first pre-visit PROM
+  // (patient still "pending" with an upcoming appointment) and the
+  // recurring 3/6/9-month follow-up check-ins, so either one shows here
+  // whether a nurse calls it in or the patient self-completes it via the
+  // mobile app. Full follow-up management lives on /followups; this is just
+  // the "look here today" prompt. See backend/routers/followups.py:list_due_followups.
+  const [dueCalls, setDueCalls] = useState([]);
+  useEffect(() => {
+    api.get('/api/followups/due').then((res) => setDueCalls(res.data)).catch(() => setDueCalls([]));
+  }, []);
+
+  // Pop a toast for each unread staff notification (e.g. "patient completed
+  // their pre-visit questionnaire via the app") on dashboard load, then mark
+  // them read — the same lightweight "surfaced on next load" pattern as the
+  // due-calls reminder above, no live push infrastructure needed.
+  useEffect(() => {
+    api.get('/api/staff/notifications').then((res) => {
+      const unread = res.data.filter((n) => !n.isRead);
+      unread.forEach((n) => notifyToast.fire({ icon: 'success', title: n.title, text: n.body || undefined }));
+      if (unread.length) api.patch('/api/staff/notifications/read-all').catch(() => {});
+    }).catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     let list = patients;
@@ -70,6 +116,49 @@ export default function NurseDashboard({ patients, onUpdateStatus }) {
           </div>
         </div>
 
+        {/* Pre-Visit Call Reminders — the very first pre-visit PROM for a
+            patient with an upcoming appointment, or a recurring 3/6/9-month
+            follow-up check-in. Either can be closed out by the nurse calling
+            it in here, or by the patient self-completing it via the mobile
+            app beforehand — this list just reflects whatever's still open. */}
+        {dueCalls.length > 0 && (
+          <div className="card" style={{ marginBottom: 16, borderColor: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 4%, var(--surface))' }}>
+            <div className="card-header">
+              <div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <PhoneCall size={15} style={{ color: 'var(--danger)' }} />
+                  Pre-Visit Calls Due
+                </div>
+                <div className="card-subtitle">{dueCalls.length} patient{dueCalls.length !== 1 ? 's' : ''} need a pre-visit or follow-up PROM call soon — call whoever hasn't self-completed it via the app</div>
+              </div>
+              {/* <button className="btn btn-outline btn-sm" onClick={() => navigate('/followups')}>
+                View All <ArrowRight size={14} />
+              </button> */}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {dueCalls.slice(0, 4).map((call) => (
+                <div key={call.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                  <div className="patient-avatar" style={{ background: call.patientAvatar, width: 32, height: 32, fontSize: 12 }}>
+                    {call.patientName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{call.patientName} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>· {call.patientMrn}</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {call.intervalMonths ? `${call.intervalMonths}-month check-in` : 'Initial pre-visit questionnaire'} · {call.intervalMonths ? 'scheduled' : 'appointment'} {call.scheduledDate} · <Phone size={10} style={{ verticalAlign: -1 }} /> {call.patientPhone}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => navigate(`/assessment?patient=${call.patient_id}${call.intervalMonths ? '&type=followup' : ''}`)}
+                  >
+                    Start Call
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filters & Search */}
         <div className="card">
           <div className="card-header">
@@ -77,15 +166,100 @@ export default function NurseDashboard({ patients, onUpdateStatus }) {
               <div className="card-title">Scheduled Patients</div>
               <div className="card-subtitle">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</div>
             </div>
-            <div className="search-bar">
-              <Search size={16} color="#94a3b8" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" onClick={() => navigate('/patients')}>View All Records</button>
+              <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Patient</button>
+              <div className="search-bar">
+              <Search size={16} color="var(--text-muted)" />
               <input
                 placeholder="Search patients…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+              </div>
             </div>
           </div>
+
+          {showAdd && (
+            <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
+              <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <h3>Add New Patient</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Name</label>
+                    <input className="form-control" placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">MRN</label>
+                    <input className="form-control" placeholder="Medical record #" value={form.mrn} onChange={(e) => setForm({ ...form, mrn: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Age</label>
+                    <input className="form-control" placeholder="Age" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Gender</label>
+                    <input className="form-control" placeholder="Gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Date of Birth</label>
+                    <input className="form-control" type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Body Area</label>
+                    <input className="form-control" placeholder="Body area" value={form.bodyArea} onChange={(e) => setForm({ ...form, bodyArea: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Appointment Date</label>
+                    <input className="form-control" type="date" value={form.appointmentDate} onChange={(e) => setForm({ ...form, appointmentDate: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Avatar Color</label>
+                    <input className="form-control" placeholder="#hex color" value={form.avatar} onChange={(e) => setForm({ ...form, avatar: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Appointment Time</label>
+                    <input className="form-control" type="time" value={form.appointmentTime} onChange={(e) => setForm({ ...form, appointmentTime: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Phone</label>
+                    <input className="form-control" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input className="form-control" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Address</label>
+                    <input className="form-control" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Blood Type</label>
+                    <input className="form-control" placeholder="Blood type" value={form.bloodType} onChange={(e) => setForm({ ...form, bloodType: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Allergies</label>
+                    <input className="form-control" placeholder="Allergies" value={form.allergies} onChange={(e) => setForm({ ...form, allergies: e.target.value })} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-outline" onClick={() => setShowAdd(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={async () => {
+                    try {
+                      // ensure minimal required fields
+                      if (!form.name || !form.mrn || !form.dob || !form.appointmentDate) return alert('Please provide Name, MRN, DOB, and appointment date');
+                      await createPatient(form);
+                      setShowAdd(false);
+                    } catch (e) {
+                      console.error(e);
+                      const msg = e?.response?.data?.detail || e?.response?.data || e?.message || 'Failed to create patient';
+                      alert(msg);
+                    }
+                  }}>Create Patient</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="filters-row">
             {['all', 'pending', 'assessment-completed', 'follow-up', 'completed'].map((f) => (
@@ -133,7 +307,7 @@ export default function NurseDashboard({ patients, onUpdateStatus }) {
                     <td className="text-sm">{p.mrn}</td>
                     <td>
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar size={14} color="#94a3b8" />
+                        <Calendar size={14} color="var(--text-muted)" />
                         {p.appointmentTime}
                       </div>
                     </td>
