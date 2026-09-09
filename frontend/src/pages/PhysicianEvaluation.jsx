@@ -5,7 +5,7 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Stethoscope,
          Zap, TrendingUp, Activity, FileText, Trash2, History, Search, ListChecks,
          AlertTriangle, Clock3, BrainCircuit } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api, { withAuthToken } from '../api';
+import api, { API_BASE, withAuthToken } from '../api';
 import { useLanguage } from '../hooks/useLanguage';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup, useAssessmentConfig } from '../hooks/useLookupData';
@@ -17,8 +17,6 @@ import PrintTypeModal from '../components/PrintTypeModal';
 import PromAssignmentModal from '../components/PromAssignmentModal';
 import PromTrendChart from '../components/PromTrendChart';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
-
-const API_BASE = 'http://localhost:8000';
 
 function uid() {
   return `t${Date.now()}-${Math.floor(Math.random() * 10000)}`;

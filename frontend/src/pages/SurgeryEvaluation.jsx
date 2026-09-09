@@ -4,6 +4,7 @@ import { ArrowLeft, Mic, FlaskConical, Pill, CalendarCheck, Scissors,
          FilePlus, ClipboardList, Printer, Send, UserCheck, Check, X,
          FileText, Trash2, Search, ListChecks, AlertTriangle } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { API_BASE } from '../api';
 import { useLanguage } from '../hooks/useLanguage';
 import { useDictation } from '../hooks/useDictation';
 import { useLookup } from '../hooks/useLookupData';
@@ -12,8 +13,6 @@ import AudioWaveformPlayer from '../components/AudioWaveformPlayer';
 import PrintDocModal from '../components/PrintDocModal';
 import PrintTypeModal from '../components/PrintTypeModal';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
-
-const API_BASE = 'http://localhost:8000';
 
 function uid() {
   return `t${Date.now()}-${Math.floor(Math.random() * 10000)}`;
