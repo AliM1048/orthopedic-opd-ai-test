@@ -69,7 +69,6 @@ export default function Surgeries({ patients }) {
               <p>{t('surgeries.emptyState')}</p>
             </div>
           ) : (
-            <div className="table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -107,7 +106,6 @@ export default function Surgeries({ patients }) {
                 ))}
               </tbody>
             </table>
-            </div>
           )}
         </div>
       </div>
