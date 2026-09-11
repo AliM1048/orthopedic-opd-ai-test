@@ -277,6 +277,14 @@ class TreatmentCreate(BaseModel):
     encounter_id: Optional[str] = None
 
 
+class TreatmentUpdate(BaseModel):
+    type: Optional[str] = None
+    duration: Optional[str] = None
+    details: Optional[str] = None
+    followUpDate: Optional[str] = None
+    status: Optional[str] = None
+
+
 class TreatmentOutcomeCreate(BaseModel):
     treatment_id: Optional[str] = None
     encounter_id: Optional[str] = None
@@ -437,17 +445,17 @@ class PromTrendOut(BaseModel):
 # ── Mobile app: patient auth + self-service (routers/patient_auth.py, routers/patient_self.py) ──
 
 class PatientRequestOtp(BaseModel):
-    phone: str
+    mrn: str
 
 
 class PatientRequestOtpResponse(BaseModel):
     message: str
-    phone: str
+    mrn: str
     devOtp: Optional[str] = None  # only populated when OTP_DEV_MODE is on — no SMS provider wired up yet
 
 
 class PatientVerifyOtp(BaseModel):
-    phone: str
+    mrn: str
     code: str
 
 

@@ -233,6 +233,27 @@ export function usePatients(token) {
       });
   }, []);
 
+  const updateTreatment = useCallback((patientId, treatmentId, updates) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              treatments: p.treatments.map((tr) =>
+                tr.id === treatmentId ? { ...tr, ...updates } : tr
+              )
+            }
+          : p
+      )
+    );
+    return api.patch(`/api/patients/${patientId}/treatments/${treatmentId}`, updates)
+      .then((res) => {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === patientId ? res.data : p))
+        );
+      });
+  }, []);
+
   const deleteTreatment = useCallback((patientId, treatmentId) => {
     setPatients((prev) =>
       prev.map((p) =>
@@ -320,6 +341,7 @@ export function usePatients(token) {
     updateDiagnostic,
     deleteDiagnostic,
     addTreatment,
+    updateTreatment,
     deleteTreatment,
     markEvaluationSent,
     markSurgeryEvaluationSent,

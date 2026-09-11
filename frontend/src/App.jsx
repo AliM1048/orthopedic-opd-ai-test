@@ -41,7 +41,7 @@ function AuthedApp({ user, patients, actions }) {
   const {
     createEncounter, updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
     addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
-    addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
+    addDiagnostic, deleteDiagnostic, addTreatment, updateTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
   } = actions;
 
   const nurseCanAccess = NURSE_ALLOWED_PATHS.includes(location.pathname)
@@ -95,7 +95,15 @@ function AuthedApp({ user, patients, actions }) {
           />
           <Route
             path="/surgeries"
-            element={<Surgeries patients={patients} />}
+            element={
+              <Surgeries
+                patients={patients}
+                user={user}
+                onAddTreatment={addTreatment}
+                onUpdateTreatment={updateTreatment}
+                onDeleteTreatment={deleteTreatment}
+              />
+            }
           />
           <Route
             path="/surgery-evaluation"
@@ -166,6 +174,7 @@ export default function App() {
     addDiagnostic,
     deleteDiagnostic,
     addTreatment,
+    updateTreatment,
     deleteTreatment,
     markEvaluationSent,
     markSurgeryEvaluationSent,
@@ -196,7 +205,7 @@ export default function App() {
                     actions={{
                       updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
                       addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,
-                      addDiagnostic, deleteDiagnostic, addTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
+                      addDiagnostic, deleteDiagnostic, addTreatment, updateTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
                       createPatient, createEncounter,
                     }}
                   />

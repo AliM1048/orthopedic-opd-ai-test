@@ -1,6 +1,5 @@
 import os
 import random
-import re
 import uuid
 from datetime import datetime, timedelta
 
@@ -30,42 +29,22 @@ OTP_EXPIRE_MINUTES = 5
 OTP_MAX_ATTEMPTS = 5
 
 
-def _normalize_phone(phone: str) -> str:
-    return re.sub(r"\D", "", phone or "")
-
-
-def _find_patients_by_phone(phone: str, db: Session) -> list[Patient]:
-    """Patient.phone is stored with clinic-entered formatting (spaces,
-    country code, etc.), so match on the trailing digits rather than an
-    exact string compare. Returns every match — a shared household/family
-    phone number can legitimately belong to more than one patient record,
-    and the caller must not silently guess which one to log in as."""
-    digits = _normalize_phone(phone)
-    if len(digits) < 7:
-        return []
-    suffix = digits[-9:]
-    return [p for p in db.query(Patient).all() if _normalize_phone(p.phone).endswith(suffix)]
-
-
-def _find_patient_by_phone(phone: str, db: Session) -> Patient | None:
-    matches = _find_patients_by_phone(phone, db)
-    if len(matches) != 1:
+def _find_patient_by_mrn(mrn: str, db: Session) -> Patient | None:
+    """Patient.mrn is unique (models.py), so unlike a phone number there's
+    never an ambiguous multi-match case here — a case-insensitive, trimmed
+    match is enough to tolerate how the patient happens to type it."""
+    mrn = (mrn or "").strip()
+    if not mrn:
         return None
-    return matches[0]
+    return db.query(Patient).filter(Patient.mrn.ilike(mrn)).first()
 
 
 @router.post("/request-otp", response_model=PatientRequestOtpResponse)
 def request_otp(body: PatientRequestOtp, db: Session = Depends(get_db)):
-    matches = _find_patients_by_phone(body.phone, db)
-    if len(matches) > 1:
-        # Refuse rather than guess which patient this phone belongs to — a
-        # shared family/household number must not risk logging one patient
-        # into a different patient's medical record.
-        raise HTTPException(status_code=409, detail="This phone number is linked to more than one patient record. Please contact the clinic to verify your identity.")
-    patient = matches[0] if matches else None
+    patient = _find_patient_by_mrn(body.mrn, db)
     if not patient:
-        print(f"No patient found with this phone number: {body.phone}")
-        raise HTTPException(status_code=404, detail="No patient found with this phone number")
+        print(f"No patient found with this MRN: {body.mrn}")
+        raise HTTPException(status_code=404, detail="No patient found with this MRN")
 
     code = f"{random.randint(0, 999999):06d}"
     code_hash = bcrypt.hashpw(code.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -86,21 +65,21 @@ def request_otp(body: PatientRequestOtp, db: Session = Depends(get_db)):
     print(f"[DEV OTP] patient {patient.id} ({patient.phone}) code: {code}")
 
     return PatientRequestOtpResponse(
-        message="A verification code has been sent to your phone.",
-        phone=patient.phone,
+        message="A verification code has been sent to the phone number on file.",
+        mrn=patient.mrn,
         devOtp=code if OTP_DEV_MODE else None,
     )
 
 
 @router.post("/verify-otp", response_model=PatientLoginResponse)
 def verify_otp(body: PatientVerifyOtp, db: Session = Depends(get_db)):
-    patient = _find_patient_by_phone(body.phone, db)
+    patient = _find_patient_by_mrn(body.mrn, db)
     if not patient:
-        raise HTTPException(status_code=401, detail="Invalid phone number or code")
+        raise HTTPException(status_code=401, detail="Invalid MRN or code")
 
     otp = db.query(PatientOTP).filter(PatientOTP.patient_id == patient.id).first()
     if not otp:
-        raise HTTPException(status_code=401, detail="No verification code was requested for this phone number")
+        raise HTTPException(status_code=401, detail="No verification code was requested for this MRN")
 
     if otp.attempts >= OTP_MAX_ATTEMPTS:
         db.delete(otp)

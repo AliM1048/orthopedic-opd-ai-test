@@ -51,8 +51,8 @@
     "pastMedicalHistoryPlaceholder": "Relevant prior conditions, surgeries, medications — leave blank if none.",
     "examinationLabel": "Examination",
     "examinationPlaceholder": "Inspection, palpation, range of motion, special tests…",
-    "assessmentLabel": "Assessment",
-    "assessmentPlaceholder": "Clinical assessment / diagnosis…",
+    "assessmentLabel": "ASSESSMENT AND IMAGES RESULTS",
+    "assessmentPlaceholder": "Clinical assessment / diagnosis / prior imaging or test results…",
     "planLabel": "Plan",
     "planPlaceholder": "Management plan — tests, treatment, follow-up…"
   },

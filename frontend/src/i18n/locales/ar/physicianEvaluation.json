@@ -51,8 +51,8 @@
     "pastMedicalHistoryPlaceholder": "الحالات السابقة ذات الصلة، العمليات الجراحية، الأدوية — اتركه فارغًا إن لم يوجد شيء.",
     "examinationLabel": "الفحص",
     "examinationPlaceholder": "المعاينة، الجس، مدى الحركة، الاختبارات الخاصة…",
-    "assessmentLabel": "التقييم الأولي",
-    "assessmentPlaceholder": "التقييم السريري / التشخيص…",
+    "assessmentLabel": "التقييم ونتائج الصور",
+    "assessmentPlaceholder": "التقييم السريري / التشخيص / نتائج الصور أو الفحوصات السابقة…",
     "planLabel": "الخطة",
     "planPlaceholder": "خطة العلاج — الفحوصات، العلاج، المتابعة…"
   },
