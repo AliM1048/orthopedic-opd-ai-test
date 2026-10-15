@@ -1,8 +1,24 @@
 {
   "title": "Surgeries",
-  "subtitle": "Patients with a scheduled or upcoming surgery",
-  "emptyState": "No scheduled surgeries.",
+  "subtitle": "All scheduled and unscheduled surgeries",
+  "emptyState": "No surgeries recorded.",
   "mrn": "MRN",
   "surgeryDate": "Surgery Date",
-  "details": "Details"
+  "details": "Details",
+  "noDateSet": "No date set",
+  "addSurgery": "Add Surgery",
+  "changePatient": "Change",
+  "duration": "Duration",
+  "durationPlaceholder": "e.g. 6 weeks recovery",
+  "detailsPlaceholder": "Procedure details / notes",
+  "editDateTooltip": "Edit surgery date",
+  "deleteSurgeryTooltip": "Delete surgery",
+  "surgeryAdded": "Surgery added",
+  "surgeryAddFailed": "Failed to add surgery",
+  "dateSaved": "Surgery date updated",
+  "dateSaveFailed": "Failed to update surgery date",
+  "deleted": "Surgery deleted",
+  "deleteFailed": "Failed to delete surgery",
+  "deleteConfirmTitle": "Delete surgery for {{name}}?",
+  "deleteConfirmText": "This surgery record will be permanently removed from the patient's record."
 }

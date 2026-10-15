@@ -185,6 +185,41 @@ def keyword_match(text: str, synonyms: dict) -> list[str]:
             ordered.append(id_)
     return ordered
 
+
+# Marks a sentence as describing a PAST result ("old MRI", "X-ray from last
+# year", "previous ultrasound showed...") rather than a test being newly
+# ordered now. Used to keep keyword_match_new_orders() from flagging a test
+# as "ordered" just because its name appears near a stray mention of an old
+# result — this can happen even when the sentence is correctly placed in the
+# "evaluation" section, and especially when a spoken "Diagnosis:" cue gets
+# misheard by the ASR as "Diagnostics:" and sweeps evaluation text (old
+# results included) into the diagnostics-ordering chunk that this matcher
+# scans (see segment_dictation's marker collision between the two).
+_PRIOR_RESULT_QUALIFIER_PATTERN = re.compile(
+    r"\b(?:old|previous|prior|earlier|already|last)\b"
+    r"|\b\d+\s*(?:days?|weeks?|months?|years?)\s*ago\b"
+    r"|\b(?:و)?(?:ال)?قديمه?\b|\b(?:و)?(?:ال)?سابقه?\b|\bمن\s*(?:و)?(?:ال)?قبل\b|\bمنذ\b"
+    r"|\b(?:ancien\w*|pr[ée]c[ée]dent\w*|d[ée]j[àa])\b",
+    re.I,
+)
+
+# Splits on sentence-ending punctuation (Latin and Arabic question mark) so
+# a qualifier in one sentence doesn't suppress a genuinely new order stated
+# in a neighboring sentence of the same section chunk.
+_SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?؟])\s+")
+
+
+def keyword_match_new_orders(text: str, synonyms: dict) -> list[str]:
+    """Like keyword_match(), but drops a sentence entirely before matching if
+    it carries a "prior/old/already/...ago" qualifier — a test name said in
+    that sentence is describing a past result, not something to order now."""
+    haystack = _normalize_arabic(text)
+    kept_sentences = [
+        s for s in _SENTENCE_SPLIT_PATTERN.split(haystack)
+        if not _PRIOR_RESULT_QUALIFIER_PATTERN.search(s)
+    ]
+    return keyword_match(" ".join(kept_sentences), synonyms)
+
 # Spoken section markers a physician uses to delimit one continuous dictation
 # without touching the screen. Word-boundary regexes so "diagnosis" and
 # "diagnostics" don't collide with each other. Arabic/French alternatives
@@ -330,22 +365,36 @@ _DURATION_UNIT_DAYS = {
     "week": 7, "weeks": 7, "اسبوع": 7, "اسابيع": 7, "semaine": 7, "semaines": 7,
     "month": 30, "months": 30, "شهر": 30, "اشهر": 30, "mois": 30,
 }
+# ASR commonly spells out small counts as words ("three weeks") rather than
+# digits ("3 weeks") — without this, "three weeks" fails _RELATIVE_DURATION_PATTERN
+# entirely and date resolution falls through to the LLM's own arithmetic,
+# which is not reliable (observed: it once turned "three weeks" into a date
+# only 2 weeks out). English only for now — Arabic/French spelled-out counts
+# still fall through to the LLM same as before.
+_ENGLISH_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}
+_COUNT_PATTERN = r"(\d+|" + "|".join(_ENGLISH_NUMBER_WORDS) + r")"
 _RELATIVE_DURATION_PATTERN = re.compile(
-    r"(\d+)\s*(day|days|week|weeks|month|months|يوم|ايام|اسبوع|اسابيع|شهر|اشهر|jours?|semaines?|mois)\b",
+    _COUNT_PATTERN + r"\s*(day|days|week|weeks|month|months|يوم|ايام|اسبوع|اسابيع|شهر|اشهر|jours?|semaines?|mois)\b",
     re.I)
 _DUAL_DURATION_PATTERN = re.compile(r"\b(يومين|اسبوعين|شهرين)\b")
 
 
 def _relative_duration_to_iso_date(text: str, today: datetime) -> str | None:
-    """Parses a relative offset ("in 3 weeks" / "بعد 3 أسابيع" / "dans 2
-    semaines", or an Arabic dual form like "أسبوعين" with no digit at all)
-    into an absolute date, or None if the text doesn't contain one."""
+    """Parses a relative offset ("in 3 weeks" / "in three weeks" / "بعد 3
+    أسابيع" / "dans 2 semaines", or an Arabic dual form like "أسبوعين" with no
+    digit at all) into an absolute date, or None if the text doesn't contain
+    one."""
     haystack = _normalize_arabic(text)
     m = _RELATIVE_DURATION_PATTERN.search(haystack)
     if m:
+        raw_count = m.group(1).lower()
+        count = int(raw_count) if raw_count.isdigit() else _ENGLISH_NUMBER_WORDS.get(raw_count)
         unit_days = _DURATION_UNIT_DAYS.get(m.group(2).lower())
-        if unit_days:
-            return (today + timedelta(days=int(m.group(1)) * unit_days)).strftime("%Y-%m-%d")
+        if count and unit_days:
+            return (today + timedelta(days=count * unit_days)).strftime("%Y-%m-%d")
     m2 = _DUAL_DURATION_PATTERN.search(haystack)
     if m2:
         return (today + timedelta(days=_DUAL_DURATION_DAYS[m2.group(1)])).strftime("%Y-%m-%d")
@@ -381,10 +430,22 @@ def _apply_followup_date_fallback(treatments: list, fallback_date: str | None) -
     own followUpDate (the AI should have derived that one from its own
     duration already — see the prompt's followUpDate rules). Checked from
     the end since the general follow-up mention is typically about whatever
-    was said last. Never overwrites a date the AI already set — this is a
-    safety net for the gap the AI leaves, not an override of a correct
-    per-treatment answer."""
+    was said last.
+
+    With a SINGLE treatment there's no ambiguity about which one an explicit
+    follow-up cue belongs to, so the deterministically parsed date overrides
+    even a value the AI already set — date arithmetic ("three weeks" -> an
+    exact ISO date) is exactly the kind of fixed-format computation a regex
+    gets right every time and a small/fast LLM can get wrong (observed: gpt
+    turning "three weeks" into a date only 2 weeks out). With MULTIPLE
+    treatments this stays a gap-filler only, never overriding an AI value —
+    overriding there could clobber a treatment-specific date the AI validly
+    derived from its own stated duration under the prompt's rules 1-3, which
+    this single cue can't disambiguate between treatments."""
     if not fallback_date or not treatments:
+        return
+    if len(treatments) == 1:
+        treatments[0]["followUpDate"] = fallback_date
         return
     for entry in reversed(treatments):
         if not entry.get("followUpDate"):
@@ -532,7 +593,7 @@ Return JSON with exactly this shape:
     "historyOfPresentIllness": "onset, duration, character, aggravating/relieving factors of the current problem",
     "pastMedicalHistory": "relevant prior conditions, surgeries, medications mentioned — empty string if none was said",
     "examination": "physical exam findings described (inspection, palpation, range of motion, special tests, etc.)",
-    "assessment": "the clinical assessment / diagnosis, same content as the top-level diagnosis field",
+    "assessment": "the clinical assessment / diagnosis, same content as the top-level diagnosis field. If the dictation also mentions the RESULT of a PRIOR/EXISTING imaging or diagnostic test — e.g. an old MRI, X-ray, CT scan, ultrasound, or lab result already available, as opposed to a test being newly ordered now — append it on a new line starting with 'Imaging/Test Results: ' so it stays part of the assessment.",
     "plan": "the management plan in prose — may restate the diagnostic tests and treatments below in sentence form"
   }},
   "diagnostic_tests": ["<ids from the known diagnostic test ids that were mentioned>"],
@@ -551,6 +612,13 @@ Rules:
   was not said.
 - Only use ids from the known lists above for diagnostic_tests and
   treatments[].type — never invent new ids.
+- diagnostic_tests is ONLY for tests being newly ordered now. If the
+  dictation instead mentions the RESULT of a test already done in the past
+  (e.g. "his old MRI showed a torn meniscus", "previous X-ray revealed grade
+  3 osteoarthritis", "ultrasound from last month showed a rotator cuff
+  tear"), do NOT add it to diagnostic_tests — instead fold that result into
+  the "assessment" soap field as described above. Never drop a mentioned
+  prior result silently.
 - If the same treatment (e.g. physiotherapy) has a duration AND a follow-up
   date, put BOTH on the SAME treatment object — never create a second,
   separate treatment object just to hold a follow-up date.
@@ -650,7 +718,7 @@ def extract_structured(transcript: str, note_type: str = "physician") -> dict:
 
     today = datetime.utcnow()
     sections = segment_dictation(transcript)
-    keyword_tests = keyword_match(sections["diagnostics"], DIAGNOSTIC_TEST_SYNONYMS)
+    keyword_tests = keyword_match_new_orders(sections["diagnostics"], DIAGNOSTIC_TEST_SYNONYMS)
     keyword_treatment_types = keyword_match(sections["treatment"], TREATMENT_SYNONYMS)
     fallback_details = extract_details_cue(sections["treatment"])
     fallback_followup_date = extract_followup_date_cue(sections["treatment"], today)
