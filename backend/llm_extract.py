@@ -147,6 +147,7 @@ def _normalize_arabic(text: str) -> str:
 # script) is resolved by accented characters or common French stopwords;
 # English is the default when neither signal is present.
 _ARABIC_SCRIPT_PATTERN = re.compile(r"[؀-ۿ]")
+_LATIN_WORD_PATTERN = re.compile(r"[A-Za-z]{2,}")
 _FRENCH_SIGNAL_PATTERN = re.compile(
     r"[àâäéèêëïîôöùûüÿœæç]"
     r"|\b(le|la|les|des|une|un|est|dans|avec|pour|que|qui|vous|nous|votre|nos|et|au|aux|du|ce|cette|ces|douleur|traitement)\b",
@@ -155,11 +156,17 @@ _FRENCH_SIGNAL_PATTERN = re.compile(
 
 
 def detect_language(text: str) -> str:
-    """Best-effort en/ar/fr guess from transcribed text. Falls back to "en"
-    when the text is empty or carries no clear signal either way."""
+    """Best-effort en/ar/fr/mixed guess from transcribed text. Falls back to
+    "en" when the text is empty or carries no clear signal either way."""
     if not text or not text.strip():
         return "en"
     if _ARABIC_SCRIPT_PATTERN.search(text):
+        # Arabic speech that also carries Latin-script words (English medical
+        # terms said mid-sentence) is code-switched: forcing "ar" on it makes
+        # the ASR translate or transliterate the English terms, so it is
+        # reported as "mixed" and transcribed without a forced language.
+        if len(_LATIN_WORD_PATTERN.findall(text)) >= 2:
+            return "mixed"
         return "ar"
     if _FRENCH_SIGNAL_PATTERN.search(text):
         return "fr"
@@ -365,20 +372,29 @@ _DURATION_UNIT_DAYS = {
     "week": 7, "weeks": 7, "اسبوع": 7, "اسابيع": 7, "semaine": 7, "semaines": 7,
     "month": 30, "months": 30, "شهر": 30, "اشهر": 30, "mois": 30,
 }
-# ASR commonly spells out small counts as words ("three weeks") rather than
-# digits ("3 weeks") — without this, "three weeks" fails _RELATIVE_DURATION_PATTERN
-# entirely and date resolution falls through to the LLM's own arithmetic,
-# which is not reliable (observed: it once turned "three weeks" into a date
-# only 2 weeks out). English only for now — Arabic/French spelled-out counts
-# still fall through to the LLM same as before.
-_ENGLISH_NUMBER_WORDS = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+# ASR commonly spells out small counts as words ("three weeks", "ثلاثة أسابيع",
+# "trois semaines") rather than digits -- without this, the count fails
+# _RELATIVE_DURATION_PATTERN entirely and date resolution falls through to the
+# LLM's own arithmetic, which is not reliable (observed: it once turned "three
+# weeks" into a date only 2 weeks out). Arabic words are in normalised form
+# (see _normalize_arabic), since matching runs on the normalised haystack.
+_NUMBER_WORDS = {
+    "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
     "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6,
+    "sept": 7, "huit": 8, "neuf": 9, "dix": 10, "onze": 11, "douze": 12,
+    "واحد": 1, "اثنين": 2, "اثنان": 2, "ثلاث": 3, "ثلاثه": 3, "اربع": 4, "اربعه": 4,
+    "خمس": 5, "خمسه": 5, "ست": 6, "سته": 6, "سبع": 7, "سبعه": 7, "ثماني": 8, "ثمانيه": 8,
+    "تسع": 9, "تسعه": 9, "عشر": 10, "عشره": 10,
 }
-_COUNT_PATTERN = r"(\d+|" + "|".join(_ENGLISH_NUMBER_WORDS) + r")"
+_ENGLISH_NUMBER_WORDS = _NUMBER_WORDS  # backwards-compatible name
+_COUNT_PATTERN = r"(?<!\w)(\d+|" + "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True)) + r")"
 _RELATIVE_DURATION_PATTERN = re.compile(
     _COUNT_PATTERN + r"\s*(day|days|week|weeks|month|months|يوم|ايام|اسبوع|اسابيع|شهر|اشهر|jours?|semaines?|mois)\b",
     re.I)
+# A bare unit after "in"/"بعد"/"dans" means one of it ("بعد شهر" = in a month).
+_BARE_UNIT_PATTERN = re.compile(
+    r"(?:\bin|\bafter|بعد|\bdans)\s+(?:ال)?(day|week|month|يوم|اسبوع|شهر|jour|semaine|mois)\b", re.I)
 _DUAL_DURATION_PATTERN = re.compile(r"\b(يومين|اسبوعين|شهرين)\b")
 
 
@@ -391,13 +407,16 @@ def _relative_duration_to_iso_date(text: str, today: datetime) -> str | None:
     m = _RELATIVE_DURATION_PATTERN.search(haystack)
     if m:
         raw_count = m.group(1).lower()
-        count = int(raw_count) if raw_count.isdigit() else _ENGLISH_NUMBER_WORDS.get(raw_count)
+        count = int(raw_count) if raw_count.isdigit() else _NUMBER_WORDS.get(raw_count)
         unit_days = _DURATION_UNIT_DAYS.get(m.group(2).lower())
         if count and unit_days:
             return (today + timedelta(days=count * unit_days)).strftime("%Y-%m-%d")
     m2 = _DUAL_DURATION_PATTERN.search(haystack)
     if m2:
         return (today + timedelta(days=_DUAL_DURATION_DAYS[m2.group(1)])).strftime("%Y-%m-%d")
+    m3 = _BARE_UNIT_PATTERN.search(haystack)
+    if m3:
+        return (today + timedelta(days=_DURATION_UNIT_DAYS[m3.group(1).lower()])).strftime("%Y-%m-%d")
     return None
 
 

@@ -22,7 +22,9 @@ what it might have said.
 Write directly to the patient ("you"/"your"), in warm, clear, non-alarming
 language a non-medical person can understand. Briefly explain any clinical
 term you must use. 3 to 5 sentences, one paragraph, no headings, no bullet
-points, no markdown.
+points, no markdown. Keep sentences short: no more than 15 words each, using
+everyday words. Mention EVERY test, treatment, and procedure listed in the plan,
+without exception. Speak as "your care team" or "your doctor" -- never write "I".
 
 Provider: {provider_label}
 Visit date: {date}

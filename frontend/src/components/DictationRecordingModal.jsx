@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Mic, Square, X, RotateCcw, Sparkles, Globe2 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 
-const LANGUAGE_LABELS = { en: 'English', ar: 'العربية', fr: 'Français' };
+const LANGUAGE_LABELS = { en: 'English', ar: 'العربية', fr: 'Français', mixed: 'العربية + English' };
 
 function formatTimer(seconds) {
   const m = String(Math.floor(seconds / 60)).padStart(2, '0');

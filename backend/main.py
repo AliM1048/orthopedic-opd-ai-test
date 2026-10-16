@@ -175,7 +175,13 @@ LANGUAGE_MAP = {
     "en": "english",
     "ar": "arabic",
     "fr": "french",
+    "mixed": "arabic-english",
 }
+# Languages the transcription call may be forced to. "mixed" (Arabic speech
+# carrying English terms, see llm_extract.detect_language) is deliberately
+# left unforced: forcing Arabic on it makes the ASR translate or transliterate
+# the English terms.
+FORCEABLE_LANGUAGES = {"en", "ar", "fr"}
 
 # Biases the model toward orthopedic vocabulary it otherwise rarely produces
 # (drug names, "osteoarthritis", "physiotherapy", the diagnostic test names,
@@ -233,10 +239,15 @@ def run_transcription(path: str, language: str | None = None) -> dict:
         kwargs = {
             "model": OPENAI_TRANSCRIBE_MODEL,
             "file": f,
-            "prompt": CLINICAL_VOCAB_PROMPTS.get(language, CLINICAL_VOCAB_PROMPTS["en"]),
             "response_format": "json",
         }
-        if language:
+        # Mixed Arabic-English speech gets neither a forced language nor a
+        # vocabulary prompt: a single-language prompt pulls the other
+        # language's words toward it (translation/transliteration) and can
+        # leak prompt terms into noisy audio.
+        if language != "mixed":
+            kwargs["prompt"] = CLINICAL_VOCAB_PROMPTS.get(language, CLINICAL_VOCAB_PROMPTS["en"])
+        if language in FORCEABLE_LANGUAGES:
             kwargs["language"] = language
         response = openai_client.audio.transcriptions.create(**kwargs)
     return {
