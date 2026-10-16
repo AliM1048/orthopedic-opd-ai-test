@@ -50,6 +50,7 @@ from routers.encounters import router as encounters_router
 from routers.research import router as research_router
 from routers.ai_assistant import router as ai_assistant_router
 from routers.outcomes import router as outcomes_router
+from routers.public_intake import router as public_intake_router
 from routers.followups import auto_send_initial_prom_forms
 from database import SessionLocal
 
@@ -65,6 +66,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:5175",
         "http://localhost:3000",
+        "http://localhost:5180",  # doctor-portfolio website dev server
         "http://localhost:8081",  # Expo web dev server (`npm run web` / `expo start --web`)
         "http://localhost:19006",  # Expo web dev server, older SDK default port
         "https://orthopedic-opd-ai-test.onrender.com",  # deployed frontend (Render Static Site)
@@ -73,7 +75,7 @@ app.add_middleware(
     # physical phone (Expo Go, or the mobile app's PROM-fill WebView loading the
     # frontend dev server) hits this backend via the dev machine's LAN IP instead
     # of localhost. Dev-only convenience, not used for any deployed environment.
-    allow_origin_regex=r"http://(192\.168|10\.\d+|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+:(3000|5173|5174|5175|8000|8081|19006)",
+    allow_origin_regex=r"http://(192\.168|10\.\d+|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+:(3000|5173|5174|5175|5180|8000|8081|19006)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -103,6 +105,8 @@ app.include_router(prom_trend_router, dependencies=[Depends(get_current_user)])
 
 # Public (no login) — the tokenized patient self-completion link/QR
 app.include_router(prom_public_router)
+# Public — AI pre-visit intake chat on the doctor's portfolio website
+app.include_router(public_intake_router)
 
 # Mobile app: patient-scoped auth (public) + self-service routes (protected by
 # the patient JWT, audience-separated from the staff token above — see
@@ -175,7 +179,13 @@ LANGUAGE_MAP = {
     "en": "english",
     "ar": "arabic",
     "fr": "french",
+    "mixed": "arabic-english",
 }
+# Languages the transcription call may be forced to. "mixed" (Arabic speech
+# carrying English terms, see llm_extract.detect_language) is deliberately
+# left unforced: forcing Arabic on it makes the ASR translate or transliterate
+# the English terms.
+FORCEABLE_LANGUAGES = {"en", "ar", "fr"}
 
 # Biases the model toward orthopedic vocabulary it otherwise rarely produces
 # (drug names, "osteoarthritis", "physiotherapy", the diagnostic test names,
@@ -233,10 +243,15 @@ def run_transcription(path: str, language: str | None = None) -> dict:
         kwargs = {
             "model": OPENAI_TRANSCRIBE_MODEL,
             "file": f,
-            "prompt": CLINICAL_VOCAB_PROMPTS.get(language, CLINICAL_VOCAB_PROMPTS["en"]),
             "response_format": "json",
         }
-        if language:
+        # Mixed Arabic-English speech gets neither a forced language nor a
+        # vocabulary prompt: a single-language prompt pulls the other
+        # language's words toward it (translation/transliteration) and can
+        # leak prompt terms into noisy audio.
+        if language != "mixed":
+            kwargs["prompt"] = CLINICAL_VOCAB_PROMPTS.get(language, CLINICAL_VOCAB_PROMPTS["en"])
+        if language in FORCEABLE_LANGUAGES:
             kwargs["language"] = language
         response = openai_client.audio.transcriptions.create(**kwargs)
     return {

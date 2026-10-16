@@ -64,7 +64,27 @@ export default function PromTrendChart({ patientId, scoreDirection: fallbackDire
     : direction === 'lower_better' ? improvement <= 0 : improvement >= 0;
 
   const maxOffset = points[points.length - 1].dayOffset || 1;
-  const xScale = (offset) => PAD_L + (offset / maxOffset) * (CHART_W - PAD_L - PAD_R);
+  const plotW = CHART_W - PAD_L - PAD_R;
+  const step = points.length > 1 ? plotW / (points.length - 1) : 0;
+  // Milestones are fixed clinical timepoints, not evenly spaced in real days
+  // (Baseline=0, 6 Weeks=42, 3 Months=90 vs. 2 Years->5 Years=1095 days
+  // apart) — a linear day-offset scale crushed the early labels together
+  // into an overlapping mess. Space milestones evenly by index instead so
+  // every x-axis label gets equal room, and interpolate anything in between
+  // (event markers) piecewise between its two neighboring milestones so it
+  // still lands at roughly the right relative position in time.
+  const xScale = (offset) => {
+    const clamped = Math.max(0, Math.min(offset, maxOffset));
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i].dayOffset;
+      const b = points[i + 1].dayOffset;
+      if (clamped <= b || i === points.length - 2) {
+        const frac = b > a ? (clamped - a) / (b - a) : 0;
+        return PAD_L + (i + frac) * step;
+      }
+    }
+    return PAD_L;
+  };
   const yScale = (score) => PAD_T + (1 - score / 100) * (CHART_H - PAD_T - PAD_B);
 
   const linePath = known
