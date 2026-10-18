@@ -545,6 +545,7 @@ class PatientAppointmentOut(BaseModel):
     date: str
     time: str
     physicianName: Optional[str] = None  # most recent evaluation on file, if any
+    isPast: bool = False                 # appointment date is before today → mobile shows it as "last appointment"
 
 
 class ActiveCareItemOut(BaseModel):

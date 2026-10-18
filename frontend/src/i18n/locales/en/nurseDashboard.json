@@ -50,6 +50,7 @@
   "filterPending": "Pending",
   "filterAssessed": "Assessed",
   "noPatientsMatchFilter": "No patients match your filter.",
+  "loadingPatients": "Loading patients…",
   "tableHeaderAppointment": "Appointment",
   "tableHeaderAction": "Action",
   "viewAction": "View",

@@ -23,7 +23,7 @@ const notifyToast = Swal.mixin({
   },
 });
 
-export default function NurseDashboard({ patients, onUpdateStatus, createPatient }) {
+export default function NurseDashboard({ patients, loading, onUpdateStatus, createPatient }) {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -91,28 +91,28 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
           <div className="stat-card">
             <div className="stat-icon blue"><Users size={24} /></div>
             <div>
-              <div className="stat-value">{stats.total}</div>
+              <div className="stat-value">{loading ? '–' : stats.total}</div>
               <div className="stat-label">{t('nurseDashboard.statTotalPatients')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon yellow"><Clock size={24} /></div>
             <div>
-              <div className="stat-value">{stats.pending}</div>
+              <div className="stat-value">{loading ? '–' : stats.pending}</div>
               <div className="stat-label">{t('nurseDashboard.statPendingCall')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon green"><CheckCircle size={24} /></div>
             <div>
-              <div className="stat-value">{stats.completed}</div>
+              <div className="stat-value">{loading ? '–' : stats.completed}</div>
               <div className="stat-label">{t('nurseDashboard.statCompleted')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon purple"><AlertTriangle size={24} /></div>
             <div>
-              <div className="stat-value">{stats.followUp}</div>
+              <div className="stat-value">{loading ? '–' : stats.followUp}</div>
               <div className="stat-label">{t('nurseDashboard.statFollowUp')}</div>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
           <div className="card-header">
             <div>
               <div className="card-title">{t('nurseDashboard.scheduledPatients')}</div>
-              <div className="card-subtitle">{t('nurseDashboard.patientsFound', { count: filtered.length, plural: filtered.length !== 1 ? 's' : '' })}</div>
+              <div className="card-subtitle">{loading ? t('nurseDashboard.loadingPatients') : t('nurseDashboard.patientsFound', { count: filtered.length, plural: filtered.length !== 1 ? 's' : '' })}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn btn-outline" onClick={() => navigate('/patients')}>{t('nurseDashboard.viewAllRecords')}</button>
@@ -276,7 +276,12 @@ export default function NurseDashboard({ patients, onUpdateStatus, createPatient
             ))}
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="empty-state">
+              <div className="loading-spinner" />
+              <p>{t('nurseDashboard.loadingPatients')}</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
               <p>{t('nurseDashboard.noPatientsMatchFilter')}</p>

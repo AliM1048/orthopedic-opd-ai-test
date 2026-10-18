@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_patient
 from database import get_db
-from models import ChatMessage, Diagnostic, Document, Evaluation, Patient, PatientNotification, PROMAssignment, SurgeryEvaluation, Treatment
+from models import ChatMessage, Diagnostic, Document, Evaluation, FollowUpCall, Patient, PatientNotification, PROMAssignment, SurgeryEvaluation, Treatment
 from notifications import create_staff_notification
 from schemas import (
     ActiveCareItemOut, ChatMessageCreate, ChatMessageOut, PatientAppointmentOut, PatientNotificationOut,
@@ -35,6 +35,26 @@ def _get_patient(patient_id: str, db: Session) -> Patient:
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
+
+
+def _appointment_has_passed(patient: Patient) -> bool:
+    """True once the patient's stored appointment date is before today (the
+    day of the appointment itself still counts as upcoming)."""
+    try:
+        appointment = datetime.strptime((patient.appointmentDate or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return False
+    return appointment < date.today()
+
+
+def _is_for_past_visit(a: PROMAssignment, patient: Patient) -> bool:
+    """A form sent for an appointment that has already happened — there's no
+    point nagging the patient to fill it in anymore. Forms the doctor routed
+    for after the exam/intervention, and follow-up check-ins (assigned after
+    the visit), are kept."""
+    if a.timing in ("after_exam", "after_intervention"):
+        return False
+    return (a.assignedAt or "")[:10] <= (patient.appointmentDate or "")[:10]
 
 
 def _evaluation_report(e: Evaluation, documents: list[Document]) -> VisitReportOut:
@@ -194,10 +214,37 @@ def get_appointment(current_patient: dict = Depends(get_current_patient), db: Se
         .order_by(Evaluation.date.desc())
         .first()
     )
+    physician_name = latest_evaluation.physician if latest_evaluation else None
+
+    # The patient's next date is whichever comes first of their booked clinic
+    # appointment and any pending 3/6/9-month (or custom) follow-up check-in
+    # still ahead — those live in FollowUpCall, not on Patient.appointmentDate.
+    today_iso = date.today().strftime("%Y-%m-%d")
+    upcoming: list[tuple[str, str]] = []
+    if not _appointment_has_passed(patient):
+        upcoming.append((patient.appointmentDate[:10], patient.appointmentTime or ""))
+    next_call = (
+        db.query(FollowUpCall)
+        .filter(
+            FollowUpCall.patient_id == patient.id,
+            FollowUpCall.status == "pending",
+            FollowUpCall.scheduledDate >= today_iso,
+        )
+        .order_by(FollowUpCall.scheduledDate.asc())
+        .first()
+    )
+    if next_call:
+        upcoming.append((next_call.scheduledDate[:10], ""))  # check-in calls have no set time
+    if upcoming:
+        next_date, next_time = min(upcoming)
+        return PatientAppointmentOut(date=next_date, time=next_time, physicianName=physician_name, isPast=False)
+
+    # Nothing ahead — show the last appointment instead.
     return PatientAppointmentOut(
         date=patient.appointmentDate,
         time=patient.appointmentTime,
-        physicianName=latest_evaluation.physician if latest_evaluation else None,
+        physicianName=physician_name,
+        isPast=True,
     )
 
 
@@ -230,16 +277,18 @@ def get_active_care(current_patient: dict = Depends(get_current_patient), db: Se
 
 @router.get("/prom-status", response_model=Optional[PatientPromStatusOut])
 def get_prom_status(current_patient: dict = Depends(get_current_patient), db: Session = Depends(get_db)):
-    patient_id = current_patient["patient_id"]
+    patient = _get_patient(current_patient["patient_id"], db)
     assignments = (
         db.query(PROMAssignment)
         .filter(
-            PROMAssignment.patient_id == patient_id,
+            PROMAssignment.patient_id == patient.id,
             PROMAssignment.status.in_(["sent_pending", "assigned_to_clerk"]),
         )
         .order_by(PROMAssignment.assignedAt.desc())
         .all()
     )
+    if _appointment_has_passed(patient):
+        assignments = [a for a in assignments if not _is_for_past_visit(a, patient)]
     if not assignments:
         return None
     a = assignments[0]

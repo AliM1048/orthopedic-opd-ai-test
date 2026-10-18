@@ -1049,6 +1049,14 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 .empty-state { text-align: center; padding: 48px; color: var(--text-muted); }
 .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
 .empty-state p { font-size: 14px; }
+.loading-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 12px;
+}
 
 /* ── Modal / Add Patient Form Styles ── */
 .modal-backdrop {

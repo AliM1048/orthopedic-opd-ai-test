@@ -50,6 +50,7 @@
   "filterPending": "قيد الانتظار",
   "filterAssessed": "تم التقييم",
   "noPatientsMatchFilter": "لا يوجد مرضى مطابقون لعامل التصفية.",
+  "loadingPatients": "جارٍ تحميل المرضى…",
   "tableHeaderAppointment": "الموعد",
   "tableHeaderAction": "إجراء",
   "viewAction": "عرض",

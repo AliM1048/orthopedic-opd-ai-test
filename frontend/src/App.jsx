@@ -36,7 +36,7 @@ const NURSE_ALLOWED_PREFIXES = ['/patient/'];
 
 // Everything a logged-in user can reach — split out so the public,
 // no-login PROM link route (below) never gets caught behind the auth gate.
-function AuthedApp({ user, patients, actions }) {
+function AuthedApp({ user, patients, patientsLoading, actions }) {
   const location = useLocation();
   const {
     createEncounter, updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
@@ -56,7 +56,7 @@ function AuthedApp({ user, patients, actions }) {
         <Routes>
           <Route
             path="/"
-            element={<NurseDashboard patients={patients} onUpdateStatus={updateStatus} createPatient={actions.createPatient} />}
+            element={<NurseDashboard patients={patients} loading={patientsLoading} onUpdateStatus={updateStatus} createPatient={actions.createPatient} />}
           />
           <Route
             path="/patient/:id"
@@ -161,6 +161,7 @@ export default function App() {
 
   const {
     patients,
+    loading: patientsLoading,
     createEncounter,
     updateStatus,
     updateBodyArea,
@@ -202,6 +203,7 @@ export default function App() {
                   <AuthedApp
                     user={user}
                     patients={patients}
+                    patientsLoading={patientsLoading}
                     actions={{
                       updateStatus, updateBodyArea, addAssessment, addEvaluation, updateEvaluation,
                       addSurgeryEvaluation, updateSurgeryEvaluation, uploadEvaluationDocument, deleteEvaluationDocument,

@@ -12,10 +12,20 @@ export function usePatients(token) {
       return;
     }
     // fetch when a token becomes available (login) or on mount if stored
-    api.get('/api/patients')
-      .then((res) => setPatients(res.data.patients))
-      .catch(() => setPatients([]))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const loadPatients = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/api/patients');
+        if (!cancelled) setPatients(res.data.patients);
+      } catch {
+        if (!cancelled) setPatients([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadPatients();
+    return () => { cancelled = true; };
   }, [token]);
 
   const getPatient = useCallback(
