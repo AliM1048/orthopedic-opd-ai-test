@@ -4,11 +4,12 @@ import { Search, Users } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import PatientRecordPanel from '../components/patient/PatientRecordPanel';
 import { useLanguage } from '../hooks/useLanguage';
+import { SkeletonList } from '../components/common/Skeleton';
 
 // Master-detail patient lookup: search/select on the left, full record on
 // the right — reuses the exact same PatientRecordPanel the /patient/:id
 // profile page renders, so switching patients here never navigates away.
-export default function PatientStatus({ patients }) {
+export default function PatientStatus({ patients, loading }) {
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const preselectId = searchParams.get('patient');
@@ -44,7 +45,9 @@ export default function PatientStatus({ patients }) {
               <input placeholder={t('patientStatus.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
 
-            {filtered.length === 0 ? (
+            {loading ? (
+              <SkeletonList rows={7} />
+            ) : filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">👤</div>
                 <p>{t('patientStatus.noPatientsFound')}</p>

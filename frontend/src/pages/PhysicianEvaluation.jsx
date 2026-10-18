@@ -329,8 +329,8 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
           </div>
         </div>
         <div className="topbar-right">
-          <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            🖨 {t('physicianEvaluation.reviewPrint.printFullSummary')}
+          <button className="btn btn-primary" onClick={() => setShowPrintTypeModal(true)}>
+            <Printer size={15} /> {t('physicianEvaluation.reviewPrint.printFullSummary')}
           </button>
         </div>
       </div>
@@ -436,11 +436,8 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
-                    <button
-                      onClick={() => setPrintOrder(order)}
-                      style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
-                    >
-                      🖨 {t('physicianEvaluation.reviewPrint.title')}
+                    <button className="btn btn-secondary btn-xs" onClick={() => setPrintOrder(order)}>
+                      <Printer size={12} /> {t('physicianEvaluation.reviewPrint.title')}
                     </button>
                   </div>
                 </div>
@@ -483,8 +480,8 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.reviewPrint.tableOrder')}</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.common.details')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'start', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.reviewPrint.tableOrder')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'start', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('physicianEvaluation.common.details')}</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('common.status')}</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0', fontSize: 11 }}>{t('common.print')}</th>
                 </tr>
@@ -504,11 +501,12 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
                     </td>
                     <td style={{ padding: '9px 10px', textAlign: 'center' }}>
                       <button
+                        className="btn btn-secondary btn-icon"
                         onClick={() => setPrintOrder(order)}
-                        style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#64748b', fontWeight: 600 }}
                         title={t('physicianEvaluation.reviewPrint.printOrderTitle', { title: order.title })}
+                        aria-label={t('physicianEvaluation.reviewPrint.printOrderTitle', { title: order.title })}
                       >
-                        🖨
+                        <Printer size={14} />
                       </button>
                     </td>
                   </tr>
@@ -535,8 +533,8 @@ function ReviewPrintView({ patient, physicianName, audioUrl, isPlaying, togglePl
 
           {/* Print full doc button */}
           <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', gap: 8 }}>
-            <button onClick={() => setShowPrintTypeModal(true)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              🖨 {t('physicianEvaluation.reviewPrint.printFullDocument')}
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowPrintTypeModal(true)}>
+              <Printer size={15} /> {t('physicianEvaluation.reviewPrint.printFullDocument')}
             </button>
           </div>
         </div>
@@ -1377,7 +1375,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)' }}>{Math.round(item.confidence * 100)}%</span>
                       </div>
                     ))}
-                    {aiRecommendation.warnings?.map((warning) => <p key={warning} style={{ color: 'var(--warning-dark)', fontSize: 11, margin: 0 }}><AlertTriangle size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{warning}</p>)}
+                    {aiRecommendation.warnings?.map((warning) => <p key={warning} style={{ color: 'var(--warning-dark)', fontSize: 11, margin: 0 }}><AlertTriangle size={12} style={{ verticalAlign: -2, marginInlineEnd: 4 }} />{warning}</p>)}
                     <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{t('physicianEvaluation.aiAssistant.modelLabel')} {aiRecommendation.modelVersion}</span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
                       <button type="button" className="btn btn-primary btn-sm" onClick={() => recordAiFeedback('accepted')} disabled={!!aiFeedback}>{t('common.accept')}</button>
@@ -1518,7 +1516,7 @@ export default function PhysicianEvaluation({ patients, user, onAddEvaluation, o
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
                         <span style={{ fontSize: 16 }}>{order.icon}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
+                        <span style={{ marginInlineStart: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{order.status}</span>
                         <button
                           type="button"
                           onClick={() => handleDeleteOrder(order)}

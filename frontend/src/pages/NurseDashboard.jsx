@@ -1,32 +1,35 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, PhoneCall, ArrowRight } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { Search, Phone, Calendar, Users, Clock, CheckCircle, AlertTriangle, PhoneCall, ChevronLeft, ChevronRight } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
+import { Skeleton, SkeletonTableRows } from '../components/common/Skeleton';
 import api from '../api';
 import { useLanguage } from '../hooks/useLanguage';
+import { notifyToast, toastError, toastSuccess, toastWarning } from '../utils/toast';
 
-// Top-center, fading in/out rather than the library's default slide-and-pop —
-// see the .opd-toast* rules in index.css for the actual look.
-const notifyToast = Swal.mixin({
-  toast: true,
-  position: 'top',
-  showConfirmButton: false,
-  timer: 6000,
-  timerProgressBar: true,
-  showClass: { popup: 'opd-toast-in' },
-  hideClass: { popup: 'opd-toast-out' },
-  customClass: { popup: 'opd-toast' },
-  didOpen: (el) => {
-    el.addEventListener('mouseenter', Swal.stopTimer);
-    el.addEventListener('mouseleave', Swal.resumeTimer);
-  },
-});
+// Local-time YYYY-MM-DD (toISOString() would give the UTC date, which is
+// the wrong day for part of the evening/early morning).
+function toISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function shiftDay(iso, days) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return toISODate(new Date(y, m - 1, d + days));
+}
+
+function formatDay(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
 
 export default function NurseDashboard({ patients, loading, onUpdateStatus, createPatient }) {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  // Appointment day shown in the list — defaults to today; '' = all dates.
+  const today = toISODate(new Date());
+  const [day, setDay] = useState(today);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     name: '', mrn: '', age: 30, gender: 'Male', dob: '', bodyArea: 'Knee', appointmentDate: '', appointmentTime: '', phone: '', email: '', address: '', bloodType: 'O+', allergies: '', avatar: '#7c3aed'
@@ -56,8 +59,15 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
     }).catch(() => {});
   }, []);
 
+  const dayPatients = useMemo(() => {
+    if (!day) return patients;
+    return patients
+      .filter((p) => (p.appointmentDate || '').slice(0, 10) === day)
+      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
+  }, [patients, day]);
+
   const filtered = useMemo(() => {
-    let list = patients;
+    let list = dayPatients;
     if (filter !== 'all') list = list.filter((p) => p.status === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -66,14 +76,19 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
       );
     }
     return list;
-  }, [patients, filter, search]);
+  }, [dayPatients, filter, search]);
 
+  // Stats follow the selected day, so they describe the list below them.
   const stats = useMemo(() => ({
-    total:     patients.length,
-    pending:   patients.filter((p) => p.status === 'pending').length,
-    completed: patients.filter((p) => p.status === 'completed' || p.status === 'assessment-completed').length,
-    followUp:  patients.filter((p) => p.status === 'follow-up').length,
-  }), [patients]);
+    total:     dayPatients.length,
+    pending:   dayPatients.filter((p) => p.status === 'pending').length,
+    completed: dayPatients.filter((p) => p.status === 'completed' || p.status === 'assessment-completed').length,
+    followUp:  dayPatients.filter((p) => p.status === 'follow-up').length,
+  }), [dayPatients]);
+
+  const dayLabel = !day ? t('nurseDashboard.allDates')
+    : day === today ? `${t('nurseDashboard.todaysAppointments')} · ${formatDay(day)}`
+    : formatDay(day);
 
   return (
     <>
@@ -81,7 +96,7 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
       <div className="topbar">
         <div className="topbar-left">
           <h1>{t('nurseDashboard.pageTitle')}</h1>
-          <p>{t('nurseDashboard.todaysAppointments')} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <p>{dayLabel}</p>
         </div>
       </div>
 
@@ -91,28 +106,28 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
           <div className="stat-card">
             <div className="stat-icon blue"><Users size={24} /></div>
             <div>
-              <div className="stat-value">{loading ? '–' : stats.total}</div>
-              <div className="stat-label">{t('nurseDashboard.statTotalPatients')}</div>
+              <div className="stat-value">{loading ? <Skeleton width={36} height={22} /> : stats.total}</div>
+              <div className="stat-label">{day ? t('nurseDashboard.statAppointments') : t('nurseDashboard.statTotalPatients')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon yellow"><Clock size={24} /></div>
             <div>
-              <div className="stat-value">{loading ? '–' : stats.pending}</div>
+              <div className="stat-value">{loading ? <Skeleton width={36} height={22} /> : stats.pending}</div>
               <div className="stat-label">{t('nurseDashboard.statPendingCall')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon green"><CheckCircle size={24} /></div>
             <div>
-              <div className="stat-value">{loading ? '–' : stats.completed}</div>
+              <div className="stat-value">{loading ? <Skeleton width={36} height={22} /> : stats.completed}</div>
               <div className="stat-label">{t('nurseDashboard.statCompleted')}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon purple"><AlertTriangle size={24} /></div>
             <div>
-              <div className="stat-value">{loading ? '–' : stats.followUp}</div>
+              <div className="stat-value">{loading ? <Skeleton width={36} height={22} /> : stats.followUp}</div>
               <div className="stat-label">{t('nurseDashboard.statFollowUp')}</div>
             </div>
           </div>
@@ -250,13 +265,17 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
                   <button className="btn btn-primary" onClick={async () => {
                     try {
                       // ensure minimal required fields
-                      if (!form.name || !form.mrn || !form.dob || !form.appointmentDate) return alert(t('nurseDashboard.missingFieldsAlert'));
+                      if (!form.name || !form.mrn || !form.dob || !form.appointmentDate) {
+                        toastWarning(t('nurseDashboard.missingFieldsAlert'));
+                        return;
+                      }
                       await createPatient(form);
                       setShowAdd(false);
+                      toastSuccess(t('nurseDashboard.patientCreated'), form.name);
                     } catch (e) {
                       console.error(e);
-                      const msg = e?.response?.data?.detail || e?.response?.data || e?.message || t('nurseDashboard.createPatientFailed');
-                      alert(msg);
+                      const detail = e?.response?.data?.detail;
+                      toastError(t('nurseDashboard.createPatientFailed'), typeof detail === 'string' ? detail : e?.message);
                     }
                   }}>{t('nurseDashboard.createPatient')}</button>
                 </div>
@@ -265,6 +284,28 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
           )}
 
           <div className="filters-row">
+            <div className="day-picker">
+              <button type="button" className="day-picker-step" onClick={() => setDay(shiftDay(day || today, -1))} aria-label={t('nurseDashboard.previousDay')} title={t('nurseDashboard.previousDay')}>
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="date"
+                className="day-picker-input"
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                aria-label={t('nurseDashboard.fieldAppointmentDate')}
+              />
+              <button type="button" className="day-picker-step" onClick={() => setDay(shiftDay(day || today, 1))} aria-label={t('nurseDashboard.nextDay')} title={t('nurseDashboard.nextDay')}>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <button type="button" className={`filter-chip ${day === today ? 'active' : ''}`} onClick={() => setDay(today)}>
+              {t('nurseDashboard.today')}
+            </button>
+            <button type="button" className={`filter-chip ${!day ? 'active' : ''}`} onClick={() => setDay('')}>
+              {t('nurseDashboard.allDates')}
+            </button>
+            <span className="filters-divider" />
             {['all', 'pending', 'assessment-completed', 'follow-up', 'completed'].map((f) => (
               <button
                 key={f}
@@ -276,15 +317,10 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
             ))}
           </div>
 
-          {loading ? (
-            <div className="empty-state">
-              <div className="loading-spinner" />
-              <p>{t('nurseDashboard.loadingPatients')}</p>
-            </div>
-          ) : filtered.length === 0 ? (
+          {!loading && filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <p>{t('nurseDashboard.noPatientsMatchFilter')}</p>
+              <p>{day && dayPatients.length === 0 ? t('nurseDashboard.noAppointmentsOnDay') : t('nurseDashboard.noPatientsMatchFilter')}</p>
             </div>
           ) : (
             <div className="table-scroll">
@@ -299,8 +335,9 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
                   <th>{t('nurseDashboard.tableHeaderAction')}</th>
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((p) => (
+              <tbody aria-busy={loading}>
+                {loading && <SkeletonTableRows rows={6} cols={6} />}
+                {!loading && filtered.map((p) => (
                   <tr key={p.id} onClick={() => navigate(`/patient/${p.id}`)}>
                     <td>
                       <div className="flex items-center gap-3">
@@ -317,7 +354,7 @@ export default function NurseDashboard({ patients, loading, onUpdateStatus, crea
                     <td>
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar size={14} color="var(--text-muted)" />
-                        {p.appointmentTime}
+                        {!day && p.appointmentDate ? `${p.appointmentDate.slice(0, 10)} · ` : ''}{p.appointmentTime}
                       </div>
                     </td>
                     <td className="text-sm fw-600">{p.bodyArea}</td>

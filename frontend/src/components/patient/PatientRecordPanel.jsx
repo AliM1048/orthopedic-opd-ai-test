@@ -181,7 +181,7 @@ export default function PatientRecordPanel({ patient }) {
             className={`tab-btn ${activeTab === key ? 'active' : ''}`}
             onClick={() => setActiveTab(key)}
           >
-            <Icon size={14} style={{ display: 'inline', marginRight: 6, verticalAlign: -2 }} />
+            <Icon size={14} style={{ display: 'inline', marginInlineEnd: 6, verticalAlign: -2 }} />
             {t(labelKey)}
           </button>
         ))}
@@ -238,7 +238,7 @@ export default function PatientRecordPanel({ patient }) {
       {activeTab === 'assessments' && (
         <div className="card">
           <div className="card-header">
-            <div className="card-title"><ClipboardList size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.tabAssessments')}</div>
+            <div className="card-title"><ClipboardList size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.tabAssessments')}</div>
           </div>
           {patient.assessments.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noAssessmentsYetPeriod')}</p>
@@ -260,7 +260,7 @@ export default function PatientRecordPanel({ patient }) {
       {activeTab === 'evaluations' && (
         <div className="card">
           <div className="card-header">
-            <div className="card-title"><Stethoscope size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.physicianEvaluationsTitle')}</div>
+            <div className="card-title"><Stethoscope size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.physicianEvaluationsTitle')}</div>
           </div>
           {patient.evaluations.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noEvaluationsYetPeriod')}</p>
@@ -298,7 +298,7 @@ export default function PatientRecordPanel({ patient }) {
       {activeTab === 'surgery' && (
         <div className="card">
           <div className="card-header">
-            <div className="card-title"><Scissors size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.surgeryEvaluationsTitle')}</div>
+            <div className="card-title"><Scissors size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.surgeryEvaluationsTitle')}</div>
           </div>
           {(patient.surgeryEvaluations || []).length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noSurgeriesYet')}</p>
@@ -320,7 +320,7 @@ export default function PatientRecordPanel({ patient }) {
       {activeTab === 'diagnostics' && (
         <div className="card">
           <div className="card-header">
-            <div className="card-title"><FileText size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.diagnosticTestsTitle')}</div>
+            <div className="card-title"><FileText size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.diagnosticTestsTitle')}</div>
           </div>
           {patient.diagnostics.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noDiagnosticTestsYet')}</p>
@@ -345,7 +345,7 @@ export default function PatientRecordPanel({ patient }) {
       {activeTab === 'treatments' && (
         <div className="card">
           <div className="card-header">
-            <div className="card-title"><Pill size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.treatmentPlansTitle')}</div>
+            <div className="card-title"><Pill size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.treatmentPlansTitle')}</div>
           </div>
           {patient.treatments.length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>{t('patientRecordPanel.noTreatmentsYetPeriod')}</p>
@@ -369,7 +369,7 @@ export default function PatientRecordPanel({ patient }) {
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title"><CalendarClock size={16} style={{ display: 'inline', marginRight: 6 }} />{t('patientRecordPanel.followUpCallsTitle')}</div>
+              <div className="card-title"><CalendarClock size={16} style={{ display: 'inline', marginInlineEnd: 6 }} />{t('patientRecordPanel.followUpCallsTitle')}</div>
               <div className="card-subtitle">{t('patientRecordPanel.followUpCallsSubtitle', { days: REMINDER_LEAD_DAYS })}</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>

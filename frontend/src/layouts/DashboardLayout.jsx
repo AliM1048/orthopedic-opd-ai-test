@@ -1,38 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Stethoscope, Users, FileSignature,
-  LogOut, Activity, ChevronsLeft, ChevronsRight, Sun, Moon, ClipboardList,
+  LayoutDashboard, Users, FileSignature,
+  LogOut, Activity, ChevronsLeft, Sun, Moon,
   Scissors, MessageCircle, Menu, Languages, ChevronRight
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 
+// The physician evaluation page isn't listed here — it only makes sense for
+// a selected patient, so it's reached from the patient profile instead.
 const NAV_ITEMS = [
   { labelKey: 'nav.sectionNurse', items: [
     { to: '/',            icon: LayoutDashboard, textKey: 'nav.dashboard' },
     { to: '/messages',    icon: MessageCircle,   textKey: 'nav.messages' },
   ]},
-  { labelKey: 'nav.sectionPhysician', items: [
-    { to: '/evaluation',  icon: Stethoscope, textKey: 'nav.evaluation' },
-  ]},
   { labelKey: 'nav.sectionSurgery', items: [
     { to: '/surgeries', icon: Scissors, textKey: 'nav.surgeries', restricted: true },
   ]},
-  // { labelKey: 'nav.sectionClerk', items: [
-  //   { to: '/clerk-tasks', icon: ClipboardList, textKey: 'nav.promTasks' },
-  // ]},
   { labelKey: 'nav.sectionRecords', items: [
     { to: '/analytics',      icon: Activity,        textKey: 'nav.analytics', restricted: true },
-    { to: '/records',        icon: Users,           textKey: 'nav.patientStatus', restricted: true },
-    { to: '/documents/new',  icon: FileSignature,   textKey: 'nav.generateDocument', restricted: true },
+    { to: '/records',        icon: Users,           textKey: 'nav.patientStatus' },
+    { to: '/documents/new',  icon: FileSignature,   textKey: 'nav.generateDocument' },
   ]},
 ];
 
-// Nurses are restricted to the dashboard + physician evaluation (see
-// NURSE_ALLOWED_PATHS in App.jsx for the matching route guard); every other
-// role keeps seeing everything, unchanged. `restricted: true` on a nav item
-// above marks it as one of the pages hidden from that role.
+// Nurses see every page except surgeries and analytics (see
+// NURSE_BLOCKED_PATHS in App.jsx for the matching route guard); every other
+// role keeps seeing everything. `restricted: true` on a nav item above marks
+// it as one of the pages hidden from that role.
+
+const ROLE_LABEL_KEYS = { physician: 'common.physician', nurse: 'common.nurse' };
 
 export default function DashboardLayout({ children, user }) {
   const navigate = useNavigate();
@@ -41,13 +39,29 @@ export default function DashboardLayout({ children, user }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Label bubble shown beside an icon on the collapsed rail. Rendered
+  // position:fixed from the hovered item's rect so the sidebar's own
+  // overflow scrolling can't clip it.
+  const [railTip, setRailTip] = useState(null);
   const settingsRef = useRef(null);
   const isNurse = user?.role === 'nurse';
   const visibleNavSections = NAV_ITEMS
     .map((section) => ({ ...section, items: section.items.filter((item) => !(isNurse && item.restricted)) }))
     .filter((section) => section.items.length > 0);
 
+  const showRailTip = (e, text) => {
+    if (!collapsed) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const top = rect.top + rect.height / 2;
+    // In RTL the rail sits on the right, so the bubble opens to its left.
+    setRailTip(document.documentElement.dir === 'rtl'
+      ? { text, top, right: window.innerWidth - rect.left + 12 }
+      : { text, top, left: rect.right + 12 });
+  };
+  const hideRailTip = () => setRailTip(null);
+
   const toggleCollapsed = () => {
+    setRailTip(null);
     setCollapsed((c) => {
       const next = !c;
       localStorage.setItem('sidebarCollapsed', String(next));
@@ -95,24 +109,28 @@ export default function DashboardLayout({ children, user }) {
             type="button"
             className="sidebar-toggle"
             onClick={toggleCollapsed}
-            title={collapsed ? t('common.expandSidebar') : t('common.collapseSidebar')}
-            style={{ marginLeft: collapsed ? 0 : 'auto' }}
+            aria-label={collapsed ? t('common.expandSidebar') : t('common.collapseSidebar')}
+            onMouseEnter={(e) => showRailTip(e, t('common.expandSidebar'))}
+            onMouseLeave={hideRailTip}
           >
-            {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+            {/* One icon, rotated by CSS when collapsed (see .sidebar-toggle) */}
+            <ChevronsLeft size={14} />
           </button>
         </div>
 
         <nav className="sidebar-nav">
           {visibleNavSections.map((section) => (
-            <div key={section.labelKey}>
+            <div key={section.labelKey} className="sidebar-section">
               <div className="sidebar-section-label">{t(section.labelKey)}</div>
               {section.items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
-                  title={t(item.textKey)}
-                  onClick={closeMobileNav}
+                  aria-label={t(item.textKey)}
+                  onClick={() => { closeMobileNav(); hideRailTip(); }}
+                  onMouseEnter={(e) => showRailTip(e, t(item.textKey))}
+                  onMouseLeave={hideRailTip}
                   className={({ isActive }) =>
                     `nav-item${isActive ? ' active' : ''}`
                   }
@@ -154,20 +172,26 @@ export default function DashboardLayout({ children, user }) {
           <button
             type="button"
             className={`settings-trigger${settingsOpen ? ' open' : ''}`}
-            onClick={() => setSettingsOpen((o) => !o)}
-            title={t('common.settings')}
+            onClick={() => { hideRailTip(); setSettingsOpen((o) => !o); }}
+            aria-label={t('common.settings')}
+            onMouseEnter={(e) => !settingsOpen && showRailTip(e, user?.name || t('common.settings'))}
+            onMouseLeave={hideRailTip}
           >
             <div className="sidebar-user">
               <div className="sidebar-avatar">{user?.name?.split(' ').map((w) => w[0]).join('').slice(0, 2) || 'NS'}</div>
               <div className="sidebar-user-text">
-                <div style={{ fontWeight: 600, color: '#fff', fontSize: 13, textAlign: 'left' }}>{user?.name || t('common.unknown')}</div>
-                <div style={{ fontSize: 11, color: 'var(--sidebar-text)' }}>{user?.role === 'physician' ? t('common.physician') : t('common.orthopedicWard')}</div>
+                <div className="sidebar-user-name">{user?.name || t('common.unknown')}</div>
+                <div className="sidebar-user-role">{ROLE_LABEL_KEYS[user?.role] ? t(ROLE_LABEL_KEYS[user.role]) : t('common.orthopedicWard')}</div>
               </div>
-              <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--sidebar-text)', transform: settingsOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }} />
+              <ChevronRight size={14} className="sidebar-user-chevron" style={{ transform: settingsOpen ? 'rotate(90deg)' : 'none' }} />
             </div>
           </button>
         </div>
       </aside>
+
+      {collapsed && railTip && (
+        <div className="rail-tooltip" style={{ top: railTip.top, left: railTip.left, right: railTip.right }}>{railTip.text}</div>
+      )}
 
       {/* ── Main ── */}
       <div className="main-content">

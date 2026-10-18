@@ -103,7 +103,7 @@ def list_patients(search: str = "", db: Session = Depends(get_db)):
     )
 
 
-@router.post("", response_model=PatientOut, dependencies=[Depends(require_roles("physician", "nurse"))])
+@router.post("", response_model=PatientOut, dependencies=[Depends(require_roles("physician", "nurse", "admin"))])
 def create_patient(body: PatientCreate, db: Session = Depends(get_db)):
     mrn = body.mrn.strip()
     existing = db.query(Patient).filter(Patient.mrn == mrn).first()

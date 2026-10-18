@@ -209,8 +209,8 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
           </div>
         </div>
         <div className="topbar-right">
-          <button onClick={() => setShowPrintTypeModal(true)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            🖨 {t('surgeryEvaluation.review.printFullSummary')}
+          <button className="btn btn-primary" onClick={() => setShowPrintTypeModal(true)}>
+            <Printer size={15} /> {t('surgeryEvaluation.review.printFullSummary')}
           </button>
         </div>
       </div>
@@ -277,8 +277,8 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colOrder')}</th>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colDetails')}</th>
+                    <th style={{ textAlign: 'start', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colOrder')}</th>
+                    <th style={{ textAlign: 'start', padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('surgeryEvaluation.orders.colDetails')}</th>
                     <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('common.status')}</th>
                     <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 700 }}>{t('common.print')}</th>
                   </tr>
@@ -287,7 +287,7 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
                   {orders.map((order, i) => (
                     <tr key={order.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '9px 8px' }}>
-                        <span style={{ fontSize: 15, marginRight: 6 }}>{order.icon}</span>
+                        <span style={{ fontSize: 15, marginInlineEnd: 6 }}>{order.icon}</span>
                         <span style={{ fontWeight: 700, color: '#0f172a' }}>{order.title}</span>
                       </td>
                       <td style={{ padding: '9px 8px', color: '#475569' }}>{order.summary}</td>
@@ -296,11 +296,12 @@ function ReviewPrintView({ patient, surgeonName, audioUrl, isPlaying, togglePlay
                       </td>
                       <td style={{ padding: '9px 8px', textAlign: 'center' }}>
                         <button
+                          className="btn btn-secondary btn-icon"
                           onClick={() => setPrintOrder(order)}
-                          style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#64748b', fontWeight: 600 }}
                           title={t('surgeryEvaluation.orders.printOrderTooltip', { title: order.title })}
+                          aria-label={t('surgeryEvaluation.orders.printOrderTooltip', { title: order.title })}
                         >
-                          🖨
+                          <Printer size={14} />
                         </button>
                       </td>
                     </tr>
@@ -962,7 +963,7 @@ export default function SurgeryEvaluation({ patients, user, onAddSurgeryEvaluati
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
                         <span style={{ fontSize: 16 }}>{order.icon}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{order.title}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{t(`surgeryEvaluation.status.${order.status}`)}</span>
+                        <span style={{ marginInlineStart: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${order.statusColor}18`, color: order.statusColor, border: `1px solid ${order.statusColor}30` }}>{t(`surgeryEvaluation.status.${order.status}`)}</span>
                         <button
                           type="button"
                           onClick={() => handleDeleteOrder(order)}

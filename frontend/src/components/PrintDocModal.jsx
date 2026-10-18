@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Printer, X } from 'lucide-react';
 import rasoulLogo from '../assets/rasoul_hosp_logo.jpeg';
 import PrintTypeModal from './PrintTypeModal';
 import { useLanguage } from '../hooks/useLanguage';
@@ -41,7 +42,7 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
 
         {/* Letterhead */}
         <div style={{ padding: '24px 32px 18px', borderBottom: '3px solid #0369a1' }}>
-          <button onClick={onClose} className="no-print" style={{ float: 'right', background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#64748b', fontSize: 18, lineHeight: 1 }}>×</button>
+          <button onClick={onClose} className="btn btn-secondary btn-icon no-print" style={{ float: 'right' }} aria-label={t('components.printDoc.close')}><X size={16} /></button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src={rasoulLogo} alt={t('components.printDoc.hospitalName')} style={{ width: 64, height: 64, flexShrink: 0, objectFit: 'contain' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -100,9 +101,9 @@ export default function PrintDocModal({ order, patient, physicianName, onClose }
 
         {/* Action buttons */}
         <div className="no-print" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '14px 32px', display: 'flex', gap: 10, justifyContent: 'flex-end', borderRadius: '0 0 16px 16px' }}>
-          <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#475569' }}>{t('components.printDoc.close')}</button>
-          <button onClick={handlePrint} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#0369a1,#6366f1)', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-            🖨 {docType === 'insurance' ? t('components.printDoc.printInsuranceDocument') : t('components.printDoc.printDocument')}
+          <button className="btn btn-secondary" onClick={onClose}>{t('components.printDoc.close')}</button>
+          <button className="btn btn-primary" onClick={handlePrint}>
+            <Printer size={15} /> {docType === 'insurance' ? t('components.printDoc.printInsuranceDocument') : t('components.printDoc.printDocument')}
           </button>
         </div>
       </div>

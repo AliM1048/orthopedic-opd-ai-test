@@ -23,16 +23,11 @@ import ClerkTasks from './pages/ClerkTasks';
 import Messages from './pages/Messages';
 import PromPublicFill from './pages/PromPublicFill';
 
-// Nurses are restricted to the dashboard + physician evaluation + patient
-// messaging (chat isn't a specialized clinical action — the backend itself
-// gates it on "any logged-in staff", no role restriction); every other role
-// keeps seeing everything, unchanged (see DashboardLayout's matching
-// `restricted` nav-item flags, and forbid_roles("nurse") on the backend for
-// the surgery-evaluations endpoints).
-const NURSE_ALLOWED_PATHS = ['/', '/evaluation', '/messages', '/assessment'];
-// Dynamic segments the nurse dashboard itself links to (row click -> patient
-// profile) — checked separately since they aren't exact matches.
-const NURSE_ALLOWED_PREFIXES = ['/patient/'];
+// Nurses can reach every page except the surgery pages and analytics; every
+// other role (physician, admin) keeps full access (see DashboardLayout's
+// matching `restricted` nav-item flags, and forbid_roles("nurse") on the
+// backend for the surgery-evaluations endpoints).
+const NURSE_BLOCKED_PATHS = ['/surgeries', '/surgery-evaluation', '/analytics'];
 
 // Everything a logged-in user can reach — split out so the public,
 // no-login PROM link route (below) never gets caught behind the auth gate.
@@ -44,9 +39,7 @@ function AuthedApp({ user, patients, patientsLoading, actions }) {
     addDiagnostic, deleteDiagnostic, addTreatment, updateTreatment, deleteTreatment, markEvaluationSent, markSurgeryEvaluationSent,
   } = actions;
 
-  const nurseCanAccess = NURSE_ALLOWED_PATHS.includes(location.pathname)
-    || NURSE_ALLOWED_PREFIXES.some((p) => location.pathname.startsWith(p));
-  if (user?.role === 'nurse' && !nurseCanAccess) {
+  if (user?.role === 'nurse' && NURSE_BLOCKED_PATHS.includes(location.pathname)) {
     return <Navigate to="/" replace />;
   }
 
@@ -60,7 +53,7 @@ function AuthedApp({ user, patients, patientsLoading, actions }) {
           />
           <Route
             path="/patient/:id"
-            element={<PatientProfile patients={patients} />}
+            element={<PatientProfile patients={patients} loading={patientsLoading} />}
           />
           <Route
             path="/assessment"
@@ -124,7 +117,7 @@ function AuthedApp({ user, patients, patientsLoading, actions }) {
           />
           <Route
             path="/patients"
-            element={<AllPatients patients={patients} />}
+            element={<AllPatients patients={patients} loading={patientsLoading} />}
           />
           <Route
             path="/analytics"
@@ -132,7 +125,7 @@ function AuthedApp({ user, patients, patientsLoading, actions }) {
           />
           <Route
             path="/records"
-            element={<PatientStatus patients={patients} />}
+            element={<PatientStatus patients={patients} loading={patientsLoading} />}
           />
           <Route
             path="/clerk-tasks"

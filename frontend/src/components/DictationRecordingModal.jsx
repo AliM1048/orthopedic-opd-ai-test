@@ -172,7 +172,7 @@ export default function DictationRecordingModal({
                     <span className="dictation-processing-dot" />
                     <span className="dictation-processing-dot" />
                     <span className="dictation-processing-dot" />
-                    <span style={{ marginLeft: 8 }}>{t('components.dictationModal.transcribing')}</span>
+                    <span style={{ marginInlineStart: 8 }}>{t('components.dictationModal.transcribing')}</span>
                   </div>
                   <button type="button" className="dictation-cancel-btn" onClick={onCancel}>
                     <X size={13} /> {t('components.dictationModal.cancel')}

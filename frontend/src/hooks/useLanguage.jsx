@@ -30,6 +30,10 @@ export function LanguageProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('lang', language);
+    // Arabic reads right-to-left — flipping `dir` mirrors the layout (sidebar
+    // on the right, text aligned right) via the logical CSS properties and
+    // [dir="rtl"] rules in index.css.
+    document.documentElement.setAttribute('dir', language === 'ar' ? 'rtl' : 'ltr');
     localStorage.setItem('language', language);
   }, [language]);
 

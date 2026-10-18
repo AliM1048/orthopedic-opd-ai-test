@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Calendar, ArrowLeft } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import { useLanguage } from '../hooks/useLanguage';
+import { SkeletonTableRows } from '../components/common/Skeleton';
 
-export default function AllPatients({ patients }) {
+export default function AllPatients({ patients, loading }) {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function AllPatients({ patients }) {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {!loading && filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">👤</div>
               <p>{t('allPatients.noPatientsFound')}</p>
@@ -58,8 +59,9 @@ export default function AllPatients({ patients }) {
                   <th>{t('common.status')}</th>
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((p) => (
+              <tbody aria-busy={loading}>
+                {loading && <SkeletonTableRows rows={6} cols={6} />}
+                {!loading && filtered.map((p) => (
                   <tr key={p.id} onClick={() => navigate(`/patient/${p.id}`)}>
                     <td>
                       <div className="flex items-center gap-3">
